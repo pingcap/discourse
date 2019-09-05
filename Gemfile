@@ -205,9 +205,9 @@ gem 'rqrcode'
 gem 'sshkey', require: false
 
 gem 'rchardet', require: false
+gem 'mysql2'
 
 if ENV["IMPORT"] == "1"
-  gem 'mysql2'
   gem 'redcarpet'
   gem 'sqlite3', '~> 1.3', '>= 1.3.13'
   gem 'ruby-bbcode-to-md', git: 'https://github.com/nlalonde/ruby-bbcode-to-md'
