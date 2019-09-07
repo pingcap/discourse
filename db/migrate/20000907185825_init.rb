@@ -506,8 +506,8 @@ class Init < ActiveRecord::Migration[5.2]
       t.boolean "is_auto_generated", default: false
       t.boolean "is_bounce", default: false, null: false
       t.index ["created_at"], name: "index_incoming_emails_on_created_at"
-      t.index ["error"], name: "index_incoming_emails_on_error"
-      t.index ["message_id"], name: "index_incoming_emails_on_message_id"
+      t.index ["error"], name: "index_incoming_emails_on_error", length: 100
+      t.index ["message_id"], name: "index_incoming_emails_on_message_id", length: 100
       t.index ["post_id"], name: "index_incoming_emails_on_post_id"
       t.index ["user_id"], name: "index_incoming_emails_on_user_id", where: "(user_id IS NOT NULL)"
     end
@@ -515,7 +515,7 @@ class Init < ActiveRecord::Migration[5.2]
     create_table "incoming_links", id: :serial, force: :cascade do |t|
       t.datetime "created_at", null: false
       t.integer "user_id"
-      t.inet "ip_address"
+      t.string "ip_address"
       t.integer "current_user_id"
       t.integer "post_id", null: false
       t.integer "incoming_referer_id"
@@ -1025,13 +1025,13 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "last_match_at"
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
-      t.inet "ip_address"
+      t.string "ip_address"
       t.index ["email"], name: "index_screened_emails_on_email", unique: true
       t.index ["last_match_at"], name: "index_screened_emails_on_last_match_at"
     end
 
     create_table "screened_ip_addresses", id: :serial, force: :cascade do |t|
-      t.inet "ip_address", null: false
+      t.string "ip_address", null: false
       t.integer "action_type", null: false
       t.integer "match_count", default: 0, null: false
       t.datetime "last_match_at"
@@ -1049,7 +1049,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "last_match_at"
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
-      t.inet "ip_address"
+      t.string "ip_address"
       t.index ["last_match_at"], name: "index_screened_urls_on_last_match_at"
       t.index ["url"], name: "index_screened_urls_on_url", unique: true
     end
@@ -1057,7 +1057,7 @@ class Init < ActiveRecord::Migration[5.2]
     create_table "search_logs", id: :serial, force: :cascade do |t|
       t.string "term", null: false
       t.integer "user_id"
-      t.inet "ip_address"
+      t.string "ip_address"
       t.integer "search_result_id"
       t.integer "search_type", null: false
       t.datetime "created_at", null: false
@@ -1341,7 +1341,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "user_id"
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
-      t.inet "ip_address"
+      t.string "ip_address"
       t.index ["topic_link_id"], name: "by_link"
     end
 
@@ -1426,7 +1426,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "topic_id", null: false
       t.date "viewed_at", null: false
       t.integer "user_id"
-      t.inet "ip_address"
+      t.string "ip_address"
       t.index ["topic_id", "viewed_at"], name: "index_topic_views_on_topic_id_and_viewed_at"
       t.index ["user_id", "ip_address", "topic_id"], name: "uniq_ip_or_user_id_topic_views", unique: true
       t.index ["user_id", "viewed_at"], name: "index_topic_views_on_user_id_and_viewed_at"
@@ -1594,7 +1594,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.string "action", null: false
       t.integer "user_auth_token_id"
       t.integer "user_id"
-      t.inet "client_ip"
+      t.string "client_ip"
       t.string "user_agent"
       t.string "auth_token"
       t.datetime "created_at"
@@ -1608,7 +1608,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.string "prev_auth_token", null: false
       t.string "user_agent"
       t.boolean "auth_token_seen", default: false, null: false
-      t.inet "client_ip"
+      t.string "client_ip"
       t.datetime "rotated_at", null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
@@ -1767,7 +1767,7 @@ class Init < ActiveRecord::Migration[5.2]
     create_table "user_profile_views", id: :serial, force: :cascade do |t|
       t.integer "user_profile_id", null: false
       t.datetime "viewed_at", null: false
-      t.inet "ip_address"
+      t.string "ip_address"
       t.integer "user_id"
       t.index ["user_id"], name: "index_user_profile_views_on_user_id"
       t.index ["user_profile_id"], name: "index_user_profile_views_on_user_profile_id"
@@ -1885,13 +1885,13 @@ class Init < ActiveRecord::Migration[5.2]
       t.date "date_of_birth"
       t.integer "views", default: 0, null: false
       t.integer "flag_level", default: 0, null: false
-      t.inet "ip_address"
+      t.string "ip_address"
       t.boolean "moderator", default: false
       t.string "title"
       t.integer "uploaded_avatar_id"
       t.string "locale", limit: 10
       t.integer "primary_group_id"
-      t.inet "registration_ip_address"
+      t.string "registration_ip_address"
       t.boolean "staged", default: false, null: false
       t.datetime "first_seen_at"
       t.datetime "silenced_till"
