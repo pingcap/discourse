@@ -746,16 +746,17 @@ class Init < ActiveRecord::Migration[5.2]
       t.text "value"
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
-      t.index "name, \"left\"(value, 200)", name: "index_post_custom_fields_on_name_and_value"
+      t.virtual "left_value_200", type: :string, as: "LEFT(value, 200)", stored: true
+      t.index "name, left_value_200", name: "index_post_custom_fields_on_name_and_value"
       t.index ["post_id", "name"], name: "index_post_custom_fields_on_post_id_and_name"
-      t.index ["post_id"], name: "idx_post_custom_fields_akismet", where: "(((name)::text = 'AKISMET_STATE'::text) AND (value = 'needs_review'::text))"
-      t.index ["post_id"], name: "index_post_custom_fields_on_notice_args", unique: true, where: "((name)::text = 'notice_args'::text)"
-      t.index ["post_id"], name: "index_post_custom_fields_on_notice_type", unique: true, where: "((name)::text = 'notice_type'::text)"
-      t.index ["post_id"], name: "index_post_custom_fields_on_post_id", unique: true, where: "((name)::text = 'missing uploads'::text)"
-      t.index ["post_id"], name: "index_post_id_where_missing_uploads_ignored", unique: true, where: "((name)::text = 'missing uploads ignored'::text)"
-      t.index ["post_id"], name: "post_custom_field_broken_images_idx", unique: true, where: "((name)::text = 'broken_images'::text)"
-      t.index ["post_id"], name: "post_custom_field_downloaded_images_idx", unique: true, where: "((name)::text = 'downloaded_images'::text)"
-      t.index ["post_id"], name: "post_custom_field_large_images_idx", unique: true, where: "((name)::text = 'large_images'::text)"
+      t.index ["post_id"], name: "idx_post_custom_fields_akismet", where: "(((name) = 'AKISMET_STATE') AND (value = 'needs_review'))"
+      t.index ["post_id"], name: "index_post_custom_fields_on_notice_args", unique: true, where: "((name) = 'notice_args')"
+      t.index ["post_id"], name: "index_post_custom_fields_on_notice_type", unique: true, where: "((name) = 'notice_type')"
+      t.index ["post_id"], name: "index_post_custom_fields_on_post_id", unique: true, where: "((name) = 'missing uploads')"
+      t.index ["post_id"], name: "index_post_id_where_missing_uploads_ignored", unique: true, where: "((name)::text = 'missing uploads ignored')"
+      t.index ["post_id"], name: "post_custom_field_broken_images_idx", unique: true, where: "((name) = 'broken_images')"
+      t.index ["post_id"], name: "post_custom_field_downloaded_images_idx", unique: true, where: "((name) = 'downloaded_images')"
+      t.index ["post_id"], name: "post_custom_field_large_images_idx", unique: true, where: "((name) = 'large_images')"
     end
 
     create_table "post_details", id: :serial, force: :cascade do |t|
