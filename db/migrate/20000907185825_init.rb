@@ -781,7 +781,7 @@ class Init < ActiveRecord::Migration[5.2]
     create_table "post_reply_keys", force: :cascade do |t|
       t.integer "user_id", null: false
       t.integer "post_id", null: false
-      t.uuid "reply_key", null: false
+      t.string "reply_key", null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
       t.index ["reply_key"], name: "index_post_reply_keys_on_reply_key", unique: true
