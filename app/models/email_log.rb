@@ -27,6 +27,11 @@ class EmailLog < ActiveRecord::Base
     User.where(id: user_id).update_all("last_emailed_at = CURRENT_TIMESTAMP") if user_id.present?
   end
 
+  before_save do
+    key = self.read_attribute(:bounce_key)
+    self.bounce_key = SecureRandom.uuid if key.blank?
+  end
+
   def self.unique_email_per_post(post, user)
     return yield unless post && user
 

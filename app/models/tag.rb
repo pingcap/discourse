@@ -24,7 +24,7 @@ class Tag < ActiveRecord::Base
   has_many :tag_group_memberships
   has_many :tag_groups, through: :tag_group_memberships
 
-  after_save :index_search
+  #after_save :index_search
 
   after_commit :trigger_tag_created_event, on: :create
   after_commit :trigger_tag_updated_event, on: :update

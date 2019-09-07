@@ -16,7 +16,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "created_by_id"
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
-      t.inet "allowed_ips", array: true
+      t.json "allowed_ips", array: true
       t.boolean "hidden", default: false, null: false
       t.index ["key"], name: "index_api_keys_on_key"
       t.index ["user_id"], name: "index_api_keys_on_user_id", unique: true
@@ -120,7 +120,8 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "search_priority", default: 0
       t.boolean "allow_global_tags", default: false, null: false
       t.integer "reviewable_by_group_id"
-      t.index "COALESCE(parent_category_id, '-1'::integer), name", name: "unique_index_categories_on_name", unique: true
+      t.virtual "virtual_parent_category_id", type: :string, as: "COALESCE(parent_category_id, '-1')", stored: true
+      t.index "virtual_parent_category_id, name", name: "unique_index_categories_on_name", unique: true
       t.index ["email_in"], name: "index_categories_on_email_in", unique: true
       t.index ["reviewable_by_group_id"], name: "index_categories_on_reviewable_by_group_id"
       t.index ["search_priority"], name: "index_categories_on_search_priority"
@@ -161,11 +162,10 @@ class Init < ActiveRecord::Migration[5.2]
     end
 
     create_table "category_search_data", primary_key: "category_id", id: :integer, default: nil, force: :cascade do |t|
-      t.tsvector "search_data"
+      t.text "search_data"
       t.text "raw_data"
       t.text "locale"
       t.integer "version", default: 0
-      t.index ["search_data"], name: "idx_search_category", using: :gin
     end
 
     create_table "category_tag_groups", id: :serial, force: :cascade do |t|
@@ -302,7 +302,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
       t.integer "post_id"
-      t.uuid "bounce_key"
+      t.string "bounce_key"
       t.boolean "bounced", default: false, null: false
       t.string "message_id"
       t.index ["bounce_key"], name: "index_email_logs_on_bounce_key", unique: true, where: "(bounce_key IS NOT NULL)"
@@ -798,12 +798,11 @@ class Init < ActiveRecord::Migration[5.2]
     end
 
     create_table "post_search_data", primary_key: "post_id", id: :integer, default: nil, force: :cascade do |t|
-      t.tsvector "search_data"
+      t.text "search_data"
       t.text "raw_data"
       t.string "locale"
       t.integer "version", default: 0
       t.index ["post_id", "version", "locale"], name: "index_post_search_data_on_post_id_and_version_and_locale"
-      t.index ["search_data"], name: "idx_search_post", using: :gin
     end
 
     create_table "post_stats", id: :serial, force: :cascade do |t|
@@ -1153,11 +1152,10 @@ class Init < ActiveRecord::Migration[5.2]
     end
 
     create_table "tag_search_data", primary_key: "tag_id", id: :serial, force: :cascade do |t|
-      t.tsvector "search_data"
+      t.text "search_data"
       t.text "raw_data"
       t.text "locale"
       t.integer "version", default: 0
-      t.index ["search_data"], name: "idx_search_tag", using: :gin
     end
 
     create_table "tag_users", id: :serial, force: :cascade do |t|
@@ -1375,9 +1373,8 @@ class Init < ActiveRecord::Migration[5.2]
     create_table "topic_search_data", primary_key: "topic_id", id: :serial, force: :cascade do |t|
       t.text "raw_data"
       t.string "locale", null: false
-      t.tsvector "search_data"
+      t.text "search_data"
       t.integer "version", default: 0
-      t.index ["search_data"], name: "idx_search_topic", using: :gin
       t.index ["topic_id", "version", "locale"], name: "index_topic_search_data_on_topic_id_and_version_and_locale"
     end
 
@@ -1796,11 +1793,10 @@ class Init < ActiveRecord::Migration[5.2]
     end
 
     create_table "user_search_data", primary_key: "user_id", id: :integer, default: nil, force: :cascade do |t|
-      t.tsvector "search_data"
+      t.text "search_data"
       t.text "raw_data"
       t.text "locale"
       t.integer "version", default: 0
-      t.index ["search_data"], name: "idx_search_user", using: :gin
     end
 
     create_table "user_second_factors", force: :cascade do |t|
