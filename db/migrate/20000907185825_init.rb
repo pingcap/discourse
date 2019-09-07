@@ -1177,7 +1177,8 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
       t.integer "pm_topic_count", default: 0, null: false
-      t.index "lower((name)::text)", name: "index_tags_on_lower_name", unique: true
+      t.virtual "lower_tag_name", type: :string, as: "LOWER(name)", stored: true
+      t.index "lower_tag_name", name: "index_tags_on_lower_name", unique: true
       t.index ["name"], name: "index_tags_on_name", unique: true
     end
 
