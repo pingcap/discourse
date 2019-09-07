@@ -524,9 +524,10 @@ class Init < ActiveRecord::Migration[5.2]
     end
 
     create_table "incoming_referers", id: :serial, force: :cascade do |t|
-      t.string "path", limit: 1000, null: false
+      t.text "path", limit: 1000, null: false
       t.integer "incoming_domain_id", null: false
-      t.index ["path", "incoming_domain_id"], name: "index_incoming_referers_on_path_and_incoming_domain_id", unique: true
+      t.virtual "md5_path", type: :string, as: "MD5(path)", stored: true
+      t.index ["md5_path", "incoming_domain_id"], name: "index_incoming_referers_on_path_and_incoming_domain_id", unique: true
     end
 
     create_table "instagram_user_infos", id: :serial, force: :cascade do |t|
@@ -643,14 +644,15 @@ class Init < ActiveRecord::Migration[5.2]
     end
 
     create_table "permalinks", id: :serial, force: :cascade do |t|
-      t.string "url", limit: 1000, null: false
+      t.text "url", limit: 1000, null: false
       t.integer "topic_id"
       t.integer "post_id"
       t.integer "category_id"
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
-      t.string "external_url", limit: 1000
-      t.index ["url"], name: "index_permalinks_on_url", unique: true
+      t.text "external_url", limit: 1000
+      t.virtual "md5_url", type: :string, as: "MD5(url)", stored: true
+      t.index ["md5_url"], name: "index_permalinks_on_url", unique: true
     end
 
     create_table "plugin_store_rows", id: :serial, force: :cascade do |t|
