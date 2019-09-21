@@ -1,3 +1,9 @@
+GIT
+  remote: git://github.com/hooopo/mini_sql.git
+  revision: b98f57e96dbb118d888a32e27c4ba0cb66148fc5
+  specs:
+    mini_sql (0.2.2)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -186,7 +192,6 @@ GEM
       libv8 (>= 6.9.411)
     mini_scheduler (0.11.0)
       sidekiq
-    mini_sql (0.2.2)
     mini_suffix (0.3.0)
       ffi (~> 1.9)
     minitest (5.11.3)
@@ -470,7 +475,7 @@ DEPENDENCIES
   mini_mime
   mini_racer
   mini_scheduler
-  mini_sql
+  mini_sql!
   mini_suffix
   minitest
   mocha
