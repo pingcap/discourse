@@ -663,47 +663,6 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["plugin_name", "key"], name: "index_plugin_store_rows_on_plugin_name_and_key", unique: true
     end
 
-    create_table "poll_options", force: :cascade do |t|
-      t.bigint "poll_id"
-      t.string "digest", null: false
-      t.text "html", null: false
-      t.integer "anonymous_votes"
-      t.datetime "created_at", null: false
-      t.datetime "updated_at", null: false
-      t.index ["poll_id", "digest"], name: "index_poll_options_on_poll_id_and_digest", unique: true
-      t.index ["poll_id"], name: "index_poll_options_on_poll_id"
-    end
-
-    create_table "poll_votes", id: false, force: :cascade do |t|
-      t.bigint "poll_id"
-      t.bigint "poll_option_id"
-      t.bigint "user_id"
-      t.datetime "created_at", null: false
-      t.datetime "updated_at", null: false
-      t.index ["poll_id", "poll_option_id", "user_id"], name: "index_poll_votes_on_poll_id_and_poll_option_id_and_user_id", unique: true
-      t.index ["poll_id"], name: "index_poll_votes_on_poll_id"
-      t.index ["poll_option_id"], name: "index_poll_votes_on_poll_option_id"
-      t.index ["user_id"], name: "index_poll_votes_on_user_id"
-    end
-
-    create_table "polls", force: :cascade do |t|
-      t.bigint "post_id"
-      t.string "name", default: "poll", null: false
-      t.datetime "close_at"
-      t.integer "type", default: 0, null: false
-      t.integer "status", default: 0, null: false
-      t.integer "results", default: 0, null: false
-      t.integer "visibility", default: 0, null: false
-      t.integer "min"
-      t.integer "max"
-      t.integer "step"
-      t.integer "anonymous_voters"
-      t.datetime "created_at", null: false
-      t.datetime "updated_at", null: false
-      t.index ["post_id", "name"], name: "index_polls_on_post_id_and_name", unique: true
-      t.index ["post_id"], name: "index_polls_on_post_id"
-    end
-
     create_table "post_action_types", id: :serial, force: :cascade do |t|
       t.string "name_key", limit: 50, null: false
       t.boolean "is_flag", default: false, null: false
@@ -1316,7 +1275,8 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
       t.index ["topic_id", "name"], name: "index_topic_custom_fields_on_topic_id_and_name"
-      t.index ["value", "name"], name: "topic_custom_fields_value_key_idx", where: "((value IS NOT NULL) AND (char_length(value) < 400))"
+      # TODO FIX
+      #t.index ["value", "name"], name: "topic_custom_fields_value_key_idx", where: "((value IS NOT NULL) AND (char_length(value) < 400))"
     end
 
     create_table "topic_embeds", id: :serial, force: :cascade do |t|
@@ -1328,7 +1288,8 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "updated_at", null: false
       t.datetime "deleted_at"
       t.integer "deleted_by_id"
-      t.index ["embed_url"], name: "index_topic_embeds_on_embed_url", unique: true
+      t.virtual "md5_embed_url", type: :string, as: "MD5(embed_url)", stored: true
+      t.index ["md5_embed_url"], name: "index_topic_embeds_on_embed_url", unique: true
     end
 
     create_table "topic_invites", id: :serial, force: :cascade do |t|
@@ -1482,7 +1443,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "highest_staff_post_number", default: 0, null: false
       t.string "featured_link"
       t.float "reviewable_score", default: 0.0, null: false
-      t.index "lower((title)::text)", name: "index_topics_on_lower_title"
+      #t.index "lower((title)::text)", name: "index_topics_on_lower_title"
       t.index ["bumped_at"], name: "index_topics_on_bumped_at", order: :desc
       t.index ["created_at", "visible"], name: "index_topics_on_created_at_and_visible", where: "((deleted_at IS NULL) AND ((archetype)::text <> 'private_message'::text))"
       t.index ["deleted_at", "visible", "archetype", "category_id", "id"], name: "idx_topics_front_page"
@@ -1530,7 +1491,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "thumbnail_width"
       t.integer "thumbnail_height"
       t.string "etag"
-      t.index "lower((extension)::text)", name: "index_uploads_on_extension"
+      #t.index "lower((extension)::text)", name: "index_uploads_on_extension"
       t.index ["etag"], name: "index_uploads_on_etag"
       t.index ["id", "url"], name: "index_uploads_on_id_and_url"
       t.index ["sha1"], name: "index_uploads_on_sha1", unique: true
@@ -1565,7 +1526,8 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
       t.datetime "revoked_at"
-      t.text "scopes", default: [], null: false, array: true
+      # TODO
+      t.json "scopes", null: false, array: true
       t.datetime "last_used_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
       t.index ["client_id"], name: "index_user_api_keys_on_client_id", unique: true
       t.index ["key"], name: "index_user_api_keys_on_key", unique: true
@@ -1585,9 +1547,10 @@ class Init < ActiveRecord::Migration[5.2]
       t.string "provider_uid", null: false
       t.integer "user_id"
       t.datetime "last_used", default: -> { "CURRENT_TIMESTAMP" }, null: false
-      t.jsonb "info", default: {}, null: false
-      t.jsonb "credentials", default: {}, null: false
-      t.jsonb "extra", default: {}, null: false
+      # TODO
+      t.json "info", null: false
+      t.json "credentials", null: false
+      t.json "extra", null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
       t.index ["provider_name", "provider_uid"], name: "associated_accounts_provider_uid", unique: true
@@ -1663,7 +1626,9 @@ class Init < ActiveRecord::Migration[5.2]
       t.boolean "primary", default: false, null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
-      t.index "lower((email)::text)", name: "index_user_emails_on_email", unique: true
+      t.virtual "lower_email", type: :string, as: "LOWER(email)", stored: true
+      t.index "lower_email", unique: true
+      t.index "email", name: "index_user_emails_on_email", unique: true
       t.index ["user_id", "primary"], name: "index_user_emails_on_user_id_and_primary", unique: true, where: "\"primary\""
       t.index ["user_id"], name: "index_user_emails_on_user_id"
     end
@@ -1720,7 +1685,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["acting_user_id", "action", "id"], name: "index_user_histories_on_acting_user_id_and_action_and_id"
       t.index ["action", "id"], name: "index_user_histories_on_action_and_id"
       t.index ["category_id"], name: "index_user_histories_on_category_id"
-      t.index ["subject", "id"], name: "index_user_histories_on_subject_and_id"
+      #t.index ["subject", "id"], name: "index_user_histories_on_subject_and_id"
       t.index ["target_user_id", "id"], name: "index_user_histories_on_target_user_id_and_id"
       t.index ["topic_id", "target_user_id", "action"], name: "index_user_histories_on_topic_id_and_target_user_id_and_action"
     end
@@ -1757,7 +1722,8 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "theme_key_seq", default: 0, null: false
       t.boolean "allow_private_messages", default: true, null: false
       t.integer "homepage_id"
-      t.integer "theme_ids", default: [], null: false, array: true
+      # TODO
+      t.text "theme_ids", null: false, array: true
       t.boolean "hide_profile_and_presence", default: false, null: false
       t.integer "text_size_key", default: 0, null: false
       t.integer "text_size_seq", default: 0, null: false
@@ -1961,14 +1927,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "updated_at", null: false
     end
 
-    add_foreign_key "javascript_caches", "theme_fields", on_delete: :cascade
-    add_foreign_key "javascript_caches", "themes", on_delete: :cascade
-    add_foreign_key "poll_options", "polls"
-    add_foreign_key "poll_votes", "poll_options"
-    add_foreign_key "poll_votes", "polls"
-    add_foreign_key "poll_votes", "users"
-    add_foreign_key "polls", "posts"
-    add_foreign_key "user_profiles", "uploads", column: "card_background_upload_id"
-    add_foreign_key "user_profiles", "uploads", column: "profile_background_upload_id"
+    #add_foreign_key "javascript_caches", "theme_fields", on_delete: :cascade
+    #add_foreign_key "javascript_caches", "themes", on_delete: :cascade
+    #add_foreign_key "poll_options", "polls"
+    #add_foreign_key "poll_votes", "poll_options"
+    #add_foreign_key "poll_votes", "polls"
+    #add_foreign_key "poll_votes", "users"
+    #add_foreign_key "polls", "posts"
+    #add_foreign_key "user_profiles", "uploads", column: "card_background_upload_id"
+    #add_foreign_key "user_profiles", "uploads", column: "profile_background_upload_id"
   end
 end
