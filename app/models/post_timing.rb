@@ -33,9 +33,8 @@ class PostTiming < ActiveRecord::Base
   end
 
   def self.record_new_timing(args)
-    DB.exec("INSERT INTO post_timings (topic_id, user_id, post_number, msecs)
-              SELECT :topic_id, :user_id, :post_number, :msecs
-              ON CONFLICT DO NOTHING",
+    DB.exec("INSERT IGNORE INTO post_timings (topic_id, user_id, post_number, msecs)
+              SELECT :topic_id, :user_id, :post_number, :msecs",
             args)
     # concurrency is hard, we are not running serialized so this can possibly
     # still happen, if it happens we just don't care, its an invalid record anyway
