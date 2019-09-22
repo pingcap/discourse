@@ -38,8 +38,8 @@ class PostTiming < ActiveRecord::Base
             args)
     # concurrency is hard, we are not running serialized so this can possibly
     # still happen, if it happens we just don't care, its an invalid record anyway
-    Post.where(['topic_id = :topic_id and post_number = :post_number', args]).update_all 'reads = reads + 1'
-    UserStat.where(user_id: args[:user_id]).update_all 'posts_read_count = posts_read_count + 1'
+    Post.where(['topic_id = :topic_id and post_number = :post_number', args]).update_all '`reads` = `reads` + 1'
+    UserStat.where(user_id: args[:user_id]).update_all '`posts_read_count` = `posts_read_count` + 1'
   end
 
   # Increases a timer if a row exists, otherwise create it
