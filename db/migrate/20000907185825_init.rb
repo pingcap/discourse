@@ -10,7 +10,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_anonymous_users_on_user_id", unique: true
     end
 
-    create_table "api_keys", id: :serial, force: :cascade do |t|
+    create_table "api_keys", force: :cascade do |t|
       t.string "key", limit: 64, null: false
       t.integer "user_id"
       t.integer "created_by_id"
@@ -22,14 +22,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_api_keys_on_user_id", unique: true
     end
 
-    create_table "application_requests", id: :serial, force: :cascade do |t|
+    create_table "application_requests", force: :cascade do |t|
       t.date "date", null: false
       t.integer "req_type", null: false
       t.integer "count", default: 0, null: false
       t.index ["date", "req_type"], name: "index_application_requests_on_date_and_req_type", unique: true
     end
 
-    create_table "badge_groupings", id: :serial, force: :cascade do |t|
+    create_table "badge_groupings", force: :cascade do |t|
       t.string "name", null: false
       t.text "description"
       t.integer "position", null: false
@@ -37,14 +37,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "updated_at", null: false
     end
 
-    create_table "badge_types", id: :serial, force: :cascade do |t|
+    create_table "badge_types", force: :cascade do |t|
       t.string "name", null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
       t.index ["name"], name: "index_badge_types_on_name", unique: true
     end
 
-    create_table "badges", id: :serial, force: :cascade do |t|
+    create_table "badges", force: :cascade do |t|
       t.string "name", null: false
       t.text "description"
       t.integer "badge_type_id", null: false
@@ -69,7 +69,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["name"], name: "index_badges_on_name", unique: true
     end
 
-    create_table "categories", id: :serial, force: :cascade do |t|
+    create_table "categories", force: :cascade do |t|
       t.string "name", limit: 50, null: false
       t.string "color", limit: 6, default: "0088CC", null: false
       t.integer "topic_id"
@@ -134,7 +134,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["web_hook_id", "category_id"], name: "index_categories_web_hooks_on_web_hook_id_and_category_id", unique: true
     end
 
-    create_table "category_custom_fields", id: :serial, force: :cascade do |t|
+    create_table "category_custom_fields", force: :cascade do |t|
       t.integer "category_id", null: false
       t.string "name", limit: 256, null: false
       t.text "value"
@@ -143,7 +143,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["category_id", "name"], name: "index_category_custom_fields_on_category_id_and_name"
     end
 
-    create_table "category_featured_topics", id: :serial, force: :cascade do |t|
+    create_table "category_featured_topics", force: :cascade do |t|
       t.integer "category_id", null: false
       t.integer "topic_id", null: false
       t.datetime "created_at", null: false
@@ -153,7 +153,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["category_id", "topic_id"], name: "cat_featured_threads", unique: true
     end
 
-    create_table "category_groups", id: :serial, force: :cascade do |t|
+    create_table "category_groups", force: :cascade do |t|
       t.integer "category_id", null: false
       t.integer "group_id", null: false
       t.datetime "created_at", null: false
@@ -168,7 +168,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "version", default: 0
     end
 
-    create_table "category_tag_groups", id: :serial, force: :cascade do |t|
+    create_table "category_tag_groups", force: :cascade do |t|
       t.integer "category_id", null: false
       t.integer "tag_group_id", null: false
       t.datetime "created_at", null: false
@@ -186,7 +186,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["tag_id"], name: "index_category_tag_stats_on_tag_id"
     end
 
-    create_table "category_tags", id: :serial, force: :cascade do |t|
+    create_table "category_tags", force: :cascade do |t|
       t.integer "category_id", null: false
       t.integer "tag_id", null: false
       t.datetime "created_at", null: false
@@ -195,7 +195,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["tag_id", "category_id"], name: "idx_category_tags_ix2", unique: true
     end
 
-    create_table "category_users", id: :serial, force: :cascade do |t|
+    create_table "category_users", force: :cascade do |t|
       t.integer "category_id", null: false
       t.integer "user_id", null: false
       t.integer "notification_level", null: false
@@ -203,7 +203,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "category_id", "notification_level"], name: "idx_category_users_u1", unique: true
     end
 
-    create_table "child_themes", id: :serial, force: :cascade do |t|
+    create_table "child_themes", force: :cascade do |t|
       t.integer "parent_theme_id"
       t.integer "child_theme_id"
       t.datetime "created_at", null: false
@@ -212,7 +212,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["parent_theme_id", "child_theme_id"], name: "index_child_themes_on_parent_theme_id_and_child_theme_id", unique: true
     end
 
-    create_table "color_scheme_colors", id: :serial, force: :cascade do |t|
+    create_table "color_scheme_colors", force: :cascade do |t|
       t.string "name", null: false
       t.string "hex", null: false
       t.integer "color_scheme_id", null: false
@@ -221,7 +221,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["color_scheme_id"], name: "index_color_scheme_colors_on_color_scheme_id"
     end
 
-    create_table "color_schemes", id: :serial, force: :cascade do |t|
+    create_table "color_schemes", force: :cascade do |t|
       t.string "name", null: false
       t.integer "version", default: 1, null: false
       t.datetime "created_at", null: false
@@ -231,7 +231,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "theme_id"
     end
 
-    create_table "custom_emojis", id: :serial, force: :cascade do |t|
+    create_table "custom_emojis", force: :cascade do |t|
       t.string "name", null: false
       t.integer "upload_id", null: false
       t.datetime "created_at", null: false
@@ -239,11 +239,11 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["name"], name: "index_custom_emojis_on_name", unique: true
     end
 
-    create_table "developers", id: :serial, force: :cascade do |t|
+    create_table "developers", force: :cascade do |t|
       t.integer "user_id", null: false
     end
 
-    create_table "directory_items", id: :serial, force: :cascade do |t|
+    create_table "directory_items", force: :cascade do |t|
       t.integer "period_type", null: false
       t.integer "user_id", null: false
       t.integer "likes_received", null: false
@@ -265,14 +265,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["topics_entered"], name: "index_directory_items_on_topics_entered"
     end
 
-    create_table "draft_sequences", id: :serial, force: :cascade do |t|
+    create_table "draft_sequences", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "draft_key", null: false
       t.integer "sequence", null: false
       t.index ["user_id", "draft_key"], name: "index_draft_sequences_on_user_id_and_draft_key", unique: true
     end
 
-    create_table "drafts", id: :serial, force: :cascade do |t|
+    create_table "drafts", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "draft_key", null: false
       t.text "data", null: false
@@ -283,7 +283,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "draft_key"], name: "index_drafts_on_user_id_and_draft_key"
     end
 
-    create_table "email_change_requests", id: :serial, force: :cascade do |t|
+    create_table "email_change_requests", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "old_email", null: false
       t.string "new_email", null: false
@@ -295,7 +295,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_email_change_requests_on_user_id"
     end
 
-    create_table "email_logs", id: :serial, force: :cascade do |t|
+    create_table "email_logs", force: :cascade do |t|
       t.string "to_address", null: false
       t.string "email_type", null: false
       t.integer "user_id"
@@ -313,7 +313,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_email_logs_on_user_id"
     end
 
-    create_table "email_tokens", id: :serial, force: :cascade do |t|
+    create_table "email_tokens", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "email", null: false
       t.string "token", null: false
@@ -325,7 +325,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_email_tokens_on_user_id"
     end
 
-    create_table "embeddable_hosts", id: :serial, force: :cascade do |t|
+    create_table "embeddable_hosts", force: :cascade do |t|
       t.string "host", null: false
       t.integer "category_id", null: false
       t.datetime "created_at", null: false
@@ -334,7 +334,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.string "class_name"
     end
 
-    create_table "github_user_infos", id: :serial, force: :cascade do |t|
+    create_table "github_user_infos", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "screen_name", null: false
       t.integer "github_user_id", null: false
@@ -353,7 +353,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "given_date"], name: "index_given_daily_likes_on_user_id_and_given_date", unique: true
     end
 
-    create_table "google_user_infos", id: :serial, force: :cascade do |t|
+    create_table "google_user_infos", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "google_user_id", null: false
       t.string "first_name"
@@ -370,7 +370,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_google_user_infos_on_user_id", unique: true
     end
 
-    create_table "group_archived_messages", id: :serial, force: :cascade do |t|
+    create_table "group_archived_messages", force: :cascade do |t|
       t.integer "group_id", null: false
       t.integer "topic_id", null: false
       t.datetime "created_at", null: false
@@ -378,7 +378,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["group_id", "topic_id"], name: "index_group_archived_messages_on_group_id_and_topic_id", unique: true
     end
 
-    create_table "group_custom_fields", id: :serial, force: :cascade do |t|
+    create_table "group_custom_fields", force: :cascade do |t|
       t.integer "group_id", null: false
       t.string "name", limit: 256, null: false
       t.text "value"
@@ -387,7 +387,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["group_id", "name"], name: "index_group_custom_fields_on_group_id_and_name"
     end
 
-    create_table "group_histories", id: :serial, force: :cascade do |t|
+    create_table "group_histories", force: :cascade do |t|
       t.integer "group_id", null: false
       t.integer "acting_user_id", null: false
       t.integer "target_user_id"
@@ -403,7 +403,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["target_user_id"], name: "index_group_histories_on_target_user_id"
     end
 
-    create_table "group_mentions", id: :serial, force: :cascade do |t|
+    create_table "group_mentions", force: :cascade do |t|
       t.integer "post_id"
       t.integer "group_id"
       t.datetime "created_at", null: false
@@ -423,7 +423,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_group_requests_on_user_id"
     end
 
-    create_table "group_users", id: :serial, force: :cascade do |t|
+    create_table "group_users", force: :cascade do |t|
       t.integer "group_id", null: false
       t.integer "user_id", null: false
       t.datetime "created_at", null: false
@@ -434,7 +434,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "group_id"], name: "index_group_users_on_user_id_and_group_id", unique: true
     end
 
-    create_table "groups", id: :serial, force: :cascade do |t|
+    create_table "groups", force: :cascade do |t|
       t.string "name", null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
@@ -482,14 +482,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "ignored_user_id"], name: "index_ignored_users_on_user_id_and_ignored_user_id", unique: true
     end
 
-    create_table "incoming_domains", id: :serial, force: :cascade do |t|
+    create_table "incoming_domains", force: :cascade do |t|
       t.string "name", limit: 100, null: false
       t.boolean "https", default: false, null: false
       t.integer "port", null: false
       t.index ["name", "https", "port"], name: "index_incoming_domains_on_name_and_https_and_port", unique: true
     end
 
-    create_table "incoming_emails", id: :serial, force: :cascade do |t|
+    create_table "incoming_emails", force: :cascade do |t|
       t.integer "user_id"
       t.integer "topic_id"
       t.integer "post_id"
@@ -512,7 +512,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_incoming_emails_on_user_id", where: "(user_id IS NOT NULL)"
     end
 
-    create_table "incoming_links", id: :serial, force: :cascade do |t|
+    create_table "incoming_links", force: :cascade do |t|
       t.datetime "created_at", null: false
       t.integer "user_id"
       t.string "ip_address"
@@ -523,14 +523,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["post_id"], name: "index_incoming_links_on_post_id"
     end
 
-    create_table "incoming_referers", id: :serial, force: :cascade do |t|
+    create_table "incoming_referers", force: :cascade do |t|
       t.text "path", limit: 1000, null: false
       t.integer "incoming_domain_id", null: false
       t.virtual "md5_path", type: :string, as: "MD5(path)", stored: true
       t.index ["md5_path", "incoming_domain_id"], name: "index_incoming_referers_on_path_and_incoming_domain_id", unique: true
     end
 
-    create_table "instagram_user_infos", id: :serial, force: :cascade do |t|
+    create_table "instagram_user_infos", force: :cascade do |t|
       t.integer "user_id"
       t.string "screen_name"
       t.integer "instagram_user_id"
@@ -538,14 +538,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "updated_at", null: false
     end
 
-    create_table "invited_groups", id: :serial, force: :cascade do |t|
+    create_table "invited_groups", force: :cascade do |t|
       t.integer "group_id"
       t.integer "invite_id"
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
     end
 
-    create_table "invites", id: :serial, force: :cascade do |t|
+    create_table "invites", force: :cascade do |t|
       t.string "invite_key", limit: 32, null: false
       t.string "email"
       t.integer "invited_by_id", null: false
@@ -575,7 +575,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["theme_id"], name: "index_javascript_caches_on_theme_id"
     end
 
-    create_table "message_bus", id: :serial, force: :cascade do |t|
+    create_table "message_bus", force: :cascade do |t|
       t.string "name"
       t.string "context"
       t.text "data"
@@ -583,7 +583,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["created_at"], name: "index_message_bus_on_created_at"
     end
 
-    create_table "muted_users", id: :serial, force: :cascade do |t|
+    create_table "muted_users", force: :cascade do |t|
       t.integer "user_id", null: false
       t.integer "muted_user_id", null: false
       t.datetime "created_at", null: false
@@ -592,7 +592,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "muted_user_id"], name: "index_muted_users_on_user_id_and_muted_user_id", unique: true
     end
 
-    create_table "notifications", id: :serial, force: :cascade do |t|
+    create_table "notifications", force: :cascade do |t|
       t.integer "notification_type", null: false
       t.integer "user_id", null: false
       t.string "data", limit: 1000, null: false
@@ -610,7 +610,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "topic_id", "post_number"], name: "index_notifications_on_user_id_and_topic_id_and_post_number"
     end
 
-    create_table "oauth2_user_infos", id: :serial, force: :cascade do |t|
+    create_table "oauth2_user_infos", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "uid", null: false
       t.string "provider", null: false
@@ -621,14 +621,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["uid", "provider"], name: "index_oauth2_user_infos_on_uid_and_provider", unique: true
     end
 
-    create_table "onceoff_logs", id: :serial, force: :cascade do |t|
+    create_table "onceoff_logs", force: :cascade do |t|
       t.string "job_name"
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
       t.index ["job_name"], name: "index_onceoff_logs_on_job_name"
     end
 
-    create_table "optimized_images", id: :serial, force: :cascade do |t|
+    create_table "optimized_images", force: :cascade do |t|
       t.string "sha1", limit: 40, null: false
       t.string "extension", limit: 10, null: false
       t.integer "width", null: false
@@ -643,7 +643,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["upload_id"], name: "index_optimized_images_on_upload_id"
     end
 
-    create_table "permalinks", id: :serial, force: :cascade do |t|
+    create_table "permalinks", force: :cascade do |t|
       t.text "url", limit: 1000, null: false
       t.integer "topic_id"
       t.integer "post_id"
@@ -655,7 +655,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["md5_url"], name: "index_permalinks_on_url", unique: true
     end
 
-    create_table "plugin_store_rows", id: :serial, force: :cascade do |t|
+    create_table "plugin_store_rows", force: :cascade do |t|
       t.string "plugin_name", null: false
       t.string "key", null: false
       t.string "type_name", null: false
@@ -663,7 +663,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["plugin_name", "key"], name: "index_plugin_store_rows_on_plugin_name_and_key", unique: true
     end
 
-    create_table "post_action_types", id: :serial, force: :cascade do |t|
+    create_table "post_action_types", force: :cascade do |t|
       t.string "name_key", limit: 50, null: false
       t.boolean "is_flag", default: false, null: false
       t.string "icon", limit: 20
@@ -674,7 +674,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "reviewable_priority", default: 0, null: false
     end
 
-    create_table "post_actions", id: :serial, force: :cascade do |t|
+    create_table "post_actions", force: :cascade do |t|
       t.integer "post_id", null: false
       t.integer "user_id", null: false
       t.integer "post_action_type_id", null: false
@@ -699,7 +699,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_post_actions_on_user_id"
     end
 
-    create_table "post_custom_fields", id: :serial, force: :cascade do |t|
+    create_table "post_custom_fields", force: :cascade do |t|
       t.integer "post_id", null: false
       t.string "name", limit: 256, null: false
       t.text "value"
@@ -718,7 +718,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["post_id"], name: "post_custom_field_large_images_idx", unique: true, where: "((name) = 'large_images')"
     end
 
-    create_table "post_details", id: :serial, force: :cascade do |t|
+    create_table "post_details", force: :cascade do |t|
       t.integer "post_id"
       t.string "key"
       t.string "value"
@@ -747,7 +747,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "post_id"], name: "index_post_reply_keys_on_user_id_and_post_id", unique: true
     end
 
-    create_table "post_revisions", id: :serial, force: :cascade do |t|
+    create_table "post_revisions", force: :cascade do |t|
       t.integer "user_id"
       t.integer "post_id"
       t.text "modifications"
@@ -767,7 +767,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["post_id", "version", "locale"], name: "index_post_search_data_on_post_id_and_version_and_locale"
     end
 
-    create_table "post_stats", id: :serial, force: :cascade do |t|
+    create_table "post_stats", force: :cascade do |t|
       t.integer "post_id"
       t.integer "drafts_saved"
       t.integer "typing_duration_msecs"
@@ -787,7 +787,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_post_timings_on_user_id"
     end
 
-    create_table "post_uploads", id: :serial, force: :cascade do |t|
+    create_table "post_uploads", force: :cascade do |t|
       t.integer "post_id", null: false
       t.integer "upload_id", null: false
       t.index ["post_id", "upload_id"], name: "idx_unique_post_uploads", unique: true
@@ -795,7 +795,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["upload_id"], name: "index_post_uploads_on_upload_id"
     end
 
-    create_table "posts", id: :serial, comment: "If you want to query public posts only, use the badge_posts view.", force: :cascade do |t|
+    create_table "posts", comment: "If you want to query public posts only, use the badge_posts view.", force: :cascade do |t|
       t.integer "user_id"
       t.integer "topic_id", null: false
       t.integer "post_number", null: false, comment: "The position of this post in the topic. The pair (topic_id, post_number) forms a natural key on the posts table."
@@ -865,7 +865,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "updated_at", null: false
     end
 
-    create_table "quoted_posts", id: :serial, force: :cascade do |t|
+    create_table "quoted_posts", force: :cascade do |t|
       t.integer "post_id", null: false
       t.integer "quoted_post_id", null: false
       t.datetime "created_at", null: false
@@ -874,7 +874,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["quoted_post_id", "post_id"], name: "index_quoted_posts_on_quoted_post_id_and_post_id", unique: true
     end
 
-    create_table "remote_themes", id: :serial, force: :cascade do |t|
+    create_table "remote_themes", force: :cascade do |t|
       t.string "remote_url", null: false
       t.string "remote_version"
       t.string "local_version"
@@ -956,7 +956,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["type", "target_id"], name: "index_reviewables_on_type_and_target_id", unique: true
     end
 
-    create_table "scheduler_stats", id: :serial, force: :cascade do |t|
+    create_table "scheduler_stats", force: :cascade do |t|
       t.string "name", null: false
       t.string "hostname", null: false
       t.integer "pid", null: false
@@ -968,7 +968,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.text "error"
     end
 
-    create_table "schema_migration_details", id: :serial, force: :cascade do |t|
+    create_table "schema_migration_details", force: :cascade do |t|
       t.string "version", null: false
       t.string "name"
       t.string "hostname"
@@ -980,7 +980,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["version"], name: "index_schema_migration_details_on_version"
     end
 
-    create_table "screened_emails", id: :serial, force: :cascade do |t|
+    create_table "screened_emails", force: :cascade do |t|
       t.string "email", null: false
       t.integer "action_type", null: false
       t.integer "match_count", default: 0, null: false
@@ -992,7 +992,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["last_match_at"], name: "index_screened_emails_on_last_match_at"
     end
 
-    create_table "screened_ip_addresses", id: :serial, force: :cascade do |t|
+    create_table "screened_ip_addresses", force: :cascade do |t|
       t.string "ip_address", null: false
       t.integer "action_type", null: false
       t.integer "match_count", default: 0, null: false
@@ -1003,7 +1003,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["last_match_at"], name: "index_screened_ip_addresses_on_last_match_at"
     end
 
-    create_table "screened_urls", id: :serial, force: :cascade do |t|
+    create_table "screened_urls", force: :cascade do |t|
       t.string "url", null: false
       t.string "domain", null: false
       t.integer "action_type", null: false
@@ -1016,7 +1016,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["url"], name: "index_screened_urls_on_url", unique: true
     end
 
-    create_table "search_logs", id: :serial, force: :cascade do |t|
+    create_table "search_logs", force: :cascade do |t|
       t.string "term", null: false
       t.integer "user_id"
       t.string "ip_address"
@@ -1036,7 +1036,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["topic_id"], name: "index_shared_drafts_on_topic_id", unique: true
     end
 
-    create_table "single_sign_on_records", id: :serial, force: :cascade do |t|
+    create_table "single_sign_on_records", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "external_id", null: false
       t.text "last_payload", null: false
@@ -1052,7 +1052,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_single_sign_on_records_on_user_id"
     end
 
-    create_table "site_settings", id: :serial, force: :cascade do |t|
+    create_table "site_settings", force: :cascade do |t|
       t.string "name", null: false
       t.integer "data_type", null: false
       t.text "value"
@@ -1076,7 +1076,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_skipped_email_logs_on_user_id"
     end
 
-    create_table "stylesheet_cache", id: :serial, force: :cascade do |t|
+    create_table "stylesheet_cache", force: :cascade do |t|
       t.string "target", null: false
       t.string "digest", null: false
       t.text "content", null: false
@@ -1087,7 +1087,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["target", "digest"], name: "index_stylesheet_cache_on_target_and_digest", unique: true
     end
 
-    create_table "tag_group_memberships", id: :serial, force: :cascade do |t|
+    create_table "tag_group_memberships", force: :cascade do |t|
       t.integer "tag_id", null: false
       t.integer "tag_group_id", null: false
       t.datetime "created_at", null: false
@@ -1105,7 +1105,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["tag_group_id"], name: "index_tag_group_permissions_on_tag_group_id"
     end
 
-    create_table "tag_groups", id: :serial, force: :cascade do |t|
+    create_table "tag_groups", force: :cascade do |t|
       t.string "name", null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
@@ -1113,14 +1113,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.boolean "one_per_topic", default: false
     end
 
-    create_table "tag_search_data", primary_key: "tag_id", id: :serial, force: :cascade do |t|
+    create_table "tag_search_data", primary_key: "tag_id", force: :cascade do |t|
       t.text "search_data"
       t.text "raw_data"
       t.text "locale"
       t.integer "version", default: 0
     end
 
-    create_table "tag_users", id: :serial, force: :cascade do |t|
+    create_table "tag_users", force: :cascade do |t|
       t.integer "tag_id", null: false
       t.integer "user_id", null: false
       t.integer "notification_level", null: false
@@ -1130,7 +1130,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "tag_id", "notification_level"], name: "idx_tag_users_ix1", unique: true
     end
 
-    create_table "tags", id: :serial, force: :cascade do |t|
+    create_table "tags", force: :cascade do |t|
       t.string "name", null: false
       t.integer "topic_count", default: 0, null: false
       t.datetime "created_at", null: false
@@ -1147,7 +1147,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["web_hook_id", "tag_id"], name: "web_hooks_tags", unique: true
     end
 
-    create_table "theme_fields", id: :serial, force: :cascade do |t|
+    create_table "theme_fields", force: :cascade do |t|
       t.integer "theme_id", null: false
       t.integer "target_id", null: false
       t.string "name", limit: 255, null: false
@@ -1182,7 +1182,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["theme_id"], name: "index_theme_translation_overrides_on_theme_id"
     end
 
-    create_table "themes", id: :serial, force: :cascade do |t|
+    create_table "themes", force: :cascade do |t|
       t.string "name", null: false
       t.integer "user_id", null: false
       t.datetime "created_at", null: false
@@ -1196,7 +1196,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["remote_theme_id"], name: "index_themes_on_remote_theme_id", unique: true
     end
 
-    create_table "top_topics", id: :serial, force: :cascade do |t|
+    create_table "top_topics", force: :cascade do |t|
       t.integer "topic_id"
       t.integer "yearly_posts_count", default: 0, null: false
       t.integer "yearly_views_count", default: 0, null: false
@@ -1252,14 +1252,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["yearly_views_count"], name: "index_top_topics_on_yearly_views_count", order: :desc
     end
 
-    create_table "topic_allowed_groups", id: :serial, force: :cascade do |t|
+    create_table "topic_allowed_groups", force: :cascade do |t|
       t.integer "group_id", null: false
       t.integer "topic_id", null: false
       t.index ["group_id", "topic_id"], name: "index_topic_allowed_groups_on_group_id_and_topic_id", unique: true
       t.index ["topic_id", "group_id"], name: "index_topic_allowed_groups_on_topic_id_and_group_id", unique: true
     end
 
-    create_table "topic_allowed_users", id: :serial, force: :cascade do |t|
+    create_table "topic_allowed_users", force: :cascade do |t|
       t.integer "user_id", null: false
       t.integer "topic_id", null: false
       t.datetime "created_at", null: false
@@ -1268,7 +1268,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "topic_id"], name: "index_topic_allowed_users_on_user_id_and_topic_id", unique: true
     end
 
-    create_table "topic_custom_fields", id: :serial, force: :cascade do |t|
+    create_table "topic_custom_fields", force: :cascade do |t|
       t.integer "topic_id", null: false
       t.string "name", limit: 256, null: false
       t.text "value"
@@ -1279,7 +1279,7 @@ class Init < ActiveRecord::Migration[5.2]
       #t.index ["value", "name"], name: "topic_custom_fields_value_key_idx", where: "((value IS NOT NULL) AND (char_length(value) < 400))"
     end
 
-    create_table "topic_embeds", id: :serial, force: :cascade do |t|
+    create_table "topic_embeds", force: :cascade do |t|
       t.integer "topic_id", null: false
       t.integer "post_id", null: false
       t.string "embed_url", limit: 1000, null: false
@@ -1292,7 +1292,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["md5_embed_url"], name: "index_topic_embeds_on_embed_url", unique: true
     end
 
-    create_table "topic_invites", id: :serial, force: :cascade do |t|
+    create_table "topic_invites", force: :cascade do |t|
       t.integer "topic_id", null: false
       t.integer "invite_id", null: false
       t.datetime "created_at", null: false
@@ -1301,7 +1301,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["topic_id", "invite_id"], name: "index_topic_invites_on_topic_id_and_invite_id", unique: true
     end
 
-    create_table "topic_link_clicks", id: :serial, force: :cascade do |t|
+    create_table "topic_link_clicks", force: :cascade do |t|
       t.integer "topic_link_id", null: false
       t.integer "user_id"
       t.datetime "created_at", null: false
@@ -1310,7 +1310,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["topic_link_id"], name: "by_link"
     end
 
-    create_table "topic_links", id: :serial, force: :cascade do |t|
+    create_table "topic_links", force: :cascade do |t|
       t.integer "topic_id", null: false
       t.integer "post_id"
       t.integer "user_id", null: false
@@ -1335,7 +1335,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_topic_links_on_user_id"
     end
 
-    create_table "topic_search_data", primary_key: "topic_id", id: :serial, force: :cascade do |t|
+    create_table "topic_search_data", primary_key: "topic_id", force: :cascade do |t|
       t.text "raw_data"
       t.string "locale", null: false
       t.text "search_data"
@@ -1343,7 +1343,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["topic_id", "version", "locale"], name: "index_topic_search_data_on_topic_id_and_version_and_locale"
     end
 
-    create_table "topic_tags", id: :serial, force: :cascade do |t|
+    create_table "topic_tags", force: :cascade do |t|
       t.integer "topic_id", null: false
       t.integer "tag_id", null: false
       t.datetime "created_at", null: false
@@ -1351,7 +1351,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["topic_id", "tag_id"], name: "index_topic_tags_on_topic_id_and_tag_id", unique: true
     end
 
-    create_table "topic_timers", id: :serial, force: :cascade do |t|
+    create_table "topic_timers", force: :cascade do |t|
       t.datetime "execute_at", null: false
       t.integer "status_type", null: false
       t.integer "user_id", null: false
@@ -1367,7 +1367,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_topic_timers_on_user_id"
     end
 
-    create_table "topic_users", id: :serial, force: :cascade do |t|
+    create_table "topic_users", force: :cascade do |t|
       t.integer "user_id", null: false
       t.integer "topic_id", null: false
       t.boolean "posted", default: false, null: false
@@ -1398,7 +1398,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["viewed_at", "topic_id"], name: "index_topic_views_on_viewed_at_and_topic_id"
     end
 
-    create_table "topics", id: :serial, comment: "To query public topics only: SELECT ... FROM topics t LEFT INNER JOIN categories c ON (t.category_id = c.id AND c.read_restricted = false)", force: :cascade do |t|
+    create_table "topics", comment: "To query public topics only: SELECT ... FROM topics t LEFT INNER JOIN categories c ON (t.category_id = c.id AND c.read_restricted = false)", force: :cascade do |t|
       t.string "title", null: false
       t.datetime "last_posted_at"
       t.datetime "created_at", null: false
@@ -1455,7 +1455,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "idx_topics_user_id_deleted_at", where: "(deleted_at IS NULL)"
     end
 
-    create_table "translation_overrides", id: :serial, force: :cascade do |t|
+    create_table "translation_overrides", force: :cascade do |t|
       t.string "locale", null: false
       t.string "translation_key", null: false
       t.string "value", null: false
@@ -1475,7 +1475,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["created_at"], name: "index_unsubscribe_keys_on_created_at"
     end
 
-    create_table "uploads", id: :serial, force: :cascade do |t|
+    create_table "uploads", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "original_filename", null: false
       t.integer "filesize", null: false
@@ -1499,7 +1499,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_uploads_on_user_id"
     end
 
-    create_table "user_actions", id: :serial, force: :cascade do |t|
+    create_table "user_actions", force: :cascade do |t|
       t.integer "action_type", null: false
       t.integer "user_id", null: false
       t.integer "target_topic_id"
@@ -1517,7 +1517,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "created_at", "action_type"], name: "idx_user_actions_speed_up_user_all"
     end
 
-    create_table "user_api_keys", id: :serial, force: :cascade do |t|
+    create_table "user_api_keys", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "client_id", null: false
       t.string "key", null: false
@@ -1534,7 +1534,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_user_api_keys_on_user_id"
     end
 
-    create_table "user_archived_messages", id: :serial, force: :cascade do |t|
+    create_table "user_archived_messages", force: :cascade do |t|
       t.integer "user_id", null: false
       t.integer "topic_id", null: false
       t.datetime "created_at", null: false
@@ -1557,7 +1557,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["provider_name", "user_id"], name: "associated_accounts_provider_user", unique: true
     end
 
-    create_table "user_auth_token_logs", id: :serial, force: :cascade do |t|
+    create_table "user_auth_token_logs", force: :cascade do |t|
       t.string "action", null: false
       t.integer "user_auth_token_id"
       t.integer "user_id"
@@ -1569,7 +1569,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_user_auth_token_logs_on_user_id"
     end
 
-    create_table "user_auth_tokens", id: :serial, force: :cascade do |t|
+    create_table "user_auth_tokens", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "auth_token", null: false
       t.string "prev_auth_token", null: false
@@ -1585,7 +1585,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_user_auth_tokens_on_user_id"
     end
 
-    create_table "user_avatars", id: :serial, force: :cascade do |t|
+    create_table "user_avatars", force: :cascade do |t|
       t.integer "user_id", null: false
       t.integer "custom_upload_id"
       t.integer "gravatar_upload_id"
@@ -1597,7 +1597,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_user_avatars_on_user_id"
     end
 
-    create_table "user_badges", id: :serial, force: :cascade do |t|
+    create_table "user_badges", force: :cascade do |t|
       t.integer "badge_id", null: false
       t.integer "user_id", null: false
       t.datetime "granted_at", null: false
@@ -1611,7 +1611,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_user_badges_on_user_id"
     end
 
-    create_table "user_custom_fields", id: :serial, force: :cascade do |t|
+    create_table "user_custom_fields", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "name", limit: 256, null: false
       t.text "value"
@@ -1620,7 +1620,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "name"], name: "index_user_custom_fields_on_user_id_and_name"
     end
 
-    create_table "user_emails", id: :serial, force: :cascade do |t|
+    create_table "user_emails", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "email", limit: 513, null: false
       t.boolean "primary", default: false, null: false
@@ -1633,7 +1633,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_user_emails_on_user_id"
     end
 
-    create_table "user_exports", id: :serial, force: :cascade do |t|
+    create_table "user_exports", force: :cascade do |t|
       t.string "file_name", null: false
       t.integer "user_id", null: false
       t.datetime "created_at", null: false
@@ -1642,14 +1642,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "topic_id"
     end
 
-    create_table "user_field_options", id: :serial, force: :cascade do |t|
+    create_table "user_field_options", force: :cascade do |t|
       t.integer "user_field_id", null: false
       t.string "value", null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
     end
 
-    create_table "user_fields", id: :serial, force: :cascade do |t|
+    create_table "user_fields", force: :cascade do |t|
       t.string "name", null: false
       t.string "field_type", null: false
       t.datetime "created_at", null: false
@@ -1664,7 +1664,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.string "external_type"
     end
 
-    create_table "user_histories", id: :serial, force: :cascade do |t|
+    create_table "user_histories", force: :cascade do |t|
       t.integer "action", null: false
       t.integer "acting_user_id"
       t.integer "target_user_id"
@@ -1690,7 +1690,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["topic_id", "target_user_id", "action"], name: "index_user_histories_on_topic_id_and_target_user_id_and_action"
     end
 
-    create_table "user_open_ids", id: :serial, force: :cascade do |t|
+    create_table "user_open_ids", force: :cascade do |t|
       t.integer "user_id", null: false
       t.string "email", null: false
       t.string "url", null: false
@@ -1734,7 +1734,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_user_options_on_user_id", unique: true
     end
 
-    create_table "user_profile_views", id: :serial, force: :cascade do |t|
+    create_table "user_profile_views", force: :cascade do |t|
       t.integer "user_profile_id", null: false
       t.datetime "viewed_at", null: false
       t.string "ip_address"
@@ -1810,7 +1810,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id", "upload_id"], name: "index_user_uploads_on_user_id_and_upload_id"
     end
 
-    create_table "user_visits", id: :serial, force: :cascade do |t|
+    create_table "user_visits", force: :cascade do |t|
       t.integer "user_id", null: false
       t.date "visited_at", null: false
       t.integer "posts_read", default: 0
@@ -1821,7 +1821,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["visited_at", "mobile"], name: "index_user_visits_on_visited_at_and_mobile"
     end
 
-    create_table "user_warnings", id: :serial, force: :cascade do |t|
+    create_table "user_warnings", force: :cascade do |t|
       t.integer "topic_id", null: false
       t.integer "user_id", null: false
       t.integer "created_by_id", null: false
@@ -1831,7 +1831,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["user_id"], name: "index_user_warnings_on_user_id"
     end
 
-    create_table "users", id: :serial, force: :cascade do |t|
+    create_table "users", force: :cascade do |t|
       t.string "username", limit: 60, null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
@@ -1876,7 +1876,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["username_lower"], name: "index_users_on_username_lower", unique: true
     end
 
-    create_table "watched_words", id: :serial, force: :cascade do |t|
+    create_table "watched_words", force: :cascade do |t|
       t.string "word", null: false
       t.integer "action", null: false
       t.datetime "created_at", null: false
@@ -1891,7 +1891,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["date", "user_agent"], name: "index_web_crawler_requests_on_date_and_user_agent", unique: true
     end
 
-    create_table "web_hook_event_types", id: :serial, force: :cascade do |t|
+    create_table "web_hook_event_types", force: :cascade do |t|
       t.string "name", null: false
     end
 
@@ -1901,7 +1901,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["web_hook_event_type_id", "web_hook_id"], name: "idx_web_hook_event_types_hooks_on_ids", unique: true
     end
 
-    create_table "web_hook_events", id: :serial, force: :cascade do |t|
+    create_table "web_hook_events", force: :cascade do |t|
       t.integer "web_hook_id", null: false
       t.string "headers"
       t.text "payload"
@@ -1914,7 +1914,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["web_hook_id"], name: "index_web_hook_events_on_web_hook_id"
     end
 
-    create_table "web_hooks", id: :serial, force: :cascade do |t|
+    create_table "web_hooks", force: :cascade do |t|
       t.string "payload_url", null: false
       t.integer "content_type", default: 1, null: false
       t.integer "last_delivery_status", default: 1, null: false
