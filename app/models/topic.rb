@@ -666,11 +666,14 @@ class Topic < ActiveRecord::Base
 
     if opts[:whisper]
 
-      result = DB.query_single(<<~SQL, highest, topic_id)
+      DB.exec(<<~SQL, highest, topic_id)
         UPDATE topics
         SET highest_staff_post_number = ? + 1
         WHERE id = ?
-        RETURNING highest_staff_post_number
+      SQL
+
+      result = DB.query_single(<<~SQL, topic_id)
+        SELECT highest_staff_post_number FROM topics WHERE id = ?
       SQL
 
       result.first.to_i
@@ -680,14 +683,17 @@ class Topic < ActiveRecord::Base
       reply_sql = opts[:reply] ? ", reply_count = reply_count + 1" : ""
       posts_sql = opts[:post]  ? ", posts_count = posts_count + 1" : ""
 
-      result = DB.query_single(<<~SQL, highest: highest, topic_id: topic_id)
+      DB.exec(<<~SQL, highest: highest, topic_id: topic_id)
         UPDATE topics
         SET highest_staff_post_number = :highest + 1,
             highest_post_number = :highest + 1
             #{reply_sql}
             #{posts_sql}
         WHERE id = :topic_id
-        RETURNING highest_post_number
+      SQL
+
+      result = DB.query_single(<<~SQL, topic_id)
+        SELECT highest_post_number FROM topics WHERE id = ?
       SQL
 
       result.first.to_i
@@ -775,7 +781,7 @@ class Topic < ActiveRecord::Base
     # ignore small_action replies for private messages
     post_type = archetype == Archetype.private_message ? " AND post_type <> #{Post.types[:small_action]}" : ''
 
-    result = DB.query_single(<<~SQL, topic_id: topic_id)
+    DB.exec(<<~SQL, topic_id: topic_id)
       UPDATE topics
       SET
         highest_staff_post_number = (
@@ -805,7 +811,10 @@ class Topic < ActiveRecord::Base
                 #{post_type}
         )
       WHERE id = :topic_id
-      RETURNING highest_post_number
+    SQL
+
+    result = DB.query_single(<<~SQL, topic_id)
+      SELECT highest_post_number FROM topics WHERE id = ?
     SQL
 
     highest_post_number = result.first.to_i
