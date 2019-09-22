@@ -44,6 +44,7 @@ class UserOption < ActiveRecord::Base
   validates :email_messages_level, inclusion: { in: UserOption.email_level_types.values }
 
   def set_defaults
+    self.theme_ids = ''
     self.mailing_list_mode = SiteSetting.default_email_mailing_list_mode
     self.mailing_list_mode_frequency = SiteSetting.default_email_mailing_list_mode_frequency
     self.email_level = SiteSetting.default_email_level
