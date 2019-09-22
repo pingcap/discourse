@@ -469,12 +469,10 @@ class Group < ActiveRecord::Base
       when :trust_level_0, :trust_level_1, :trust_level_2, :trust_level_3, :trust_level_4
         "SELECT id FROM users WHERE id <= 0 OR trust_level < #{id - 10} OR staged"
       end
-
+      
     DB.exec <<-SQL
       DELETE FROM group_users
-            USING (#{remove_subquery}) X
-            WHERE group_id = #{group.id}
-              AND user_id = X.id
+            WHERE group_id = #{group.id} AND user_id IN (#{remove_subquery})
     SQL
 
     # Add people to groups
