@@ -219,3 +219,4 @@ end
 gem 'webpush', require: false
 gem 'colored2', require: false
 gem 'maxminddb'
+gem 'marginalia'

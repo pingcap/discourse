@@ -180,6 +180,9 @@ GEM
     lru_redux (1.1.0)
     mail (2.7.1)
       mini_mime (>= 0.1.1)
+    marginalia (1.8.0)
+      actionpack (>= 2.3)
+      activerecord (>= 2.3)
     maxminddb (0.1.22)
     memory_profiler (0.9.13)
     message_bus (2.2.0)
@@ -469,6 +472,7 @@ DEPENDENCIES
   logster
   lru_redux
   mail
+  marginalia
   maxminddb
   memory_profiler
   message_bus
