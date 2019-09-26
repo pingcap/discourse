@@ -11,29 +11,32 @@ class ThemeField < ActiveRecord::Base
     where(theme_id: theme_ids)
       .joins(
         "JOIN (
-          SELECT #{theme_ids.map.with_index { |id, idx| "#{id.to_i} AS theme_id, #{idx} AS theme_sort_column" }.join(" UNION ALL SELECT ")}
+          #{theme_ids.map.with_index { |id, idx| "SELECT #{id.to_i} AS theme_id, #{idx} AS theme_sort_column" }.join(" UNION ALL ")}
         ) as X ON X.theme_id = theme_fields.theme_id")
       .order("theme_sort_column")
   }
 
   scope :filter_locale_fields, ->(locale_codes) {
     return none unless locale_codes.present?
-
+    values = locale_codes.each_with_index.map do |l, i|
+      "SELECT '#{l}' AS locale_code, #{i} AS locale_sort_column"
+    end.join("\n UNION \n")
     where(target_id: Theme.targets[:translations], name: locale_codes)
       .joins(DB.sql_fragment(
       "JOIN (
-        SELECT * FROM (VALUES #{locale_codes.map { "(?)" }.join(",")}) as Y (locale_code, locale_sort_column)
+        #{values}
       ) as Y ON Y.locale_code = theme_fields.name",
       *locale_codes.map.with_index { |code, index| [code, index] }
     ))
       .order("Y.locale_sort_column")
   }
 
+  # TODO FIX ON (X.theme_sort_column)
   scope :find_first_locale_fields, ->(theme_ids, locale_codes) {
     find_by_theme_ids(theme_ids)
       .filter_locale_fields(locale_codes)
       .reorder("X.theme_sort_column", "Y.locale_sort_column")
-      .select("DISTINCT ON (X.theme_sort_column) *")
+      .select("DISTINCT *")
   }
 
   def self.types
