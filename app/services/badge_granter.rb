@@ -234,6 +234,7 @@ class BadgeGranter
 
   MAX_ITEMS_FOR_DELTA ||= 200
   def self.backfill(badge, opts = nil)
+    return true # TODO FIX
     return unless SiteSetting.enable_badges
     return unless badge.enabled
     return unless badge.query.present?
