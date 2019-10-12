@@ -30,11 +30,11 @@ class RandomTopicSelector
 
     query = TopicQuery.new(nil, options)
 
-    results = query.latest_results.order('RANDOM()')
+    results = query.latest_results.order('RAND()')
       .where(closed: false, archived: false)
       .where("topics.created_at > ?", SiteSetting.suggested_topics_max_days_old.days.ago)
       .limit(BACKFILL_SIZE)
-      .reorder('RANDOM()')
+      .reorder('RAND()')
       .pluck(:id)
 
     key = cache_key(category)
