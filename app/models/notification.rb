@@ -175,7 +175,7 @@ class Notification < ActiveRecord::Base
          WHERE
            n.notification_type = 6 AND
            n.user_id = #{user.id.to_i} AND
-           NOT read
+           NOT `read`
         ORDER BY n.id ASC
         LIMIT ?
       SQL

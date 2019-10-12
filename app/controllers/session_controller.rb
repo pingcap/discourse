@@ -289,7 +289,7 @@ class SessionController < ApplicationController
       invalid_credentials
       return
     end
-
+    
     if payload = login_error_check(user)
       render json: payload
     else

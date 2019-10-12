@@ -483,7 +483,7 @@ class User < ActiveRecord::Base
          WHERE t.deleted_at IS NULL
            AND n.notification_type = :type
            AND n.user_id = :user_id
-           AND NOT read
+           AND NOT `read`
     SQL
 
     # to avoid coalesce we do to_i
@@ -519,7 +519,7 @@ class User < ActiveRecord::Base
             n.notification_type <> :pm AND
             n.user_id = :user_id AND
             n.id > :seen_notification_id AND
-            NOT read
+            NOT `read`
           LIMIT :limit
         ) AS X
       SQL
@@ -571,7 +571,7 @@ class User < ActiveRecord::Base
           t.deleted_at IS NULL AND
           n.notification_type = :type AND
           n.user_id = :user_id AND
-          NOT read
+          NOT `read`
         ORDER BY n.id DESC
         LIMIT 20
       ) AS x
@@ -581,7 +581,7 @@ class User < ActiveRecord::Base
        LEFT JOIN topics t ON n.topic_id = t.id
        WHERE
         t.deleted_at IS NULL AND
-        (n.notification_type <> :type OR read) AND
+        (n.notification_type <> :type OR `read`) AND
         n.user_id = :user_id
        ORDER BY n.id DESC
        LIMIT 20
