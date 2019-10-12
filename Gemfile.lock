@@ -95,6 +95,8 @@ GEM
       safe_yaml (~> 1.0.0)
     crass (1.0.4)
     debug_inspector (0.0.3)
+    default_value_for (3.3.0)
+      activerecord (>= 3.2.0, < 6.1)
     diff-lcs (1.3)
     diffy (3.3.0)
     discourse-ember-source (3.8.0.1)
@@ -445,6 +447,7 @@ DEPENDENCIES
   certified
   colored2
   cppjieba_rb
+  default_value_for
   diffy
   discourse-ember-source (~> 3.8.0)
   discourse_image_optim

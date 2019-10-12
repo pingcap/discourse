@@ -30,7 +30,8 @@ end
 
 UserOption.where(user_id: -1).update_all(
   email_messages_level: UserOption.email_level_types[:never],
-  email_level: UserOption.email_level_types[:never]
+  email_level: UserOption.email_level_types[:never],
+  theme_ids: []
 )
 
 Group.user_trust_level_change!(-1, TrustLevel[4])

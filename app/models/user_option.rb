@@ -6,6 +6,7 @@ class UserOption < ActiveRecord::Base
   before_create :set_defaults
 
   after_save :update_tracked_topics
+  default_value_for :theme_ids, []
 
   def self.ensure_consistency!
     sql = <<~SQL
