@@ -314,7 +314,7 @@ class Search
   end
 
   advanced_filter(/^badge:(.*)$/) do |posts, match|
-    badge_id = Badge.where('name ilike ? OR id = ?', match, match.to_i).pluck(:id).first
+    badge_id = Badge.where('LOWER(name) like ? OR id = ?', match.downcase, match.to_i).pluck(:id).first
     if badge_id
       posts.where('posts.user_id IN (SELECT ub.user_id FROM user_badges ub WHERE ub.badge_id = ?)', badge_id)
     else
@@ -387,8 +387,8 @@ class Search
       match = match[1..-1]
     end
 
-    category_ids = Category.where('slug ilike ? OR name ilike ? OR id = ?',
-                                  match, match, match.to_i).pluck(:id)
+    category_ids = Category.where('LOWER(slug) like ? OR LOWER(name) like ? OR id = ?',
+                                  match.downcase, match.downcase, match.to_i).pluck(:id)
     if category_ids.present?
 
       unless exact
@@ -470,7 +470,7 @@ class Search
   end
 
   advanced_filter(/^group:(.+)$/) do |posts, match|
-    group_id = Group.where('name ilike ? OR (id = ? AND id > 0)', match, match.to_i).pluck(:id).first
+    group_id = Group.where('LOWER(name) like ? OR (id = ? AND id > 0)', match.downcase, match.to_i).pluck(:id).first
     if group_id
       posts.where("posts.user_id IN (select gu.user_id from group_users gu where gu.group_id = ?)", group_id)
     else
@@ -713,7 +713,7 @@ class Search
   def groups_search
     groups = Group
       .visible_groups(@guardian.user, "name ASC", include_everyone: false)
-      .where("name ILIKE :term OR full_name ILIKE :term", term: "%#{@term}%")
+      .where("LOWER(name) LIKE :term OR full_name LIKE :term", term: "%#{@term}%".downcase)
 
     groups.each { |group| @results.add(group) }
   end
@@ -768,7 +768,7 @@ class Search
         end
 
         posts = posts.joins('JOIN users u ON u.id = posts.user_id')
-        posts = posts.where("posts.raw  || ' ' || u.username || ' ' || COALESCE(u.name, '') ilike ?", "%#{term_without_quote}%")
+        posts = posts.where("LOWER(posts.raw  || ' ' || u.username || ' ' || COALESCE(u.name, '')) like ?", "%#{term_without_quote}%".downcase)
       else
         # A is for title
         # B is for category
@@ -779,7 +779,7 @@ class Search
         exact_terms = @term.scan(Regexp.new(PHRASE_MATCH_REGEXP_PATTERN)).flatten
 
         exact_terms.each do |exact|
-          posts = posts.where("posts.raw ilike :exact OR topics.title ilike :exact", exact: "%#{exact}%")
+          posts = posts.where("LOWER(posts.raw) like :exact OR LOWER(topics.title) like :exact", exact: "%#{exact}%".downcase)
         end
       end
     end

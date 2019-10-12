@@ -12,16 +12,16 @@ module Jobs
       old = base_url.sub('s3.dualstack.', 's3-')
       old_like = %"#{old}%"
 
-      DB.exec(<<~SQL, from: old, to: base_url, old_like: old_like)
+      DB.exec(<<~SQL, from: old, to: base_url, old_like: old_like.downcase)
         UPDATE uploads
         SET url = replace(url, :from, :to)
-        WHERE url ilike :old_like
+        WHERE LOWER(url) like :old_like
       SQL
 
-      DB.exec(<<~SQL, from: old, to: base_url, old_like: old_like)
+      DB.exec(<<~SQL, from: old, to: base_url, old_like: old_like.downcase)
         UPDATE optimized_images
         SET url = replace(url, :from, :to)
-        WHERE url ilike :old_like
+        WHERE LOWER(url) like :old_like
       SQL
     end
   end

@@ -8,9 +8,9 @@ class IncomingEmail < ActiveRecord::Base
   scope :errored,  -> { where("NOT is_bounce AND error IS NOT NULL") }
 
   scope :addressed_to, -> (email) do
-    where(<<~SQL, email: "%#{email}%")
-      incoming_emails.to_addresses ILIKE :email OR
-      incoming_emails.cc_addresses ILIKE :email
+    where(<<~SQL, email: "%#{email}%".downcase)
+      LOWER(incoming_emails.to_addresses) LIKE :email OR
+      LOWER(incoming_emails.cc_addresses) LIKE :email
     SQL
   end
 
@@ -20,8 +20,8 @@ class IncomingEmail < ActiveRecord::Base
           SELECT 1
           FROM user_emails
           WHERE user_emails.user_id = :user_id AND
-                (incoming_emails.to_addresses ILIKE '%' || user_emails.email || '%' OR
-                 incoming_emails.cc_addresses ILIKE '%' || user_emails.email || '%')
+                (LOWER(incoming_emails.to_addresses) LIKE '%' || LOWER(user_emails.email) || '%' OR
+                 LOWER(incoming_emails.cc_addresses) LIKE '%' || LOWER(user_emails.email) || '%')
       )
     SQL
   end

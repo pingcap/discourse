@@ -424,7 +424,7 @@ class Group < ActiveRecord::Base
 
   def self.search_groups(name, groups: nil)
     (groups || Group).where(
-      "name ILIKE :term_like OR full_name ILIKE :term_like", term_like: "%#{name}%"
+      "LOWER(name) LIKE :term_like OR LOWER(full_name) LIKE :term_like", term_like: "%#{name}%".downcase
     )
   end
 

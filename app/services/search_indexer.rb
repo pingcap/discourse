@@ -117,10 +117,8 @@ class SearchIndexer
 
     DB.exec(<<~SQL, topic_id: topic_id, version: REINDEX_VERSION)
       UPDATE post_search_data
-      SET version = :version
-      FROM posts
-      WHERE post_search_data.post_id = posts.id
-      AND posts.topic_id = :topic_id
+      INNER JOIN posts ON post_search_data.post_id = posts.id AND posts.topic_id = :topic_id
+      SET post_search_data.version = :version
     SQL
   end
 

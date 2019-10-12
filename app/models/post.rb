@@ -109,7 +109,7 @@ class Post < ActiveRecord::Base
 
     case type
     when 'string'
-      where('LOWER(raw) ILIKE ?', "%#{pattern}%")
+      where('LOWER(raw) LIKE ?', "%#{pattern}%".downcase)
     when 'regex'
       where('raw REGEXP ?', "(?n)#{pattern}")
     end

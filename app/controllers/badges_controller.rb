@@ -10,7 +10,7 @@ class BadgesController < ApplicationController
 
     if search = params[:search]
       search = search.to_s
-      badges = badges.where("name ILIKE ?", "%#{search}%")
+      badges = badges.where("LOWER(name) LIKE ?", "%#{search}%".downcase)
     end
 
     if (params[:only_listable] == "true") || !request.xhr?

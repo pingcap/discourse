@@ -496,7 +496,7 @@ class GroupsController < ApplicationController
       .order(:name)
 
     if term = params[:term].to_s
-      groups = groups.where("name ILIKE :term OR full_name ILIKE :term", term: "%#{term}%")
+      groups = groups.where("LOWER(name) LIKE :term OR LOWER(full_name) LIKE :term", term: "%#{term}%".downcase)
     end
 
     if params[:ignore_automatic].to_s == "true"
