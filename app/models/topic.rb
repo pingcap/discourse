@@ -1196,7 +1196,7 @@ class Topic < ActiveRecord::Base
     # OR if you have it archived as a user explicitly
 
     sql = <<~SQL
-      SELECT 1
+      SELECT 1 FROM one_row_table
       WHERE
         (
         SELECT count(*) FROM topic_allowed_groups tg
