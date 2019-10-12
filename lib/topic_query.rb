@@ -344,7 +344,7 @@ class TopicQuery
 
   def list_private_messages_group(user)
     list = private_messages_for(user, :group)
-    group_id = Group.where('LOWER(name) like ?', @options[:group_name]).pluck(:id).first.downcase
+    group_id = Group.where('LOWER(name) like ?', @options[:group_name].downcase).pluck(:id).first
     list = list.joins("LEFT JOIN group_archived_messages gm ON gm.topic_id = topics.id AND
                       gm.group_id = #{group_id.to_i}")
     list = list.where("gm.id IS NULL")
@@ -353,7 +353,7 @@ class TopicQuery
 
   def list_private_messages_group_archive(user)
     list = private_messages_for(user, :group)
-    group_id = Group.where('LOWER(name) like ?', @options[:group_name]).pluck(:id).first.downcase
+    group_id = Group.where('LOWER(name) like ?', @options[:group_name].downcase).pluck(:id).first
     list = list.joins("JOIN group_archived_messages gm ON gm.topic_id = topics.id AND
                       gm.group_id = #{group_id.to_i}")
     create_list(:private_messages, {}, list)

@@ -33,7 +33,7 @@ class TopicsBulkAction
   def find_group
     return unless @options[:group]
 
-    group = Group.where('LOWER(name) like ?', @options[:group]).first.downcase
+    group = Group.where('LOWER(name) like ?', @options[:group].downcase).first
     raise Discourse::InvalidParameters.new(:group) unless group
     unless group.group_users.where(user_id: @user.id).exists?
       raise Discourse::InvalidParameters.new(:group)
