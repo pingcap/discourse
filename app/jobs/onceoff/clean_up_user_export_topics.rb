@@ -13,9 +13,13 @@ module Jobs
       end
       # "[%{export_title}] 資料匯出已完成" gets converted to "%-topic", do not match that slug.
       slugs = slugs.reject { |s| s == "%-topic" }
-
-      topics = Topic.with_deleted.where(<<~SQL, slugs, UserExport::DESTROY_CREATED_BEFORE)
-        slug LIKE ANY(ARRAY[?]) AND
+      
+      slugs_condition = slugs.map do |slug|
+        "slug LIKE '#{EscapeLike.escape_like(slug)}'"
+      end.join(" OR ")
+      slugs_condition = "1=1" if slugs_condition.blank?
+      topics = Topic.with_deleted.where(<<~SQL, UserExport::DESTROY_CREATED_BEFORE)
+        #{slugs_condition} AND
         archetype = 'private_message' AND
         subtype = 'system_message' AND
         posts_count = 1 AND
