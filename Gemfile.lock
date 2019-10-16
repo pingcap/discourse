@@ -1,6 +1,6 @@
 GIT
   remote: git://github.com/hooopo/mini_sql.git
-  revision: 8e916d14fea2002708f37ccf9dbe04c471d916ee
+  revision: 72d214d92388c63c002454a189c277dc6b1b71db
   specs:
     mini_sql (0.2.2)
 
