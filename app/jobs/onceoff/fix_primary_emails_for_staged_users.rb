@@ -30,7 +30,7 @@ module Jobs
       INSERT INTO user_emails (
         user_id,
         email,
-        "primary",
+        `primary`,
         created_at,
         updated_at
       ) SELECT DISTINCT
