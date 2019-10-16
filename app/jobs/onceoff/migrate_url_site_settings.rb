@@ -25,7 +25,7 @@ module Jobs
 
         old_url = DB.query_single(
           "SELECT value FROM site_settings WHERE name = '#{old_setting}'"
-        ).first
+        ).first rescue nil
 
         next if old_url.blank?
 
