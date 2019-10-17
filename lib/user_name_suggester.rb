@@ -55,7 +55,8 @@ module UserNameSuggester
             name: normalized,
             allowed_normalized: allowed_username || ''
           }
-
+          
+          # TODO FIX generate_series
           # increasing the search space a bit to allow for some extra noise
           available = DB.query_single(<<~SQL, params).first
             WITH numbers AS (SELECT generate_series(1, :count) AS n)
