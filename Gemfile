@@ -221,4 +221,3 @@ gem 'colored2', require: false
 gem 'maxminddb'
 gem 'marginalia'
 gem "default_value_for"
-gem "sentry-raven"
