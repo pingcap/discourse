@@ -466,7 +466,7 @@ protected
 
   def recalculate_score
     # Recalculate the pending score and return it
-    result = DB.query(<<~SQL, id: self.id, pending: ReviewableScore.statuses[:pending])
+    DB.exec(<<~SQL, id: self.id, pending: ReviewableScore.statuses[:pending])
       UPDATE reviewables
       SET score = COALESCE((
         SELECT sum(score)
@@ -474,7 +474,10 @@ protected
         WHERE rs.reviewable_id = :id
       ), 0.0)
       WHERE id = :id
-      RETURNING score
+    SQL
+
+    result = DB.query(<<~SQL, id: self.id)
+      SELECT score FROM reviewables WHERE id = :id
     SQL
 
     # Update topic score
@@ -495,15 +498,24 @@ protected
     version_result = nil
 
     if version
-      version_result = DB.query_single(
-        "UPDATE reviewables SET version = version + 1 WHERE id = :id AND version = :version RETURNING version",
+      DB.exec(
+        "UPDATE reviewables SET version = version + 1 WHERE id = :id AND version = :version",
         version: version,
+        id: self.id
+      )
+      version_result = DB.exec(
+        "SELECT version FROM reviewables WHERE id = :id",
         id: self.id
       )
     else
       # We didn't supply a version to update safely, so just increase it
-      version_result = DB.query_single(
-        "UPDATE reviewables SET version = version + 1 WHERE id = :id RETURNING version",
+      DB.query_exec(
+        "UPDATE reviewables SET version = version + 1 WHERE id = :id",
+        id: self.id
+      )
+
+      version_result = DB.query_exec(
+        "SELECT version FROM reviewables WHERE id = :id",
         id: self.id
       )
     end
