@@ -69,7 +69,7 @@ class Report
   def self.wrap_slow_query(timeout = 20000)
     ActiveRecord::Base.connection.transaction do
       # Set a statement timeout so we can't tie up the server
-      DB.exec "SET LOCAL statement_timeout = #{timeout}"
+      DB.exec "SET SESSION wait_timeout = #{timeout}"
       yield
     end
   end
