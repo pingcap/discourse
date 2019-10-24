@@ -107,6 +107,14 @@ GEM
       in_threads (~> 1.3)
       progress (~> 3.0, >= 3.0.1)
     docile (1.3.1)
+    elasticsearch (7.3.0)
+      elasticsearch-api (= 7.3.0)
+      elasticsearch-transport (= 7.3.0)
+    elasticsearch-api (7.3.0)
+      multi_json
+    elasticsearch-transport (7.3.0)
+      faraday
+      multi_json
     email_reply_trimmer (0.1.12)
     ember-data-source (3.0.2)
       ember-source (>= 2, < 3.0)
@@ -376,6 +384,10 @@ GEM
       sprockets (> 3.0)
       sprockets-rails
       tilt
+    searchkick (4.1.0)
+      activemodel (>= 5)
+      elasticsearch (>= 6)
+      hashie
     seed-fu (2.3.9)
       activerecord (>= 3.1)
       activesupport (>= 3.1)
@@ -532,6 +544,7 @@ DEPENDENCIES
   sanitize
   sassc
   sassc-rails
+  searchkick
   seed-fu
   shoulda-matchers (~> 3.1, >= 3.1.3)
   sidekiq

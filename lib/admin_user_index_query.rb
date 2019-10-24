@@ -14,8 +14,8 @@ class AdminUserIndexQuery
 
   SORTABLE_MAPPING = {
     'created' => 'created_at',
-    'last_emailed' => "COALESCE(last_emailed_at, to_date('1970-01-01', 'YYYY-MM-DD'))",
-    'seen' => "COALESCE(last_seen_at, to_date('1970-01-01', 'YYYY-MM-DD'))",
+    'last_emailed' => "COALESCE(last_emailed_at, DATE_FORMAT('1970-01-01', 'YYYY-MM-DD'))",
+    'seen' => "COALESCE(last_seen_at, DATE_FORMAT('1970-01-01', 'YYYY-MM-DD'))",
     'username' => 'username',
     'email' => 'email',
     'trust_level' => 'trust_level',
@@ -54,7 +54,7 @@ class AdminUserIndexQuery
 
     if !custom_order.present?
       if params[:query] == "active"
-        order << "COALESCE(users.last_seen_at, to_date('1970-01-01', 'YYYY-MM-DD')) DESC"
+        order << "COALESCE(users.last_seen_at, DATE_FORMAT('1970-01-01', 'YYYY-MM-DD')) DESC"
       else
         order << "users.created_at DESC"
       end

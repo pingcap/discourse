@@ -303,7 +303,7 @@ class Topic < ActiveRecord::Base
   end
 
   def best_post
-    posts.where(post_type: Post.types[:regular], user_deleted: false).order('score desc nulls last').limit(1).first
+    posts.where(post_type: Post.types[:regular], user_deleted: false).order('score desc').limit(1).first
   end
 
   def has_flags?
@@ -1225,7 +1225,7 @@ class Topic < ActiveRecord::Base
   TIME_TO_FIRST_RESPONSE_SQL ||= <<-SQL
     SELECT AVG(t.hours)::float AS "hours", t.created_at AS "date"
     FROM (
-      SELECT t.id, t.created_at::date AS created_at, EXTRACT(EPOCH FROM MIN(p.created_at) - t.created_at)::float / 3600.0 AS "hours"
+      SELECT t.id, t.created_at::date AS created_at, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id
       /*where*/
@@ -1238,7 +1238,7 @@ class Topic < ActiveRecord::Base
   TIME_TO_FIRST_RESPONSE_TOTAL_SQL ||= <<-SQL
     SELECT AVG(t.hours)::float AS "hours"
     FROM (
-      SELECT t.id, EXTRACT(EPOCH FROM MIN(p.created_at) - t.created_at)::float / 3600.0 AS "hours"
+      SELECT t.id, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id
       /*where*/
