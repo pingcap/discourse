@@ -1223,9 +1223,9 @@ class Topic < ActiveRecord::Base
   end
 
   TIME_TO_FIRST_RESPONSE_SQL ||= <<-SQL
-    SELECT AVG(t.hours)::float AS "hours", t.created_at AS "date"
+    SELECT AVG(t.hours) AS "hours", t.created_at AS "date"
     FROM (
-      SELECT t.id, t.created_at::date AS created_at, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
+      SELECT t.id, date(t.created_at) AS created_at, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id
       /*where*/
@@ -1236,7 +1236,7 @@ class Topic < ActiveRecord::Base
   SQL
 
   TIME_TO_FIRST_RESPONSE_TOTAL_SQL ||= <<-SQL
-    SELECT AVG(t.hours)::float AS "hours"
+    SELECT AVG(t.hours) AS "hours"
     FROM (
       SELECT t.id, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
@@ -1275,7 +1275,7 @@ class Topic < ActiveRecord::Base
   WITH_NO_RESPONSE_SQL ||= <<-SQL
     SELECT COUNT(*) as count, tt.created_at AS "date"
     FROM (
-      SELECT t.id, t.created_at::date AS created_at, MIN(p.post_number) first_reply
+      SELECT t.id, date(t.created_at) AS created_at, MIN(p.post_number) first_reply
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id AND p.user_id != t.user_id AND p.deleted_at IS NULL AND p.post_type = #{Post.types[:regular]}
       /*where*/

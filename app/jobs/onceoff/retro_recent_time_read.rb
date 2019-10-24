@@ -9,7 +9,7 @@ module Jobs
          SET time_read = (
         SELECT (
           uv1.posts_read
-          / (SELECT CAST(sum(uv2.posts_read) AS FLOAT) FROM user_visits uv2 where uv2.user_id = uv1.user_id)
+          / (SELECT CAST(sum(uv2.posts_read) AS DECIMAL) FROM user_visits uv2 where uv2.user_id = uv1.user_id)
           * COALESCE((SELECT us.time_read FROM user_stats us WHERE us.user_id = uv1.user_id), 0)
         )
       )
