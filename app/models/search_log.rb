@@ -90,7 +90,7 @@ class SearchLog < ActiveRecord::Base
   def self.term_details(term, period = :weekly, search_type = :all)
     details = []
 
-    result = SearchLog.select("COUNT(*) AS count, created_at::date AS date")
+    result = SearchLog.select("COUNT(*) AS count, date(created_at) AS date")
       .where(
         'lower(term) = ? AND created_at > ?',
         term.downcase, start_of(period)

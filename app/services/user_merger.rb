@@ -74,7 +74,7 @@ class UserMerger
         SELECT
           :target_user_id                AS user_id,
           COUNT(1)                       AS likes_given,
-          a.created_at::DATE             AS given_date,
+          date(a.created_at)             AS given_date,
           COUNT(1) >= :max_likes_per_day AS limit_reached
         FROM post_actions AS a
         WHERE a.user_id = :target_user_id
@@ -82,7 +82,7 @@ class UserMerger
               AND EXISTS(
                   SELECT 1
                   FROM given_daily_likes AS g
-                  WHERE g.user_id = :source_user_id AND a.created_at::DATE = g.given_date
+                  WHERE g.user_id = :source_user_id AND date(a.created_at) = g.given_date
               )
         GROUP BY given_date
       ON CONFLICT (user_id, given_date)
