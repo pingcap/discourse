@@ -138,12 +138,6 @@ class ApplicationController < ActionController::Base
     render_rate_limit_error(e)
   end
 
-  rescue_from PG::ReadOnlySqlTransaction do |e|
-    Discourse.received_readonly!
-    Rails.logger.error("#{e.class} #{e.message}: #{e.backtrace.join("\n")}")
-    raise Discourse::ReadOnly
-  end
-
   rescue_from Discourse::NotLoggedIn do |e|
     if (request.format && request.format.json?) || request.xhr? || !request.get?
       rescue_discourse_actions(:not_logged_in, 403, include_ember: true)

@@ -273,7 +273,6 @@ GEM
       parallel
     parser (2.6.3.0)
       ast (~> 2.4.0)
-    pg (1.1.4)
     progress (3.5.0)
     pry (0.12.2)
       coderay (~> 1.1.0)
@@ -515,7 +514,6 @@ DEPENDENCIES
   onebox (= 1.8.92)
   openid-redis-store
   parallel_tests
-  pg
   pry-nav
   pry-rails
   puma
