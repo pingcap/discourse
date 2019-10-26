@@ -57,7 +57,7 @@ class Post < ActiveRecord::Base
 
   validates_with ::Validators::PostValidator, unless: :skip_validation
 
-  #after_save :index_search
+  after_save :index_search
 
   # We can pass several creating options to a post via attributes
   attr_accessor :image_sizes, :quoted_post_numbers, :no_bump, :invalidate_oneboxes, :cooking_options, :skip_unique_check, :skip_validation

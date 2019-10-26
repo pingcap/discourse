@@ -44,10 +44,15 @@ class SearchIndexer
     stemmer = table == "user" ? "simple" : Search.ts_config
 
     ranked_index = <<~SQL
-      setweight(to_tsvector('#{stemmer}', coalesce(:a,'')), 'A') ||
-      setweight(to_tsvector('#{stemmer}', coalesce(:b,'')), 'B') ||
-      setweight(to_tsvector('#{stemmer}', coalesce(:c,'')), 'C') ||
-      setweight(to_tsvector('#{stemmer}', coalesce(:d,'')), 'D')
+      CONCAT(
+        coalesce(:a,''),
+        ' ',
+        coalesce(:b,''),
+        ' ',
+        coalesce(:c,''),
+        ' ',
+        coalesce(:d,'')
+      )
     SQL
 
     indexed_data = search_data.select { |d| d.length > 0 }.join(' ')

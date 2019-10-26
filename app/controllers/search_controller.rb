@@ -11,7 +11,7 @@ class SearchController < ApplicationController
   end
 
   def show
-    @search_term = params.permit(:q)[:q]
+    @search_term = params.permit(:q, :page, :_)[:q]
 
     # a q param has been given but it's not in the correct format
     # eg: ?q[foo]=bar

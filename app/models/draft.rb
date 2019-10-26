@@ -60,7 +60,7 @@ class Draft < ActiveRecord::Base
       LEFT JOIN posts p ON postId :: BIGINT = p.id
       LEFT JOIN topics t ON
         CASE
-            WHEN d.draft_key LIKE '%' || '#{EXISTING_TOPIC}' || '%'
+            WHEN d.draft_key LIKE CONCAT('%', '#{EXISTING_TOPIC}', '%')
               THEN CAST(replace(d.draft_key, '#{EXISTING_TOPIC}', '') AS INT)
             ELSE 0
         END = t.id

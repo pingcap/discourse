@@ -143,7 +143,7 @@ class User < ActiveRecord::Base
   after_save :refresh_avatar
   after_save :badge_grant
   after_save :expire_old_email_tokens
-  #after_save :index_search
+  after_save :index_search
   after_save :check_site_contact_username
 
   after_commit :trigger_user_created_event, on: :create

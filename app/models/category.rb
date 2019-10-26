@@ -70,7 +70,7 @@ class Category < ActiveRecord::Base
   after_save :publish_category
   after_save :reset_topic_ids_cache
   after_save :clear_url_cache
-  #after_save :index_search
+  after_save :index_search
   after_save :update_reviewables
 
   after_destroy :reset_topic_ids_cache

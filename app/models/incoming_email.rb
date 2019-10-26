@@ -20,8 +20,8 @@ class IncomingEmail < ActiveRecord::Base
           SELECT 1
           FROM user_emails
           WHERE user_emails.user_id = :user_id AND
-                (LOWER(incoming_emails.to_addresses) LIKE '%' || LOWER(user_emails.email) || '%' OR
-                 LOWER(incoming_emails.cc_addresses) LIKE '%' || LOWER(user_emails.email) || '%')
+                (LOWER(incoming_emails.to_addresses) LIKE CONCAT('%', LOWER(user_emails.email), '%') OR
+                 LOWER(incoming_emails.cc_addresses) LIKE CONCAT('%', LOWER(user_emails.email), '%'))
       )
     SQL
   end
