@@ -52,6 +52,7 @@ if defined?(Bundler)
   end
 
   Bundler.require(*bundler_groups)
+  Dotenv::Railtie.load
 end
 
 module Discourse

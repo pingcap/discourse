@@ -221,3 +221,4 @@ gem 'maxminddb'
 gem 'marginalia'
 gem "default_value_for"
 gem 'searchkick'
+gem 'dotenv-rails', require: 'dotenv/rails-now'
