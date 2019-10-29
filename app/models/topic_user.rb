@@ -286,6 +286,7 @@ class TopicUser < ActiveRecord::Base
     INSERT_TOPIC_USER_SQL_STAFF = INSERT_TOPIC_USER_SQL.gsub("highest_post_number", "highest_staff_post_number")
 
     def update_last_read(user, topic_id, post_number, new_posts_read, msecs, opts = {})
+      return #TODO FIX
       return if post_number.blank?
       msecs = 0 if msecs.to_i < 0
 
