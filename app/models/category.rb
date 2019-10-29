@@ -413,7 +413,7 @@ class Category < ActiveRecord::Base
 
     auto_bumps = CategoryCustomField
       .where(name: Category::NUM_AUTO_BUMP_DAILY)
-      .where('NULLIF(value, \'\')::int > 0')
+      .where('CAST(NULLIF(value, \'\') AS SIGNED) > 0')
       .pluck(:category_id)
 
     if (auto_bumps.length > 0)
