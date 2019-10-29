@@ -32,17 +32,16 @@ class ScoreCalculator
     @weightings.each_key { |k| components << "COALESCE(posts.#{k}, 0) * :#{k}" }
     components = components.join(" + ")
 
-    builder = DB.build <<SQL
+    builder = DB.build <<~SQL
        UPDATE posts p
-        SET score = x.score
-       FROM (
+       INNER JOIN (
         SELECT posts.id, #{components} as score FROM posts
         join topics on posts.topic_id = topics.id
         /*where*/
         limit #{limit}
-       ) AS x
-       WHERE x.id = p.id
-SQL
+       ) AS x ON x.id = p.id
+        SET p.score = x.score
+    SQL
 
     builder.where("posts.score IS NULL OR posts.score <> #{components}", @weightings)
 
