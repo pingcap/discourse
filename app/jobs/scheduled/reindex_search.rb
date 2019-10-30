@@ -76,8 +76,8 @@ module Jobs
         DELETE FROM post_search_data
         WHERE post_id IN (
           SELECT post_id
-          FROM post_search_data
-          LEFT JOIN posts ON post_search_data.post_id = posts.id
+          FROM (select * from post_search_data) a
+          LEFT JOIN posts ON a.post_id = posts.id
           INNER JOIN topics ON posts.topic_id = topics.id
           WHERE (topics.deleted_at IS NOT NULL
           AND topics.deleted_at <= :deleted_at) OR (
@@ -94,8 +94,8 @@ module Jobs
       DELETE FROM topic_search_data
       WHERE topic_id IN (
         SELECT topic_id
-        FROM topic_search_data
-        INNER JOIN topics ON topic_search_data.topic_id = topics.id
+        FROM (select * from topic_search_data) a
+        INNER JOIN topics ON a.topic_id = topics.id
         WHERE topics.deleted_at IS NOT NULL
         AND topics.deleted_at <= :deleted_at
       )
