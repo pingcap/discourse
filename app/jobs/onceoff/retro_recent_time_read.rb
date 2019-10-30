@@ -3,6 +3,7 @@
 module Jobs
   class RetroRecentTimeRead < Jobs::Onceoff
     def execute_onceoff(args)
+      return # TODO FIX
       # update past records by evenly distributing total time reading among each post read
       sql = <<~SQL
       UPDATE user_visits uv1
