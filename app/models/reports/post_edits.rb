@@ -44,41 +44,38 @@ Report.add_report('post_edits') do |report|
   report.data = []
 
   sql = <<~SQL
-  WITH period_revisions AS (
-  SELECT pr.user_id AS editor_id,
-  pr.number AS revision_version,
-  pr.created_at,
-  pr.post_id,
-  u.username AS editor_username,
-  u.uploaded_avatar_id as editor_avatar_id
-  FROM post_revisions pr
-  JOIN users u
-  ON u.id = pr.user_id
-  WHERE u.id > 0
-  AND pr.created_at >= '#{report.start_date}'
-  AND pr.created_at <= '#{report.end_date}'
-  ORDER BY pr.created_at DESC
-  LIMIT #{report.limit || 20}
-  )
   SELECT pr.editor_id,
-  pr.editor_username,
-  pr.editor_avatar_id,
-  p.user_id AS author_id,
-  u.username AS author_username,
-  u.uploaded_avatar_id AS author_avatar_id,
-  pr.revision_version,
-  p.version AS post_version,
-  pr.post_id,
-  left(p.raw, 40) AS post_raw,
-  p.topic_id,
-  p.post_number,
-  p.edit_reason,
-  pr.created_at
-  FROM period_revisions pr
-  JOIN posts p
-  ON p.id = pr.post_id
-  JOIN users u
-  ON u.id = p.user_id
+         pr.editor_username,
+         pr.editor_avatar_id,
+         p.user_id AS author_id,
+         u.username AS author_username,
+         u.uploaded_avatar_id AS author_avatar_id,
+         pr.revision_version,
+         p.version AS post_version,
+         pr.post_id,
+         left(p.raw, 40) AS post_raw,
+         p.topic_id,
+         p.post_number,
+         p.edit_reason,
+         pr.created_at
+    FROM (
+          SELECT pr.user_id AS editor_id,
+          pr.number AS revision_version,
+          pr.created_at,
+          pr.post_id,
+          u.username AS editor_username,
+          u.uploaded_avatar_id as editor_avatar_id
+          FROM post_revisions pr
+          JOIN users u
+          ON u.id = pr.user_id
+          WHERE u.id > 0
+          AND pr.created_at >= '#{report.start_date}'
+          AND pr.created_at <= '#{report.end_date}'
+          ORDER BY pr.created_at DESC
+          LIMIT #{report.limit || 20}
+         ) pr
+         JOIN posts p ON p.id = pr.post_id
+         JOIN users u ON u.id = p.user_id
   SQL
 
   if category_filter

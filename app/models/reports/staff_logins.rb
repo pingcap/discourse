@@ -34,12 +34,13 @@ Report.add_report("staff_logins") do |report|
       u.uploaded_avatar_id uploaded_avatar_id,
       u.id user_id
     FROM (
-      SELECT DISTINCT ON (t.client_ip, t.user_id) t.client_ip, t.user_id, t.created_at
+      SELECT t.client_ip, t.user_id, MAX(t.created_at) AS created_at
       FROM user_auth_token_logs t
       WHERE t.user_id IN (#{User.admins.pluck(:id).join(',')})
         AND t.created_at >= :start_date
         AND t.created_at <= :end_date
-      ORDER BY t.client_ip, t.user_id, t.created_at DESC
+      GROUP BY t.client_ip, t.user_id
+      ORDER BY t.client_ip, t.user_id
       LIMIT #{report.limit || 20}
     ) t1
     JOIN users u ON u.id = t1.user_id

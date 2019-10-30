@@ -178,7 +178,7 @@ class Report
             return nil
           end
         end
-      rescue ActiveRecord::QueryCanceled, PG::QueryCanceled => e
+      rescue ActiveRecord::QueryCanceled => e
         report.error = :timeout
       end
     rescue Exception => e
