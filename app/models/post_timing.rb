@@ -140,7 +140,7 @@ class PostTiming < ActiveRecord::Base
       INNER JOIN (#{join_table.join(" UNION ALL ")}) x ON x.topic_id = t.topic_id AND
             x.post_number = t.post_number AND
             x.user_id = t.user_id
-      SET msecs = t.msecs + x.msecs 
+      SET t.msecs = t.msecs + x.msecs 
       SQL
 
       existing = Set.new(DB.query_single(sql))
