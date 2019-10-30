@@ -72,7 +72,7 @@ module Jobs
           AND NOT u.moderator
           AND u.suspended_at IS NULL
           AND u.suspended_till IS NULL
-          AND u.created_at >= CURRENT_TIMESTAMP - '1 month'::INTERVAL
+          AND u.created_at >= DATE_ADD(CURRENT_TIMESTAMP, INTERVAL -1 MONTH)
           AND t.archetype <> '#{Archetype.private_message}'
           AND t.deleted_at IS NULL
           AND p.deleted_at IS NULL
