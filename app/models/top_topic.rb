@@ -61,26 +61,22 @@ class TopTopic < ActiveRecord::Base
   end
 
   def self.remove_invisible_topics
-    DB.exec("WITH category_definition_topic_ids AS (
-                  SELECT COALESCE(topic_id, 0) AS id FROM categories
-                ), invisible_topic_ids AS (
+    DB.exec("DELETE FROM top_topics
+             WHERE topic_id IN (SELECT id FROM (
                   SELECT id
                   FROM topics
                   WHERE deleted_at IS NOT NULL
                      OR NOT visible
                      OR archetype = :private_message
                      OR archived
-                     OR id IN (SELECT id FROM category_definition_topic_ids)
-                )
-                DELETE FROM top_topics
-                WHERE topic_id IN (SELECT id FROM invisible_topic_ids)",
+                     OR id IN (SELECT id FROM (SELECT COALESCE(topic_id, 0) AS id FROM categories) tmp1)
+                ) tmp3)",
              private_message: Archetype::private_message)
   end
 
   def self.add_new_visible_topics
-    DB.exec("WITH category_definition_topic_ids AS (
-                  SELECT COALESCE(topic_id, 0) AS id FROM categories
-                ), visible_topics AS (
+    DB.exec("INSERT INTO top_topics (topic_id)
+              SELECT id FROM (
                 SELECT t.id
                 FROM topics t
                 LEFT JOIN top_topics tt ON t.id = tt.topic_id
@@ -88,11 +84,9 @@ class TopTopic < ActiveRecord::Base
                   AND t.visible
                   AND t.archetype <> :private_message
                   AND NOT t.archived
-                  AND t.id NOT IN (SELECT id FROM category_definition_topic_ids)
+                  AND t.id NOT IN (SELECT id FROM (SELECT COALESCE(topic_id, 0) AS id FROM categories) tmp1)
                   AND tt.topic_id IS NULL
-              )
-              INSERT INTO top_topics (topic_id)
-              SELECT id FROM visible_topics",
+              ) tmp2",
              private_message: Archetype::private_message)
   end
 
@@ -170,7 +164,8 @@ class TopTopic < ActiveRecord::Base
     end
 
     sql = <<~SQL
-        WITH top AS (
+        UPDATE top_topics
+        INNER JOIN (
           SELECT CASE
                    WHEN #{time_filter} THEN 0
                    ELSE log(GREATEST(#{period}_views_count, 1)) * #{log_views_multiplier} +
@@ -191,12 +186,9 @@ class TopTopic < ActiveRecord::Base
           FROM #{top_topics}
           LEFT JOIN topics ON topics.id = top_topics.topic_id AND
                               topics.deleted_at IS NULL
-        )
-        UPDATE top_topics
+        ) top ON top_topics.topic_id = top.topic_id
         SET #{period}_score = top.score
-        FROM top
-        WHERE top_topics.topic_id = top.topic_id
-          AND #{period}_score <> top.score
+        WHERE #{period}_score <> top.score
     SQL
 
     DB.exec(sql, from: start_of(period))
@@ -214,12 +206,15 @@ class TopTopic < ActiveRecord::Base
 
   def self.update_top_topics(period, sort, inner_join)
     DB.exec("UPDATE top_topics
-                SET #{period}_#{sort}_count = c.count
-                FROM top_topics tt
+             INNER JOIN (
+             SELECT * FROM top_topics tt
                 INNER JOIN (#{inner_join}) c ON tt.topic_id = c.topic_id
                 WHERE tt.topic_id = top_topics.topic_id
-                  AND tt.#{period}_#{sort}_count <> c.count",
-             from: start_of(period))
+                AND tt.#{period}_#{sort}_count <> c.count
+             ) tmp ON tpm.topic_id = top_topics.topic_id 
+             SET top_topics.#{period}_#{sort}_count = c.count
+            ",     
+            from: start_of(period))
   end
 end
 
