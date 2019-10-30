@@ -1511,7 +1511,7 @@ class Topic < ActiveRecord::Base
     builder.where("p.user_id != t.user_id")
     builder.where("p.user_id in (:user_ids)", user_ids: opts[:user_ids]) if opts[:user_ids]
     builder.where("p.post_type = :post_type", post_type: Post.types[:regular])
-    builder.where("EXTRACT(EPOCH FROM p.created_at - t.created_at) > 0")
+    builder.where("UNIX_TIMESTAMP(p.created_at) - UNIX_TIMESTAMP(t.created_at) > 0")
     builder.query_hash
   end
 
