@@ -47,50 +47,6 @@ Report.add_report("moderators_activity") do |report|
   report.data = []
 
   query = <<~SQL
-  WITH mods AS (
-  SELECT
-  id AS user_id,
-  username_lower AS username,
-  uploaded_avatar_id
-  FROM users u
-  WHERE u.moderator = 'true'
-  AND u.id > 0
-  ),
-  time_read AS (
-  SELECT SUM(uv.time_read) AS time_read,
-  uv.user_id
-  FROM mods m
-  JOIN user_visits uv
-  ON m.user_id = uv.user_id
-  WHERE uv.visited_at >= '#{report.start_date}'
-  AND uv.visited_at <= '#{report.end_date}'
-  GROUP BY uv.user_id
-  ),
-  flag_count AS (
-      WITH period_actions AS (
-      SELECT agreed_by_id,
-      disagreed_by_id
-      FROM post_actions
-      WHERE post_action_type_id IN (#{PostActionType.flag_types_without_custom.values.join(',')})
-      AND created_at >= '#{report.start_date}'
-      AND created_at <= '#{report.end_date}'
-      ),
-      agreed_flags AS (
-      SELECT pa.agreed_by_id AS user_id,
-      COUNT(*) AS flag_count
-      FROM mods m
-      JOIN period_actions pa
-      ON pa.agreed_by_id = m.user_id
-      GROUP BY agreed_by_id
-      ),
-      disagreed_flags AS (
-      SELECT pa.disagreed_by_id AS user_id,
-      COUNT(*) AS flag_count
-      FROM mods m
-      JOIN period_actions pa
-      ON pa.disagreed_by_id = m.user_id
-      GROUP BY disagreed_by_id
-      )
   SELECT
   COALESCE(af.user_id, df.user_id) AS user_id,
   COALESCE(af.flag_count, 0) + COALESCE(df.flag_count, 0) AS flag_count
@@ -101,7 +57,15 @@ Report.add_report("moderators_activity") do |report|
   revision_count AS (
   SELECT pr.user_id,
   COUNT(*) AS revision_count
-  FROM mods m
+  FROM (
+  SELECT
+  id AS user_id,
+  username_lower AS username,
+  uploaded_avatar_id
+  FROM users u
+  WHERE u.moderator = 'true'
+  AND u.id > 0
+  ) m
   JOIN post_revisions pr
   ON pr.user_id = m.user_id
   JOIN posts p
@@ -114,7 +78,15 @@ Report.add_report("moderators_activity") do |report|
   topic_count AS (
   SELECT t.user_id,
   COUNT(*) AS topic_count
-  FROM mods m
+  FROM (
+  SELECT
+  id AS user_id,
+  username_lower AS username,
+  uploaded_avatar_id
+  FROM users u
+  WHERE u.moderator = 'true'
+  AND u.id > 0
+  ) m
   JOIN topics t
   ON t.user_id = m.user_id
   WHERE t.archetype = 'regular'
@@ -125,7 +97,15 @@ Report.add_report("moderators_activity") do |report|
   post_count AS (
   SELECT p.user_id,
   COUNT(*) AS post_count
-  FROM mods m
+  FROM (
+  SELECT
+  id AS user_id,
+  username_lower AS username,
+  uploaded_avatar_id
+  FROM users u
+  WHERE u.moderator = 'true'
+  AND u.id > 0
+  ) m
   JOIN posts p
   ON p.user_id = m.user_id
   JOIN topics t
@@ -138,7 +118,15 @@ Report.add_report("moderators_activity") do |report|
   pm_count AS (
   SELECT p.user_id,
   COUNT(*) AS pm_count
-  FROM mods m
+  FROM (
+  SELECT
+  id AS user_id,
+  username_lower AS username,
+  uploaded_avatar_id
+  FROM users u
+  WHERE u.moderator = 'true'
+  AND u.id > 0
+  ) m
   JOIN posts p
   ON p.user_id = m.user_id
   JOIN topics t
@@ -159,9 +147,74 @@ Report.add_report("moderators_activity") do |report|
   tc.topic_count,
   pc.post_count,
   pmc.pm_count
-  FROM mods m
-  LEFT JOIN time_read tr ON tr.user_id = m.user_id
-  LEFT JOIN flag_count fc ON fc.user_id = m.user_id
+  FROM (
+  SELECT
+  id AS user_id,
+  username_lower AS username,
+  uploaded_avatar_id
+  FROM users u
+  WHERE u.moderator = 'true'
+  AND u.id > 0
+  ) m
+  LEFT JOIN (
+  SELECT SUM(uv.time_read) AS time_read,
+  uv.user_id
+  FROM (
+  SELECT
+  id AS user_id,
+  username_lower AS username,
+  uploaded_avatar_id
+  FROM users u
+  WHERE u.moderator = 'true'
+  AND u.id > 0
+  ) m
+  JOIN user_visits uv
+  ON m.user_id = uv.user_id
+  WHERE uv.visited_at >= '#{report.start_date}'
+  AND uv.visited_at <= '#{report.end_date}'
+  GROUP BY uv.user_id
+  ) tr ON tr.user_id = m.user_id
+  LEFT JOIN (
+      WITH period_actions AS (
+      SELECT agreed_by_id,
+      disagreed_by_id
+      FROM post_actions
+      WHERE post_action_type_id IN (#{PostActionType.flag_types_without_custom.values.join(',')})
+      AND created_at >= '#{report.start_date}'
+      AND created_at <= '#{report.end_date}'
+      ),
+      agreed_flags AS (
+      SELECT pa.agreed_by_id AS user_id,
+      COUNT(*) AS flag_count
+      FROM (
+  SELECT
+  id AS user_id,
+  username_lower AS username,
+  uploaded_avatar_id
+  FROM users u
+  WHERE u.moderator = 'true'
+  AND u.id > 0
+  ) m
+      JOIN period_actions pa
+      ON pa.agreed_by_id = m.user_id
+      GROUP BY agreed_by_id
+      ),
+      disagreed_flags AS (
+      SELECT pa.disagreed_by_id AS user_id,
+      COUNT(*) AS flag_count
+      FROM (
+  SELECT
+  id AS user_id,
+  username_lower AS username,
+  uploaded_avatar_id
+  FROM users u
+  WHERE u.moderator = 'true'
+  AND u.id > 0
+  ) m
+      JOIN period_actions pa
+      ON pa.disagreed_by_id = m.user_id
+      GROUP BY disagreed_by_id
+      ) fc ON fc.user_id = m.user_id
   LEFT JOIN revision_count rc ON rc.user_id = m.user_id
   LEFT JOIN topic_count tc ON tc.user_id = m.user_id
   LEFT JOIN post_count pc ON pc.user_id = m.user_id
