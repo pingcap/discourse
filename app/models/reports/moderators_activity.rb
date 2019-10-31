@@ -222,7 +222,9 @@ Report.add_report("moderators_activity") do |report|
   ORDER BY m.username
   SQL
 
-  DB.query(query).each do |row|
+  # TODO FIX
+  #DB.query(query).each do |row|
+  [].each do |row|
     mod = {}
     mod[:username] = row.username
     mod[:user_id] = row.user_id
