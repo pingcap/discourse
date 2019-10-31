@@ -189,17 +189,26 @@ after_initialize do
           result = { option_digest => user_hashes }
         else
           votes = DB.query <<~SQL
-            SELECT digest, user_id
+            SELECT digest, 
+                   user_id 
               FROM (
-                SELECT digest
-                     , user_id
-                     , ROW_NUMBER() OVER (PARTITION BY poll_option_id ORDER BY pv.created_at) AS row
-                  FROM poll_votes pv
-                  JOIN poll_options po ON pv.poll_option_id = po.id
-                 WHERE pv.poll_id = #{poll.id}
-                   AND po.poll_id = #{poll.id}
-              ) v
-              WHERE row BETWEEN #{offset} AND #{offset + limit}
+                SELECT digest, 
+                       user_id, 
+                       @row_number:=CASE WHEN @poll_option_id=poll_option_id THEN @row_number+1 ELSE 1 END AS row,
+                       @poll_option_id:=poll_option_id
+                  FROM (
+                    SELECT digest
+                         , user_id
+                         , pv.poll_option_id
+                         , pv.created_at
+                      FROM poll_votes pv
+                      JOIN poll_options po ON pv.poll_option_id = po.id
+                     WHERE pv.poll_id = #{poll.id}
+                       AND po.poll_id = #{poll.id}
+                  ) v, (SELECT @row_number:=0,@poll_option_id:='') AS t
+                  ORDER BY poll_option_id, created_at
+            ) vv
+            WHERE row BETWEEN #{offset} AND #{offset + limit}
           SQL
 
           user_ids = votes.map(&:user_id).uniq

@@ -2,6 +2,7 @@
 
 require "edit_rate_limiter"
 require 'post_locker'
+require 'onpdiff'
 
 class PostRevisor
 
