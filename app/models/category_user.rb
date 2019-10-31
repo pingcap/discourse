@@ -72,9 +72,10 @@ class CategoryUser < ActiveRecord::Base
 
     builder = DB.build <<~SQL
       UPDATE topic_users tu
-      SET notification_level = :tracking,
-          notifications_reason_id = :auto_track_category
-      FROM topics t, category_users cu
+      INNER JOIN topics t
+      INNER JOIN category_users cu
+      SET tu.notification_level = :tracking,
+          tu.notifications_reason_id = :auto_track_category
       /*where*/
     SQL
 
@@ -107,17 +108,7 @@ class CategoryUser < ActiveRecord::Base
 
     builder = DB.build <<~SQL
       UPDATE topic_users tu
-      SET notification_level =
-        CASE WHEN should_track THEN :tracking
-             WHEN should_watch THEN :watching
-             ELSE notification_level
-        END,
-      notifications_reason_id =
-        CASE WHEN should_track THEN null
-             WHEN should_watch THEN :auto_watch_category
-             ELSE notifications_reason_id
-             END
-      FROM (
+      INNER JOIN (
         SELECT tu1.topic_id,
                tu1.user_id,
                CASE WHEN
@@ -134,6 +125,16 @@ class CategoryUser < ActiveRecord::Base
         LEFT JOIN category_users cu ON cu.category_id = t.category_id AND cu.user_id = tu1.user_id AND cu.notification_level = :watching
         /*where2*/
       ) as X
+      SET notification_level =
+        CASE WHEN should_track THEN :tracking
+             WHEN should_watch THEN :watching
+             ELSE notification_level
+        END,
+      notifications_reason_id =
+        CASE WHEN should_track THEN null
+             WHEN should_watch THEN :auto_watch_category
+             ELSE notifications_reason_id
+             END
 
       /*where*/
     SQL
