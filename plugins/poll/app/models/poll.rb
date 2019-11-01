@@ -58,7 +58,7 @@ end
 #
 #  id               :bigint           not null, primary key
 #  post_id          :bigint
-#  name             :string           default("poll"), not null
+#  name             :string(255)      default("poll"), not null
 #  close_at         :datetime
 #  type             :integer          default("regular"), not null
 #  status           :integer          default("open"), not null
@@ -75,8 +75,4 @@ end
 #
 #  index_polls_on_post_id           (post_id)
 #  index_polls_on_post_id_and_name  (post_id,name) UNIQUE
-#
-# Foreign Keys
-#
-#  fk_rails_...  (post_id => posts.id)
 #

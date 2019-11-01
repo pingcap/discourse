@@ -15,13 +15,13 @@ end
 # Table name: user_associated_accounts
 #
 #  id            :bigint           not null, primary key
-#  provider_name :string           not null
-#  provider_uid  :string           not null
+#  provider_name :string(255)      not null
+#  provider_uid  :string(255)      not null
 #  user_id       :integer
 #  last_used     :datetime         not null
-#  info          :jsonb            not null
-#  credentials   :jsonb            not null
-#  extra         :jsonb            not null
+#  info          :json             not null
+#  credentials   :json             not null
+#  extra         :json             not null
 #  created_at    :datetime         not null
 #  updated_at    :datetime         not null
 #

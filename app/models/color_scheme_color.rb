@@ -10,9 +10,9 @@ end
 #
 # Table name: color_scheme_colors
 #
-#  id              :integer          not null, primary key
-#  name            :string           not null
-#  hex             :string           not null
+#  id              :bigint           not null, primary key
+#  name            :string(255)      not null
+#  hex             :string(255)      not null
 #  color_scheme_id :integer          not null
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null

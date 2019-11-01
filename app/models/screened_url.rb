@@ -43,15 +43,15 @@ end
 #
 # Table name: screened_urls
 #
-#  id            :integer          not null, primary key
-#  url           :string           not null
-#  domain        :string           not null
+#  id            :bigint           not null, primary key
+#  url           :string(255)      not null
+#  domain        :string(255)      not null
 #  action_type   :integer          not null
 #  match_count   :integer          default(0), not null
 #  last_match_at :datetime
 #  created_at    :datetime         not null
 #  updated_at    :datetime         not null
-#  ip_address    :inet
+#  ip_address    :string(255)
 #
 # Indexes
 #

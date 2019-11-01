@@ -34,7 +34,7 @@ end
 #  user_id              :integer          not null
 #  created_at           :datetime         not null
 #  updated_at           :datetime         not null
-#  unsubscribe_key_type :string
+#  unsubscribe_key_type :string(255)
 #  topic_id             :integer
 #  post_id              :integer
 #

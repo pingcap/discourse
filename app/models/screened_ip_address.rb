@@ -179,8 +179,8 @@ end
 #
 # Table name: screened_ip_addresses
 #
-#  id            :integer          not null, primary key
-#  ip_address    :inet             not null
+#  id            :bigint           not null, primary key
+#  ip_address    :string(255)      not null
 #  action_type   :integer          not null
 #  match_count   :integer          default(0), not null
 #  last_match_at :datetime

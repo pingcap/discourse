@@ -1525,11 +1525,11 @@ end
 #
 # Table name: users
 #
-#  id                        :integer          not null, primary key
+#  id                        :bigint           not null, primary key
 #  username                  :string(60)       not null
 #  created_at                :datetime         not null
 #  updated_at                :datetime         not null
-#  name                      :string
+#  name                      :string(255)
 #  seen_notification_id      :integer          default(0), not null
 #  last_posted_at            :datetime
 #  password_hash             :string(64)
@@ -1549,13 +1549,13 @@ end
 #  date_of_birth             :date
 #  views                     :integer          default(0), not null
 #  flag_level                :integer          default(0), not null
-#  ip_address                :inet
+#  ip_address                :string(255)
 #  moderator                 :boolean          default(FALSE)
-#  title                     :string
+#  title                     :string(255)
 #  uploaded_avatar_id        :integer
 #  locale                    :string(10)
 #  primary_group_id          :integer
-#  registration_ip_address   :inet
+#  registration_ip_address   :string(255)
 #  staged                    :boolean          default(FALSE), not null
 #  first_seen_at             :datetime
 #  silenced_till             :datetime
@@ -1564,8 +1564,8 @@ end
 #
 # Indexes
 #
-#  idx_users_admin                    (id) WHERE admin
-#  idx_users_moderator                (id) WHERE moderator
+#  idx_users_admin                    (id)
+#  idx_users_moderator                (id)
 #  index_users_on_last_posted_at      (last_posted_at)
 #  index_users_on_last_seen_at        (last_seen_at)
 #  index_users_on_uploaded_avatar_id  (uploaded_avatar_id)

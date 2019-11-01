@@ -27,13 +27,13 @@ end
 #
 # Table name: api_keys
 #
-#  id            :integer          not null, primary key
+#  id            :bigint           not null, primary key
 #  key           :string(64)       not null
 #  user_id       :integer
 #  created_by_id :integer
 #  created_at    :datetime         not null
 #  updated_at    :datetime         not null
-#  allowed_ips   :inet             is an Array
+#  allowed_ips   :json
 #  hidden        :boolean          default(FALSE), not null
 #
 # Indexes

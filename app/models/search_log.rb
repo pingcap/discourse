@@ -178,10 +178,10 @@ end
 #
 # Table name: search_logs
 #
-#  id                 :integer          not null, primary key
-#  term               :string           not null
+#  id                 :bigint           not null, primary key
+#  term               :string(255)      not null
 #  user_id            :integer
-#  ip_address         :inet
+#  ip_address         :string(255)
 #  search_result_id   :integer
 #  search_type        :integer          not null
 #  created_at         :datetime         not null

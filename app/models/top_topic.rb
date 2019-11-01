@@ -222,7 +222,7 @@ end
 #
 # Table name: top_topics
 #
-#  id                       :integer          not null, primary key
+#  id                       :bigint           not null, primary key
 #  topic_id                 :integer
 #  yearly_posts_count       :integer          default(0), not null
 #  yearly_views_count       :integer          default(0), not null
@@ -236,11 +236,11 @@ end
 #  daily_posts_count        :integer          default(0), not null
 #  daily_views_count        :integer          default(0), not null
 #  daily_likes_count        :integer          default(0), not null
-#  daily_score              :float            default(0.0)
-#  weekly_score             :float            default(0.0)
-#  monthly_score            :float            default(0.0)
-#  yearly_score             :float            default(0.0)
-#  all_score                :float            default(0.0)
+#  daily_score              :float(24)        default(0.0)
+#  weekly_score             :float(24)        default(0.0)
+#  monthly_score            :float(24)        default(0.0)
+#  yearly_score             :float(24)        default(0.0)
+#  all_score                :float(24)        default(0.0)
 #  daily_op_likes_count     :integer          default(0), not null
 #  weekly_op_likes_count    :integer          default(0), not null
 #  monthly_op_likes_count   :integer          default(0), not null
@@ -248,7 +248,7 @@ end
 #  quarterly_posts_count    :integer          default(0), not null
 #  quarterly_views_count    :integer          default(0), not null
 #  quarterly_likes_count    :integer          default(0), not null
-#  quarterly_score          :float            default(0.0)
+#  quarterly_score          :float(24)        default(0.0)
 #  quarterly_op_likes_count :integer          default(0), not null
 #
 # Indexes

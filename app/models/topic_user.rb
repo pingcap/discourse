@@ -490,6 +490,7 @@ end
 #
 # Table name: topic_users
 #
+#  id                       :bigint           not null, primary key
 #  user_id                  :integer          not null
 #  topic_id                 :integer          not null
 #  posted                   :boolean          default(FALSE), not null
@@ -502,7 +503,6 @@ end
 #  notifications_reason_id  :integer
 #  total_msecs_viewed       :integer          default(0), not null
 #  cleared_pinned_at        :datetime
-#  id                       :integer          not null, primary key
 #  last_emailed_post_number :integer
 #  liked                    :boolean          default(FALSE)
 #  bookmarked               :boolean          default(FALSE)

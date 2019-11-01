@@ -96,7 +96,7 @@ end
 #
 # Table name: application_requests
 #
-#  id       :integer          not null, primary key
+#  id       :bigint           not null, primary key
 #  date     :date             not null
 #  req_type :integer          not null
 #  count    :integer          default(0), not null

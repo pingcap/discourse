@@ -8,7 +8,7 @@ end
 #
 # Table name: post_stats
 #
-#  id                           :integer          not null, primary key
+#  id                           :bigint           not null, primary key
 #  post_id                      :integer
 #  drafts_saved                 :integer
 #  typing_duration_msecs        :integer

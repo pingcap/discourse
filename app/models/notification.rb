@@ -232,7 +232,7 @@ end
 #
 # Table name: notifications
 #
-#  id                :integer          not null, primary key
+#  id                :bigint           not null, primary key
 #  notification_type :integer          not null
 #  user_id           :integer          not null
 #  data              :string(1000)     not null
@@ -245,10 +245,10 @@ end
 #
 # Indexes
 #
-#  idx_notifications_speedup_unread_count                       (user_id,notification_type) WHERE (NOT read)
+#  idx_notifications_speedup_unread_count                       (user_id,notification_type)
 #  index_notifications_on_post_action_id                        (post_action_id)
-#  index_notifications_on_read_or_n_type                        (user_id,id DESC,read,topic_id) UNIQUE WHERE (read OR (notification_type <> 6))
+#  index_notifications_on_read_or_n_type                        (user_id,id,read,topic_id) UNIQUE
 #  index_notifications_on_user_id_and_created_at                (user_id,created_at)
-#  index_notifications_on_user_id_and_id                        (user_id,id) UNIQUE WHERE ((notification_type = 6) AND (NOT read))
+#  index_notifications_on_user_id_and_id                        (user_id,id) UNIQUE
 #  index_notifications_on_user_id_and_topic_id_and_post_number  (user_id,topic_id,post_number)
 #

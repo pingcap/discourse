@@ -153,15 +153,16 @@ end
 #
 # Table name: tags
 #
-#  id             :integer          not null, primary key
-#  name           :string           not null
+#  id             :bigint           not null, primary key
+#  name           :string(255)      not null
 #  topic_count    :integer          default(0), not null
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
 #  pm_topic_count :integer          default(0), not null
+#  lower_tag_name :string(255)
 #
 # Indexes
 #
-#  index_tags_on_lower_name  (lower((name)::text)) UNIQUE
+#  index_tags_on_lower_name  (lower_tag_name) UNIQUE
 #  index_tags_on_name        (name) UNIQUE
 #

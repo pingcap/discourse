@@ -122,12 +122,12 @@ end
 #
 # Table name: web_hooks
 #
-#  id                   :integer          not null, primary key
-#  payload_url          :string           not null
+#  id                   :bigint           not null, primary key
+#  payload_url          :string(255)      not null
 #  content_type         :integer          default(1), not null
 #  last_delivery_status :integer          default(1), not null
 #  status               :integer          default(1), not null
-#  secret               :string           default("")
+#  secret               :string(255)      default("")
 #  wildcard_web_hook    :boolean          default(FALSE), not null
 #  verify_certificate   :boolean          default(TRUE), not null
 #  active               :boolean          default(FALSE), not null

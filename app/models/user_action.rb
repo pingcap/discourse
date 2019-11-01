@@ -418,7 +418,7 @@ end
 #
 # Table name: user_actions
 #
-#  id              :integer          not null, primary key
+#  id              :bigint           not null, primary key
 #  action_type     :integer          not null
 #  user_id         :integer          not null
 #  target_topic_id :integer
@@ -435,6 +435,6 @@ end
 #  index_user_actions_on_acting_user_id              (acting_user_id)
 #  index_user_actions_on_action_type_and_created_at  (action_type,created_at)
 #  index_user_actions_on_target_post_id              (target_post_id)
-#  index_user_actions_on_target_user_id              (target_user_id) WHERE (target_user_id IS NOT NULL)
+#  index_user_actions_on_target_user_id              (target_user_id)
 #  index_user_actions_on_user_id_and_action_type     (user_id,action_type)
 #

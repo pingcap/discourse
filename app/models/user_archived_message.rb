@@ -49,7 +49,7 @@ end
 #
 # Table name: user_archived_messages
 #
-#  id         :integer          not null, primary key
+#  id         :bigint           not null, primary key
 #  user_id    :integer          not null
 #  topic_id   :integer          not null
 #  created_at :datetime         not null

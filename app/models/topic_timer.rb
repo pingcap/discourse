@@ -163,7 +163,7 @@ end
 #
 # Table name: topic_timers
 #
-#  id                 :integer          not null, primary key
+#  id                 :bigint           not null, primary key
 #  execute_at         :datetime         not null
 #  status_type        :integer          not null
 #  user_id            :integer          not null
@@ -178,6 +178,6 @@ end
 #
 # Indexes
 #
-#  idx_topic_id_public_type_deleted_at  (topic_id) UNIQUE WHERE ((public_type = true) AND (deleted_at IS NULL))
+#  idx_topic_id_public_type_deleted_at  (topic_id) UNIQUE
 #  index_topic_timers_on_user_id        (user_id)
 #

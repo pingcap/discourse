@@ -11,10 +11,10 @@ end
 #
 # Table name: user_open_ids
 #
-#  id         :integer          not null, primary key
+#  id         :bigint           not null, primary key
 #  user_id    :integer          not null
-#  email      :string           not null
-#  url        :string           not null
+#  email      :string(255)      not null
+#  url        :string(255)      not null
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
 #  active     :boolean          not null

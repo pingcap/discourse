@@ -20,10 +20,10 @@ end
 #
 # Table name: email_change_requests
 #
-#  id                 :integer          not null, primary key
+#  id                 :bigint           not null, primary key
 #  user_id            :integer          not null
-#  old_email          :string           not null
-#  new_email          :string           not null
+#  old_email          :string(255)      not null
+#  new_email          :string(255)      not null
 #  old_email_token_id :integer
 #  new_email_token_id :integer
 #  change_state       :integer          not null

@@ -11,11 +11,11 @@ end
 #
 # Table name: post_details
 #
-#  id         :integer          not null, primary key
+#  id         :bigint           not null, primary key
 #  post_id    :integer
-#  key        :string
-#  value      :string
-#  extra      :text
+#  key        :string(255)
+#  value      :string(255)
+#  extra      :text(65535)
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
 #

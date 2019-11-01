@@ -101,10 +101,10 @@ end
 #
 # Table name: drafts
 #
-#  id         :integer          not null, primary key
+#  id         :bigint           not null, primary key
 #  user_id    :integer          not null
-#  draft_key  :string           not null
-#  data       :text             not null
+#  draft_key  :string(255)      not null
+#  data       :text(65535)      not null
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
 #  sequence   :integer          default(0), not null

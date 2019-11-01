@@ -31,7 +31,7 @@ end
 #  id         :bigint           not null, primary key
 #  user_id    :integer          not null
 #  method     :integer          not null
-#  data       :string           not null
+#  data       :string(255)      not null
 #  enabled    :boolean          default(FALSE), not null
 #  last_used  :datetime
 #  created_at :datetime         not null

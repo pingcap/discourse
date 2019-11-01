@@ -8,9 +8,9 @@ end
 #
 # Table name: github_user_infos
 #
-#  id             :integer          not null, primary key
+#  id             :bigint           not null, primary key
 #  user_id        :integer          not null
-#  screen_name    :string           not null
+#  screen_name    :string(255)      not null
 #  github_user_id :integer          not null
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null

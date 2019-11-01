@@ -248,9 +248,9 @@ end
 #
 # Table name: invites
 #
-#  id             :integer          not null, primary key
+#  id             :bigint           not null, primary key
 #  invite_key     :string(32)       not null
-#  email          :string
+#  email          :string(255)
 #  invited_by_id  :integer          not null
 #  user_id        :integer
 #  redeemed_at    :datetime
@@ -260,7 +260,7 @@ end
 #  deleted_by_id  :integer
 #  invalidated_at :datetime
 #  moderator      :boolean          default(FALSE), not null
-#  custom_message :text
+#  custom_message :text(65535)
 #  via_email      :boolean          default(FALSE), not null
 #
 # Indexes

@@ -8,10 +8,10 @@ end
 #
 # Table name: category_custom_fields
 #
-#  id          :integer          not null, primary key
+#  id          :bigint           not null, primary key
 #  category_id :integer          not null
 #  name        :string(256)      not null
-#  value       :text
+#  value       :text(65535)
 #  created_at  :datetime         not null
 #  updated_at  :datetime         not null
 #

@@ -253,19 +253,19 @@ end
 #
 # Table name: badges
 #
-#  id                :integer          not null, primary key
-#  name              :string           not null
-#  description       :text
+#  id                :bigint           not null, primary key
+#  name              :string(255)      not null
+#  description       :text(65535)
 #  badge_type_id     :integer          not null
 #  grant_count       :integer          default(0), not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  allow_title       :boolean          default(FALSE), not null
 #  multiple_grant    :boolean          default(FALSE), not null
-#  icon              :string           default("fa-certificate")
+#  icon              :string(255)      default("fa-certificate")
 #  listable          :boolean          default(TRUE)
 #  target_posts      :boolean          default(FALSE)
-#  query             :text
+#  query             :text(65535)
 #  enabled           :boolean          default(TRUE), not null
 #  auto_revoke       :boolean          default(TRUE), not null
 #  badge_grouping_id :integer          default(5), not null
@@ -273,7 +273,7 @@ end
 #  show_posts        :boolean          default(FALSE), not null
 #  system            :boolean          default(FALSE), not null
 #  image             :string(255)
-#  long_description  :text
+#  long_description  :text(65535)
 #
 # Indexes
 #

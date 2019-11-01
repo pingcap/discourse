@@ -9,12 +9,8 @@ end
 # Table name: category_search_data
 #
 #  category_id :integer          not null, primary key
-#  search_data :tsvector
-#  raw_data    :text
-#  locale      :text
+#  search_data :text(65535)
+#  raw_data    :text(65535)
+#  locale      :text(65535)
 #  version     :integer          default(0)
-#
-# Indexes
-#
-#  idx_search_category  (search_data) USING gin
 #

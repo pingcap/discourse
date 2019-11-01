@@ -9,12 +9,8 @@ end
 # Table name: user_search_data
 #
 #  user_id     :integer          not null, primary key
-#  search_data :tsvector
-#  raw_data    :text
-#  locale      :text
+#  search_data :text(65535)
+#  raw_data    :text(65535)
+#  locale      :text(65535)
 #  version     :integer          default(0)
-#
-# Indexes
-#
-#  idx_search_user  (search_data) USING gin
 #

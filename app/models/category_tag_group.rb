@@ -9,7 +9,7 @@ end
 #
 # Table name: category_tag_groups
 #
-#  id           :integer          not null, primary key
+#  id           :bigint           not null, primary key
 #  category_id  :integer          not null
 #  tag_group_id :integer          not null
 #  created_at   :datetime         not null

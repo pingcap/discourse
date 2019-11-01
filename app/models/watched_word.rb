@@ -59,8 +59,8 @@ end
 #
 # Table name: watched_words
 #
-#  id         :integer          not null, primary key
-#  word       :string           not null
+#  id         :bigint           not null, primary key
+#  word       :string(255)      not null
 #  action     :integer          not null
 #  created_at :datetime         not null
 #  updated_at :datetime         not null

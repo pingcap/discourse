@@ -37,7 +37,7 @@ end
 #
 # Table name: user_badges
 #
-#  id              :integer          not null, primary key
+#  id              :bigint           not null, primary key
 #  badge_id        :integer          not null
 #  user_id         :integer          not null
 #  granted_at      :datetime         not null
@@ -49,7 +49,7 @@ end
 # Indexes
 #
 #  index_user_badges_on_badge_id_and_user_id              (badge_id,user_id)
-#  index_user_badges_on_badge_id_and_user_id_and_post_id  (badge_id,user_id,post_id) UNIQUE WHERE (post_id IS NOT NULL)
-#  index_user_badges_on_badge_id_and_user_id_and_seq      (badge_id,user_id,seq) UNIQUE WHERE (post_id IS NULL)
+#  index_user_badges_on_badge_id_and_user_id_and_post_id  (badge_id,user_id,post_id) UNIQUE
+#  index_user_badges_on_badge_id_and_user_id_and_seq      (badge_id,user_id,seq) UNIQUE
 #  index_user_badges_on_user_id                           (user_id)
 #

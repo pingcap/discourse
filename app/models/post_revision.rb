@@ -51,10 +51,10 @@ end
 #
 # Table name: post_revisions
 #
-#  id            :integer          not null, primary key
+#  id            :bigint           not null, primary key
 #  user_id       :integer
 #  post_id       :integer
-#  modifications :text
+#  modifications :text(65535)
 #  number        :integer
 #  created_at    :datetime         not null
 #  updated_at    :datetime         not null

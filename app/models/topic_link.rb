@@ -294,7 +294,7 @@ end
 #
 # Table name: topic_links
 #
-#  id            :integer          not null, primary key
+#  id            :bigint           not null, primary key
 #  topic_id      :integer          not null
 #  post_id       :integer
 #  user_id       :integer          not null
@@ -307,7 +307,7 @@ end
 #  reflection    :boolean          default(FALSE)
 #  clicks        :integer          default(0), not null
 #  link_post_id  :integer
-#  title         :string
+#  title         :string(255)
 #  crawled_at    :datetime
 #  quote         :boolean          default(FALSE), not null
 #  extension     :string(10)

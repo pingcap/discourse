@@ -247,7 +247,7 @@ end
 #
 # Table name: topic_embeds
 #
-#  id            :integer          not null, primary key
+#  id            :bigint           not null, primary key
 #  topic_id      :integer          not null
 #  post_id       :integer          not null
 #  embed_url     :string(1000)     not null
@@ -256,8 +256,9 @@ end
 #  updated_at    :datetime         not null
 #  deleted_at    :datetime
 #  deleted_by_id :integer
+#  md5_embed_url :string(255)
 #
 # Indexes
 #
-#  index_topic_embeds_on_embed_url  (embed_url) UNIQUE
+#  index_topic_embeds_on_embed_url  (md5_embed_url) UNIQUE
 #

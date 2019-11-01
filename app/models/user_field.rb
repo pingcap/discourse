@@ -18,17 +18,17 @@ end
 #
 # Table name: user_fields
 #
-#  id                :integer          not null, primary key
-#  name              :string           not null
-#  field_type        :string           not null
+#  id                :bigint           not null, primary key
+#  name              :string(255)      not null
+#  field_type        :string(255)      not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  editable          :boolean          default(FALSE), not null
-#  description       :string           not null
+#  description       :string(255)      not null
 #  required          :boolean          default(TRUE), not null
 #  show_on_profile   :boolean          default(FALSE), not null
 #  position          :integer          default(0)
 #  show_on_user_card :boolean          default(FALSE), not null
-#  external_name     :string
-#  external_type     :string
+#  external_name     :string(255)
+#  external_type     :string(255)
 #

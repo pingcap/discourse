@@ -83,7 +83,7 @@ end
 #
 #  id         :bigint           not null, primary key
 #  date       :date             not null
-#  user_agent :string           not null
+#  user_agent :string(255)      not null
 #  count      :integer          default(0), not null
 #
 # Indexes

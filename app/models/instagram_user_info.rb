@@ -10,9 +10,9 @@ end
 #
 # Table name: instagram_user_infos
 #
-#  id                :integer          not null, primary key
+#  id                :bigint           not null, primary key
 #  user_id           :integer
-#  screen_name       :string
+#  screen_name       :string(255)
 #  instagram_user_id :integer
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null

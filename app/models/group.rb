@@ -770,31 +770,31 @@ end
 #
 # Table name: groups
 #
-#  id                                 :integer          not null, primary key
-#  name                               :string           not null
+#  id                                 :bigint           not null, primary key
+#  name                               :string(255)      not null
 #  created_at                         :datetime         not null
 #  updated_at                         :datetime         not null
 #  automatic                          :boolean          default(FALSE), not null
 #  user_count                         :integer          default(0), not null
-#  automatic_membership_email_domains :text
+#  automatic_membership_email_domains :text(65535)
 #  automatic_membership_retroactive   :boolean          default(FALSE)
 #  primary_group                      :boolean          default(FALSE), not null
-#  title                              :string
+#  title                              :string(255)
 #  grant_trust_level                  :integer
-#  incoming_email                     :string
+#  incoming_email                     :string(255)
 #  has_messages                       :boolean          default(FALSE), not null
-#  flair_url                          :string
-#  flair_bg_color                     :string
-#  flair_color                        :string
-#  bio_raw                            :text
-#  bio_cooked                         :text
+#  flair_url                          :string(255)
+#  flair_bg_color                     :string(255)
+#  flair_color                        :string(255)
+#  bio_raw                            :text(65535)
+#  bio_cooked                         :text(65535)
 #  allow_membership_requests          :boolean          default(FALSE), not null
-#  full_name                          :string
+#  full_name                          :string(255)
 #  default_notification_level         :integer          default(3), not null
 #  visibility_level                   :integer          default(0), not null
 #  public_exit                        :boolean          default(FALSE), not null
 #  public_admission                   :boolean          default(FALSE), not null
-#  membership_request_template        :text
+#  membership_request_template        :text(65535)
 #  messageable_level                  :integer          default(0)
 #  mentionable_level                  :integer          default(0)
 #

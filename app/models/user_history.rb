@@ -248,23 +248,23 @@ end
 #
 # Table name: user_histories
 #
-#  id             :integer          not null, primary key
+#  id             :bigint           not null, primary key
 #  action         :integer          not null
 #  acting_user_id :integer
 #  target_user_id :integer
-#  details        :text
+#  details        :text(65535)
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
-#  context        :string
-#  ip_address     :string
-#  email          :string
-#  subject        :text
-#  previous_value :text
-#  new_value      :text
+#  context        :string(255)
+#  ip_address     :string(255)
+#  email          :string(255)
+#  subject        :text(65535)
+#  previous_value :text(65535)
+#  new_value      :text(65535)
 #  topic_id       :integer
 #  admin_only     :boolean          default(FALSE)
 #  post_id        :integer
-#  custom_type    :string
+#  custom_type    :string(255)
 #  category_id    :integer
 #
 # Indexes
@@ -272,7 +272,6 @@ end
 #  index_user_histories_on_acting_user_id_and_action_and_id        (acting_user_id,action,id)
 #  index_user_histories_on_action_and_id                           (action,id)
 #  index_user_histories_on_category_id                             (category_id)
-#  index_user_histories_on_subject_and_id                          (subject,id)
 #  index_user_histories_on_target_user_id_and_id                   (target_user_id,id)
 #  index_user_histories_on_topic_id_and_target_user_id_and_action  (topic_id,target_user_id,action)
 #

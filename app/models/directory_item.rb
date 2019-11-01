@@ -148,7 +148,7 @@ end
 #
 # Table name: directory_items
 #
-#  id             :integer          not null, primary key
+#  id             :bigint           not null, primary key
 #  period_type    :integer          not null
 #  user_id        :integer          not null
 #  likes_received :integer          not null

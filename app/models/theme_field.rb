@@ -513,16 +513,16 @@ end
 #
 # Table name: theme_fields
 #
-#  id               :integer          not null, primary key
+#  id               :bigint           not null, primary key
 #  theme_id         :integer          not null
 #  target_id        :integer          not null
 #  name             :string(255)      not null
-#  value            :text             not null
-#  value_baked      :text
+#  value            :text(65535)      not null
+#  value_baked      :text(65535)
 #  created_at       :datetime         not null
 #  updated_at       :datetime         not null
 #  compiler_version :string(50)       default("0"), not null
-#  error            :string
+#  error            :string(255)
 #  upload_id        :integer
 #  type_id          :integer          default(0), not null
 #

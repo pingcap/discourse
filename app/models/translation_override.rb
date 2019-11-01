@@ -102,13 +102,13 @@ end
 #
 # Table name: translation_overrides
 #
-#  id              :integer          not null, primary key
-#  locale          :string           not null
-#  translation_key :string           not null
-#  value           :string           not null
+#  id              :bigint           not null, primary key
+#  locale          :string(255)      not null
+#  translation_key :string(255)      not null
+#  value           :string(255)      not null
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
-#  compiled_js     :text
+#  compiled_js     :text(65535)
 #
 # Indexes
 #

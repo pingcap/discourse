@@ -83,20 +83,20 @@ end
 #
 # Table name: email_logs
 #
-#  id         :integer          not null, primary key
-#  to_address :string           not null
-#  email_type :string           not null
+#  id         :bigint           not null, primary key
+#  to_address :string(255)      not null
+#  email_type :string(255)      not null
 #  user_id    :integer
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
 #  post_id    :integer
-#  bounce_key :uuid
+#  bounce_key :string(255)
 #  bounced    :boolean          default(FALSE), not null
-#  message_id :string
+#  message_id :string(255)
 #
 # Indexes
 #
-#  index_email_logs_on_bounce_key  (bounce_key) UNIQUE WHERE (bounce_key IS NOT NULL)
+#  index_email_logs_on_bounce_key  (bounce_key) UNIQUE
 #  index_email_logs_on_bounced     (bounced)
 #  index_email_logs_on_created_at  (created_at)
 #  index_email_logs_on_message_id  (message_id)

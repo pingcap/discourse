@@ -75,11 +75,11 @@ end
 #
 # Table name: embeddable_hosts
 #
-#  id             :integer          not null, primary key
-#  host           :string           not null
+#  id             :bigint           not null, primary key
+#  host           :string(255)      not null
 #  category_id    :integer          not null
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
-#  path_whitelist :string
-#  class_name     :string
+#  path_whitelist :string(255)
+#  class_name     :string(255)
 #

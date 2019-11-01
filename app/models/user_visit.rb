@@ -61,7 +61,7 @@ end
 #
 # Table name: user_visits
 #
-#  id         :integer          not null, primary key
+#  id         :bigint           not null, primary key
 #  user_id    :integer          not null
 #  visited_at :date             not null
 #  posts_read :integer          default(0)

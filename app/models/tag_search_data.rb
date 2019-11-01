@@ -8,13 +8,9 @@ end
 #
 # Table name: tag_search_data
 #
-#  tag_id      :integer          not null, primary key
-#  search_data :tsvector
-#  raw_data    :text
-#  locale      :text
+#  tag_id      :bigint           not null, primary key
+#  search_data :text(65535)
+#  raw_data    :text(65535)
+#  locale      :text(65535)
 #  version     :integer          default(0)
-#
-# Indexes
-#
-#  idx_search_tag  (search_data) USING gin
 #

@@ -1480,8 +1480,8 @@ end
 #
 # Table name: topics
 #
-#  id                        :integer          not null, primary key
-#  title                     :string           not null
+#  id                        :bigint           not null, primary key
+#  title                     :string(255)      not null
 #  last_posted_at            :datetime
 #  created_at                :datetime         not null
 #  updated_at                :datetime         not null
@@ -1496,7 +1496,7 @@ end
 #  avg_time                  :integer
 #  deleted_at                :datetime
 #  highest_post_number       :integer          default(0), not null
-#  image_url                 :string
+#  image_url                 :string(255)
 #  like_count                :integer          default(0), not null
 #  incoming_link_count       :integer          default(0), not null
 #  category_id               :integer
@@ -1506,15 +1506,15 @@ end
 #  archived                  :boolean          default(FALSE), not null
 #  bumped_at                 :datetime         not null
 #  has_summary               :boolean          default(FALSE), not null
-#  archetype                 :string           default("regular"), not null
+#  archetype                 :string(255)      default("regular"), not null
 #  featured_user4_id         :integer
 #  notify_moderators_count   :integer          default(0), not null
 #  spam_count                :integer          default(0), not null
 #  pinned_at                 :datetime
-#  score                     :float
-#  percent_rank              :float            default(1.0), not null
-#  subtype                   :string
-#  slug                      :string
+#  score                     :float(24)
+#  percent_rank              :float(24)        default(1.0), not null
+#  subtype                   :string(255)
+#  slug                      :string(255)
 #  deleted_by_id             :integer
 #  participant_count         :integer          default(1)
 #  word_count                :integer
@@ -1523,19 +1523,18 @@ end
 #  pinned_until              :datetime
 #  fancy_title               :string(400)
 #  highest_staff_post_number :integer          default(0), not null
-#  featured_link             :string
-#  reviewable_score          :float            default(0.0), not null
+#  featured_link             :string(255)
+#  reviewable_score          :float(24)        default(0.0), not null
 #
 # Indexes
 #
 #  idx_topics_front_page                   (deleted_at,visible,archetype,category_id,id)
-#  idx_topics_user_id_deleted_at           (user_id) WHERE (deleted_at IS NULL)
-#  idxtopicslug                            (slug) WHERE ((deleted_at IS NULL) AND (slug IS NOT NULL))
+#  idx_topics_user_id_deleted_at           (user_id)
+#  idxtopicslug                            (slug)
 #  index_topics_on_bumped_at               (bumped_at)
-#  index_topics_on_created_at_and_visible  (created_at,visible) WHERE ((deleted_at IS NULL) AND ((archetype)::text <> 'private_message'::text))
+#  index_topics_on_created_at_and_visible  (created_at,visible)
 #  index_topics_on_id_and_deleted_at       (id,deleted_at)
-#  index_topics_on_lower_title             (lower((title)::text))
-#  index_topics_on_pinned_at               (pinned_at) WHERE (pinned_at IS NOT NULL)
-#  index_topics_on_pinned_globally         (pinned_globally) WHERE pinned_globally
-#  index_topics_on_updated_at_public       (updated_at,visible,highest_staff_post_number,highest_post_number,category_id,created_at,id) WHERE (((archetype)::text <> 'private_message'::text) AND (deleted_at IS NULL))
+#  index_topics_on_pinned_at               (pinned_at)
+#  index_topics_on_pinned_globally         (pinned_globally)
+#  index_topics_on_updated_at_public       (updated_at,visible,highest_staff_post_number,highest_post_number,category_id,created_at,id)
 #

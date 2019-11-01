@@ -68,14 +68,14 @@ end
 #
 # Table name: screened_emails
 #
-#  id            :integer          not null, primary key
-#  email         :string           not null
+#  id            :bigint           not null, primary key
+#  email         :string(255)      not null
 #  action_type   :integer          not null
 #  match_count   :integer          default(0), not null
 #  last_match_at :datetime
 #  created_at    :datetime         not null
 #  updated_at    :datetime         not null
-#  ip_address    :inet
+#  ip_address    :string(255)
 #
 # Indexes
 #
