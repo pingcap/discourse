@@ -211,7 +211,7 @@ class TopTopic < ActiveRecord::Base
                 INNER JOIN (#{inner_join}) c ON tt.topic_id = c.topic_id
                 WHERE tt.topic_id = top_topics.topic_id
                 AND tt.#{period}_#{sort}_count <> c.count
-             ) tmp ON tpm.topic_id = top_topics.topic_id 
+             ) tmp ON tmp.topic_id = top_topics.topic_id 
              SET top_topics.#{period}_#{sort}_count = c.count
             ",     
             from: start_of(period))
