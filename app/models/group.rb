@@ -549,7 +549,7 @@ class Group < ActiveRecord::Base
   end
 
   def self.find_by_email(email)
-    self.where("string_to_array(incoming_email, '|') @> ARRAY[?]", Email.downcase(email)).first
+    self.where("incoming_email LIKE ?", EscapeLike.escape_like(Email.downcase(email))).first
   end
 
   def bulk_add(user_ids)
