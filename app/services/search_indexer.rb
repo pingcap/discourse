@@ -34,14 +34,11 @@ class SearchIndexer
 
   def self.update_index(table: , id: , raw_data:)
     search_data = raw_data.map do |data|
-      inject_extra_terms(Search.prepare_data(data || "", :index))
+      inject_extra_terms(data)
     end
 
     table_name = "#{table}_search_data"
     foreign_key = "#{table}_id"
-
-    # for user login and name use "simple" lowercase stemmer
-    stemmer = table == "user" ? "simple" : Search.ts_config
 
     ranked_index = <<~SQL
       CONCAT(
@@ -88,6 +85,7 @@ class SearchIndexer
       SQL
     end
   rescue
+    puts $!
     # TODO is there any way we can safely avoid this?
     # best way is probably pushing search indexer into a dedicated process so it no longer happens on save
     # instead in the post processor
@@ -127,7 +125,7 @@ class SearchIndexer
     SQL
   end
 
-  def self.index(obj, force: false)
+  def self.index(obj, force: true)
     return if @disabled
 
     category_name = nil
