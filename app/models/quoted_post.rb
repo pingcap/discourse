@@ -34,14 +34,18 @@ class QuotedPost < ActiveRecord::Base
         post_numbers: uniq.keys.map(&:second)
       }
 
+      unnest = uniq.keys.map do |topic_id, post_number|
+        %Q{
+          SELECT #{topic_id} AS topic_id, #{post_number} AS post_number
+        }
+      end.join(" UNION ALL ")
+
       DB.exec(<<~SQL, args)
         INSERT INTO quoted_posts (post_id, quoted_post_id, created_at, updated_at)
         SELECT :post_id, p.id, current_timestamp, current_timestamp
         FROM posts p
         JOIN (
-          SELECT
-            unnest(ARRAY[:topic_ids]) topic_id,
-            unnest(ARRAY[:post_numbers]) post_number
+          #{unnest}
         ) X ON X.topic_id = p.topic_id AND X.post_number = p.post_number
         LEFT JOIN quoted_posts q on q.post_id = :post_id AND q.quoted_post_id = p.id
         WHERE q.id IS NULL
@@ -54,9 +58,7 @@ class QuotedPost < ActiveRecord::Base
           SELECT q1.id FROM quoted_posts q1
           LEFT JOIN posts p1 ON p1.id = q1.quoted_post_id
           LEFT JOIN (
-            SELECT
-              unnest(ARRAY[:topic_ids]) topic_id,
-              unnest(ARRAY[:post_numbers]) post_number
+            #{unnest}
           ) X on X.topic_id = p1.topic_id AND X.post_number = p1.post_number
           WHERE q1.post_id = :post_id AND X.topic_id IS NULL
         )
