@@ -207,9 +207,8 @@ class TopTopic < ActiveRecord::Base
   def self.update_top_topics(period, sort, inner_join)
     DB.exec("UPDATE top_topics
              INNER JOIN (
-             SELECT * FROM top_topics tt
+             SELECT tt.*, c.count FROM top_topics tt
                 INNER JOIN (#{inner_join}) c ON tt.topic_id = c.topic_id
-                WHERE tt.topic_id = top_topics.topic_id
                 AND tt.#{period}_#{sort}_count <> c.count
              ) tmp ON tmp.topic_id = top_topics.topic_id 
              SET top_topics.#{period}_#{sort}_count = c.count
