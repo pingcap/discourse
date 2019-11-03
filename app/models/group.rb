@@ -381,17 +381,14 @@ class Group < ActiveRecord::Base
 
   def self.reset_all_counters!
     DB.exec <<-SQL
-      WITH X AS (
-          SELECT group_id
+      UPDATE groups
+        JOIN (SELECT group_id
                , COUNT(user_id) users
             FROM group_users
         GROUP BY group_id
-      )
-      UPDATE groups
-         SET user_count = X.users
-        FROM X
-       WHERE id = X.group_id
-         AND user_count <> X.users
+             ) X ON X.group_id = groups.id
+         SET groups.user_count = X.users
+       WHERE groups.user_count <> X.users
     SQL
   end
 
