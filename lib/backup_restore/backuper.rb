@@ -152,17 +152,17 @@ module BackupRestore
       log "Dumping the public schema of the database..."
 
       logs = Queue.new
-      pg_dump_running = true
+      mysqldump_running = true
 
       Thread.new do
         RailsMultisite::ConnectionManagement::establish_connection(db: @current_db)
-        while pg_dump_running
+        while mysqldump_running
           message = logs.pop.strip
           log(message) unless message.blank?
         end
       end
 
-      IO.popen("#{pg_dump_command} 2>&1") do |pipe|
+      IO.popen("#{mysqldump_command} 2>&1") do |pipe|
         begin
           while line = pipe.readline
             logs << line
@@ -175,29 +175,25 @@ module BackupRestore
         end
       end
 
-      raise "pg_dump failed" unless $?.success?
+      raise "mysqldump failed" unless $?.success?
     end
 
-    def pg_dump_command
+    def mysqldump_command
       db_conf = BackupRestore.database_configuration
 
-      password_argument = "PGPASSWORD='#{db_conf.password}'" if db_conf.password.present?
+      password_argument = "--password='#{db_conf.password}'" if db_conf.password.present?
       host_argument     = "--host=#{db_conf.host}"         if db_conf.host.present?
       port_argument     = "--port=#{db_conf.port}"         if db_conf.port.present?
-      username_argument = "--username=#{db_conf.username}" if db_conf.username.present?
+      username_argument = "-u #{db_conf.username}" if db_conf.username.present?
 
-      [ password_argument,            # pass the password to pg_dump (if any)
-        "pg_dump",                    # the pg_dump command
-        "--schema=public",            # only public schema
-        "--file='#{@dump_filename}'", # output to the dump.sql file
-        "--no-owner",                 # do not output commands to set ownership of objects
-        "--no-privileges",            # prevent dumping of access privileges
-        "--verbose",                  # specifies verbose mode
-        "--compress=4",               # Compression level of 4
+      [ password_argument,            # pass the password to mysqldump (if any)
+        "mysqldump",                  # the mysqldump command
+        "--compress",                 # Compression
         host_argument,                # the hostname to connect to (if any)
         port_argument,                # the port to connect to (if any)
         username_argument,            # the username to connect as (if any)
-        db_conf.database              # the name of the database to dump
+        db_conf.database,              # the name of the database to dump
+        "> '#{@dump_filename}'", # output to the dump.sql file
       ].join(" ")
     end
 
