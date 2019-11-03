@@ -152,17 +152,13 @@ class Badge < ActiveRecord::Base
     SQL
 
     DB.exec <<~SQL
-      WITH X AS (
-          SELECT badge_id
+      UPDATE badges
+        JOIN (SELECT badge_id
                , COUNT(user_id) users
             FROM user_badges
-        GROUP BY badge_id
-      )
-      UPDATE badges
-         SET grant_count = X.users
-        FROM X
-       WHERE id = X.badge_id
-         AND grant_count <> X.users
+        GROUP BY badge_id) X ON X.badge_id = badges.id
+         SET badges.grant_count = X.users
+       WHERE badges.grant_count <> X.users
     SQL
   end
 
