@@ -328,15 +328,14 @@ module BackupRestore
     def psql_command
       db_conf = BackupRestore.database_configuration
 
-      password_argument = "PGPASSWORD='#{db_conf.password}'" if db_conf.password.present?
+      password_argument = "--password='#{db_conf.password}'" if db_conf.password.present?
       host_argument     = "--host=#{db_conf.host}"         if db_conf.host.present?
       port_argument     = "--port=#{db_conf.port}"         if db_conf.port.present?
-      username_argument = "--username=#{db_conf.username}" if db_conf.username.present?
+      username_argument = "-u #{db_conf.username}" if db_conf.username.present?
 
       [ password_argument,                # pass the password to psql (if any)
-        "psql",                           # the psql command
+        "mysql",                           # the psql command
         "--dbname='#{db_conf.database}'", # connect to database *dbname*
-        "--single-transaction",           # all or nothing (also runs COPY commands faster)
         host_argument,                    # the hostname to connect to (if any)
         port_argument,                    # the port to connect to (if any)
         username_argument                 # the username to connect as (if any)
