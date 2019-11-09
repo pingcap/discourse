@@ -171,8 +171,8 @@ class Category < ActiveRecord::Base
     DB.exec <<~SQL
       UPDATE categories c
         JOIN (#{topics_with_post_count}) x ON x.category_id = c.id
-         SET topic_count = x.topic_count,
-             post_count = x.post_count
+         SET c.topic_count = x.topic_count,
+             c.post_count = x.post_count
        WHERE (c.topic_count <> x.topic_count OR c.post_count <> x.post_count)
     SQL
 
