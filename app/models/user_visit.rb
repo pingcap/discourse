@@ -26,7 +26,7 @@ class UserVisit < ActiveRecord::Base
         WHERE date(user_visits.visited_at) >= date(:start_date) AND user_visits.visited_at <= date(:end_date)
         GROUP BY date(user_visits.visited_at)
         ORDER BY date(user_visits.visited_at)
-      ) t
+      ) dau
     SQL
 
     DB.query_hash(sql, start_date: start_date, end_date: end_date)
