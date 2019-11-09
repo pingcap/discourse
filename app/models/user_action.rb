@@ -306,21 +306,21 @@ class UserAction < ActiveRecord::Base
 
     # nuke all dupes, using magic
     builder = DB.build <<~SQL
-      DELETE FROM user_actions USING user_actions ua2
+      DELETE ua FROM user_actions ua INNER JOIN user_actions ua2 ON ua2.id = ua.id 
       /*where*/
     SQL
 
     builder.where <<~SQL
-      user_actions.action_type = ua2.action_type AND
-      user_actions.user_id = ua2.user_id AND
-      user_actions.acting_user_id = ua2.acting_user_id AND
-      user_actions.target_post_id = ua2.target_post_id AND
-      user_actions.target_post_id > 0 AND
-      user_actions.id > ua2.id
+      ua.action_type = ua2.action_type AND
+      ua.user_id = ua2.user_id AND
+      ua.acting_user_id = ua2.acting_user_id AND
+      ua.target_post_id = ua2.target_post_id AND
+      ua.target_post_id > 0 AND
+      ua.id > ua2.id
     SQL
 
     if post_ids
-      builder.where("user_actions.target_post_id in (:post_ids)", post_ids: post_ids)
+      builder.where("ua.target_post_id in (:post_ids)", post_ids: post_ids)
     end
 
     builder.exec
