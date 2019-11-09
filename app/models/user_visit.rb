@@ -14,21 +14,19 @@ class UserVisit < ActiveRecord::Base
 
   def self.count_by_active_users(start_date, end_date)
     sql = <<~SQL
-      WITH dau AS (
+      SELECT date, dau,
+        (SELECT count(distinct user_visits.user_id)
+          FROM user_visits
+          WHERE date(user_visits.visited_at) BETWEEN dau.date - 29 AND dau.date
+        ) AS mau
+      FROM (
         SELECT date(user_visits.visited_at) AS date,
                count(distinct user_visits.user_id) AS dau
         FROM user_visits
         WHERE date(user_visits.visited_at) >= date(:start_date) AND user_visits.visited_at <= date(:end_date)
         GROUP BY date(user_visits.visited_at)
         ORDER BY date(user_visits.visited_at)
-      )
-
-      SELECT date, dau,
-        (SELECT count(distinct user_visits.user_id)
-          FROM user_visits
-          WHERE date(user_visits.visited_at) BETWEEN dau.date - 29 AND dau.date
-        ) AS mau
-      FROM dau
+      ) t
     SQL
 
     DB.query_hash(sql, start_date: start_date, end_date: end_date)
