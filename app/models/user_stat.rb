@@ -95,24 +95,21 @@ class UserStat < ActiveRecord::Base
 
     # Update denormalized topics_entered
     DB.exec(<<~SQL, seen_at: last_seen)
-      UPDATE user_stats SET topics_entered = X.c
-       FROM
-      (SELECT v.user_id, COUNT(topic_id) AS c
+      UPDATE user_stats  us
+      INNER JOIN (SELECT v.user_id, COUNT(topic_id) AS c
        FROM topic_views AS v
        WHERE v.user_id IN (
           SELECT u1.id FROM users u1 where u1.last_seen_at > :seen_at
        )
-       GROUP BY v.user_id) AS X
-      WHERE
-        X.user_id = user_stats.user_id AND
-        X.c <> topics_entered
+       GROUP BY v.user_id) AS X ON X.user_id = us.user_id
+      SET us.topics_entered = X.c
+      WHERE X.c <> us.topics_entered
     SQL
 
     # Update denormalzied posts_read_count
     DB.exec(<<~SQL, seen_at: last_seen)
-      UPDATE user_stats SET posts_read_count = X.c
-      FROM
-      (SELECT pt.user_id,
+      UPDATE user_stats us
+      INNER JOIN (SELECT pt.user_id,
               COUNT(*) AS c
        FROM users AS u
        JOIN post_timings AS pt ON pt.user_id = u.id
@@ -120,9 +117,9 @@ class UserStat < ActiveRecord::Base
        WHERE u.last_seen_at > :seen_at AND
              t.archetype = 'regular' AND
              t.deleted_at IS NULL
-       GROUP BY pt.user_id) AS X
-       WHERE X.user_id = user_stats.user_id AND
-             X.c <> posts_read_count
+       GROUP BY pt.user_id) AS X ON X.user_id = us.user_id
+      SET us.posts_read_count = X.c
+      WHERE X.c <> us.posts_read_count
     SQL
   end
 
