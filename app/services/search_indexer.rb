@@ -174,6 +174,7 @@ class SearchIndexer
     if Tag === obj && (obj.saved_change_to_name? || force)
       SearchIndexer.update_tags_index(obj.id, obj.name)
     end
+    obj.public_send("#{obj.class.name.underscore}_search_data".to_sym)&.touch
   end
 
   class HtmlScrubber < Nokogiri::XML::SAX::Document
