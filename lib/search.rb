@@ -408,9 +408,8 @@ class Search
       else
         # a bit yucky but we got to add the term back in
         if match.to_s.length >= SiteSetting.min_search_term_length
-          posts.where("posts.id IN (
-            SELECT post_id FROM post_search_data pd1
-            WHERE pd1.search_data LIKE '%?%')", match)
+          p_ids = PostSearchData.search(match).results.map{ |x| x.post_id }
+          posts.where("posts.id" => p_ids)
         end
       end
     end
@@ -627,9 +626,9 @@ class Search
     # however the scope from the query below is leaking in to Category, this works around
     # the issue while we figure out what is up in Rails
     secure_category_ids
-
+    c_ids = CategorySearchData.search(term).hits.map{|x| x['_id'].to_i }
     categories = Category.includes(:category_search_data)
-      .where("category_search_data.search_data LIKE '#{EscapeLike.escape_like(term)}'")
+      .where("category_search_data.category_id" => c_ids)
       .references(:category_search_data)
       .order("topics_month DESC")
       .secured(@guardian)
@@ -642,12 +641,12 @@ class Search
 
   def user_search
     return if SiteSetting.hide_user_profiles_from_public && !@guardian.user
-
+    u_ids = UserSearchData.search(term).hits.map{ |x| x['_id'].to_i }
     users = User.includes(:user_search_data)
       .references(:user_search_data)
       .where(active: true)
       .where(staged: false)
-      .where("user_search_data.search_data LIKE '#{EscapeLike.escape_like(term)}'")
+      .where("user_search_data.user_id" => u_ids)
       .order("CASE WHEN username_lower = '#{@original_term.downcase}' THEN 0 ELSE 1 END")
       .order("last_posted_at DESC")
       .limit(limit)
@@ -667,9 +666,9 @@ class Search
 
   def tags_search
     return unless SiteSetting.tagging_enabled
-
+    t_ids = TagSearchData.search(term).hits.map{|x| x['_id'].to_i}
     tags = Tag.includes(:tag_search_data)
-      .where("tag_search_data.search_data LIKE '#{EscapeLike.escape_like(term)}'")
+      .where("tag_search_data.tag_id" => t_ids)
       .references(:tag_search_data)
       .order("name asc")
       .limit(limit)
@@ -717,8 +716,8 @@ class Search
         posts = posts.joins('JOIN users u ON u.id = posts.user_id')
         posts = posts.where("LOWER(CONCAT(posts.raw, ' ', u.username, ' ', COALESCE(u.name, ''))) like ?", "%#{term_without_quote}%".downcase)
       else
-        # TODO ES
-        posts = posts.where("post_search_data.search_data LIKE '#{EscapeLike.escape_like(@term)}'")
+        p_ids = PostSearchData.search(@term).hits.map{|x| x['_id'].to_i}
+        posts = posts.where("post_search_data.post_id" => p_ids)
         exact_terms = @term.scan(Regexp.new(PHRASE_MATCH_REGEXP_PATTERN)).flatten
 
         exact_terms.each do |exact|
