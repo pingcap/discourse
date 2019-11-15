@@ -111,12 +111,12 @@ GEM
     dotenv-rails (2.7.5)
       dotenv (= 2.7.5)
       railties (>= 3.2, < 6.1)
-    elasticsearch (7.3.0)
-      elasticsearch-api (= 7.3.0)
-      elasticsearch-transport (= 7.3.0)
-    elasticsearch-api (7.3.0)
+    elasticsearch (7.4.0)
+      elasticsearch-api (= 7.4.0)
+      elasticsearch-transport (= 7.4.0)
+    elasticsearch-api (7.4.0)
       multi_json
-    elasticsearch-transport (7.3.0)
+    elasticsearch-transport (7.4.0)
       faraday
       multi_json
     email_reply_trimmer (0.1.12)
@@ -387,9 +387,9 @@ GEM
       sprockets (> 3.0)
       sprockets-rails
       tilt
-    searchkick (4.1.0)
-      activemodel (>= 5)
-      elasticsearch (>= 6)
+    searchkick (3.1.3)
+      activemodel (>= 4.2)
+      elasticsearch (>= 5)
       hashie
     seed-fu (2.3.9)
       activerecord (>= 3.1)
@@ -549,7 +549,7 @@ DEPENDENCIES
   sanitize
   sassc
   sassc-rails
-  searchkick
+  searchkick (~> 3.1.3)
   seed-fu
   sentry-raven
   shoulda-matchers (~> 3.1, >= 3.1.3)

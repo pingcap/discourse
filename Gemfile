@@ -220,6 +220,6 @@ gem 'colored2', require: false
 gem 'maxminddb'
 gem 'marginalia'
 gem "default_value_for"
-gem 'searchkick'
+gem 'searchkick', "~> 3.1.3"
 gem 'dotenv-rails', require: 'dotenv/rails-now'
 gem "sentry-raven"
