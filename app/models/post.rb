@@ -833,15 +833,14 @@ class Post < ActiveRecord::Base
     return if user_id.blank?
 
     DB.exec(<<~SQL, user_id)
-      WITH user_quoted_posts AS (
-        SELECT post_id
-          FROM quoted_posts
-         WHERE quoted_post_id IN (SELECT id FROM posts WHERE user_id = ?)
-      )
       UPDATE posts
          SET baked_version = NULL
        WHERE baked_version IS NOT NULL
-         AND id IN (SELECT post_id FROM user_quoted_posts)
+         AND id IN (SELECT post_id FROM (
+        SELECT post_id
+          FROM quoted_posts
+         WHERE quoted_post_id IN (SELECT id FROM posts WHERE user_id = ?)
+      ) t)
     SQL
   end
 
