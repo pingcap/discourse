@@ -144,11 +144,10 @@ class Badge < ActiveRecord::Base
 
   def self.ensure_consistency!
     DB.exec <<~SQL
-      DELETE FROM user_badges
-            USING user_badges ub
-        LEFT JOIN users u ON u.id = ub.user_id
-            WHERE u.id IS NULL
-              AND user_badges.id = ub.id
+      DELETE user_badges 
+        FROM user_badges  
+             LEFT JOIN users u ON u.id = user_badges.user_id 
+       WHERE u.id IS NULL
     SQL
 
     DB.exec <<~SQL
