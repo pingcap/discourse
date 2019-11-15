@@ -52,16 +52,12 @@ class QuotedPost < ActiveRecord::Base
       SQL
 
       DB.exec(<<~SQL, args)
-        DELETE FROM quoted_posts
-        WHERE post_id = :post_id
-        AND id IN (
-          SELECT q1.id FROM quoted_posts q1
-          LEFT JOIN posts p1 ON p1.id = q1.quoted_post_id
-          LEFT JOIN (
-            #{unnest}
-          ) X on X.topic_id = p1.topic_id AND X.post_number = p1.post_number
-          WHERE q1.post_id = :post_id AND X.topic_id IS NULL
-        )
+        DELETE quoted_posts FROM quoted_posts
+               LEFT JOIN posts p1 ON p1.id = quoted_posts.quoted_post_id
+               LEFT JOIN (
+                 #{unnest}
+               ) X on X.topic_id = p1.topic_id AND X.post_number = p1.post_number
+               AND q1.post_id = :post_id AND X.topic_id IS NULL
       SQL
     end
 
