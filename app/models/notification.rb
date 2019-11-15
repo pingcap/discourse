@@ -16,7 +16,7 @@ class Notification < ActiveRecord::Base
     .where('topics.id IS NULL OR topics.deleted_at IS NULL') }
 
   scope :filter_by_display_username_and_type, ->(username, notification_type) {
-    where("data::json ->> 'display_username' = ?", username)
+    where("data->'$.display_username' = ?", username)
       .where(notification_type: notification_type)
       .order(created_at: :desc)
   }

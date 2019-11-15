@@ -640,7 +640,7 @@ class PostAlerter
           username, Notification.types[:liked]
         )
         .where(
-          "created_at > ? AND data::json ->> 'username2' IS NULL",
+          "created_at > ? AND data->'$.username2' IS NULL",
           consolidation_window
         )
 
