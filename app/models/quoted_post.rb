@@ -57,7 +57,7 @@ class QuotedPost < ActiveRecord::Base
                LEFT JOIN (
                  #{unnest}
                ) X on X.topic_id = p1.topic_id AND X.post_number = p1.post_number
-               AND q1.post_id = :post_id AND X.topic_id IS NULL
+               AND quoted_posts.post_id = :post_id AND X.topic_id IS NULL
       SQL
     end
 
