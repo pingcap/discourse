@@ -981,7 +981,7 @@ class TopicQuery
       base_messages
         .joins("
           LEFT JOIN (
-            SELECT * FROM topic_allowed_groups _tg
+            SELECT _tg.topic_id FROM topic_allowed_groups _tg
             LEFT JOIN group_users gu
             ON gu.user_id = #{@user.id.to_i}
             AND gu.group_id = _tg.group_id
