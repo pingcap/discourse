@@ -167,12 +167,10 @@ class CategoryUser < ActiveRecord::Base
 
   def self.ensure_consistency!
     DB.exec <<~SQL
-      DELETE FROM category_users
-        WHERE user_id IN (
-          SELECT cu.user_id FROM category_users cu
-          LEFT JOIN users u ON u.id = cu.user_id
-          WHERE u.id IS NULL
-        )
+      DELETE category_users 
+        FROM category_users
+             LEFT JOIN users u ON u.id = category_users.user_id
+       WHERE u.id IS NULL
     SQL
   end
 
