@@ -37,8 +37,7 @@ class Tag < ActiveRecord::Base
   def self.update_topic_counts
     DB.exec <<~SQL
       UPDATE tags t
-         SET topic_count = x.topic_count
-        FROM (
+             INNER JOIN (
              SELECT COUNT(topics.id) AS topic_count, tags.id AS tag_id
                FROM tags
           LEFT JOIN topic_tags ON tags.id = topic_tags.tag_id
@@ -46,15 +45,13 @@ class Tag < ActiveRecord::Base
                           AND topics.deleted_at IS NULL
                           AND topics.archetype != 'private_message'
            GROUP BY tags.id
-        ) x
-       WHERE x.tag_id = t.id
-         AND x.topic_count <> t.topic_count
+        ) x ON x.tag_id = t.id AND x.topic_count <> t.topic_count
+         SET t.topic_count = x.topic_count     
     SQL
 
     DB.exec <<~SQL
       UPDATE tags t
-         SET pm_topic_count = x.pm_topic_count
-        FROM (
+             INNER JOIN (
              SELECT COUNT(topics.id) AS pm_topic_count, tags.id AS tag_id
                FROM tags
           LEFT JOIN topic_tags ON tags.id = topic_tags.tag_id
@@ -62,9 +59,9 @@ class Tag < ActiveRecord::Base
                           AND topics.deleted_at IS NULL
                           AND topics.archetype = 'private_message'
            GROUP BY tags.id
-        ) x
-       WHERE x.tag_id = t.id
+        ) x ON x.tag_id = t.id
          AND x.pm_topic_count <> t.pm_topic_count
+         SET t.pm_topic_count = x.pm_topic_count
     SQL
   end
 
