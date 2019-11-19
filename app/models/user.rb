@@ -1510,7 +1510,7 @@ class User < ActiveRecord::Base
       UPDATE users
       SET uploaded_avatar_id = NULL
       WHERE uploaded_avatar_id IN (
-        SELECT u1.uploaded_avatar_id FROM users u1
+        SELECT u1.uploaded_avatar_id FROM (select * from users) u1
         LEFT JOIN uploads up
           ON u1.uploaded_avatar_id = up.id
         WHERE u1.uploaded_avatar_id IS NOT NULL AND
