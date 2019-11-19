@@ -44,8 +44,7 @@ module UserNameSuggester
 
         count = DB.query_single(<<~SQL, like: "#{normalized}%", similar: similar).first
           SELECT count(*)  FROM users
-          WHERE username_lower LIKE :like AND
-            username_lower SIMILAR TO :similar
+          WHERE username_lower LIKE :like
         SQL
 
         if count > 0

@@ -45,8 +45,7 @@ class CategoryTagStat < ActiveRecord::Base
   def self.update_topic_counts
     DB.exec <<~SQL
       UPDATE category_tag_stats stats
-      SET topic_count = x.topic_count
-      FROM (
+             INNER JOIN (
         SELECT COUNT(topics.id) AS topic_count,
                tags.id AS tag_id,
                topics.category_id as category_id
@@ -56,10 +55,10 @@ class CategoryTagStat < ActiveRecord::Base
                AND topics.deleted_at IS NULL
                AND topics.category_id IS NOT NULL
         GROUP BY tags.id, topics.category_id
-      ) x
-      WHERE stats.tag_id = x.tag_id
+      ) x ON stats.tag_id = x.tag_id
         AND stats.category_id = x.category_id
         AND x.topic_count <> stats.topic_count
+      SET stats.topic_count = x.topic_count 
     SQL
   end
 end
