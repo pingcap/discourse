@@ -1206,7 +1206,7 @@ class User < ActiveRecord::Base
   end
 
   def emails
-    self.user_emails.order("user_emails.primary DESC NULLS LAST").pluck(:email)
+    self.user_emails.order("user_emails.primary DESC").pluck(:email)
   end
 
   def secondary_emails

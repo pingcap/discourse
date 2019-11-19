@@ -256,7 +256,7 @@ class GroupsController < ApplicationController
     end
 
     if params[:order] && %w{last_posted_at last_seen_at}.include?(params[:order])
-      order = "#{params[:order]} #{dir} NULLS LAST"
+      order = "#{params[:order]} #{dir}"
     elsif params[:order] == 'added_at'
       order = "group_users.created_at #{dir}"
     end
