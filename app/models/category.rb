@@ -538,7 +538,7 @@ class Category < ActiveRecord::Base
   end
 
   def self.find_by_email(email)
-    self.where("string_to_array(email_in, '|') @> ARRAY[?]", Email.downcase(email)).first
+    self.where("email_in is not null and LOCATE(?, LOWER(email_in)) > 0", Email.downcase(email)).first
   end
 
   def has_children?
