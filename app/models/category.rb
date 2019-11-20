@@ -683,9 +683,9 @@ class Category < ActiveRecord::Base
 
     sql = <<~SQL
       UPDATE categories c
-      SET topic_id = NULL
+      SET c.topic_id = NULL
       WHERE c.id IN (
-        SELECT c2.id FROM categories c2
+        SELECT c2.id FROM (SELECT * FROM categories) c2
         LEFT JOIN topics t ON t.id = c2.topic_id AND t.deleted_at IS NULL
         WHERE t.id IS NULL AND c2.topic_id IS NOT NULL
       )
