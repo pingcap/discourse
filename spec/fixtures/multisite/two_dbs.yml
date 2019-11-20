@@ -1,5 +1,5 @@
 second:
-  adapter: postgresql
+  adapter: mysql2
   database: discourse_test_multisite
   host_names:
     - test2.localhost
