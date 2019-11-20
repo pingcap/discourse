@@ -37,20 +37,18 @@ class S3Inventory
       multisite_prefix = "uploads/#{RailsMultisite::ConnectionManagement.current_db}/"
       ActiveRecord::Base.transaction do
         begin
-          connection.exec("CREATE TEMP TABLE #{table_name}(url text UNIQUE, etag text, PRIMARY KEY(etag, url))")
-          connection.copy_data("COPY #{table_name} FROM STDIN CSV") do
-            files.each do |file|
-              CSV.foreach(file[:filename][0...-3], headers: false) do |row|
-                key = row[CSV_KEY_INDEX]
-                next if Rails.configuration.multisite && key.exclude?(multisite_prefix)
-                url = File.join(Discourse.store.absolute_base_url, key)
-                connection.put_copy_data("#{url},#{row[CSV_ETAG_INDEX]}\n")
-              end
+          connection.query("CREATE temporary TABLE #{table_name}(url varchar(255) UNIQUE, etag varchar(255) null, UNIQUE KEY(etag, url))")
+          files.each do |file|
+            CSV.foreach(file[:filename][0...-3], headers: false) do |row|
+              key = row[CSV_KEY_INDEX]
+              next if Rails.configuration.multisite && key.exclude?(multisite_prefix)
+              url = File.join(Discourse.store.absolute_base_url, key)
+              connection.query(%Q{INSERT INTO #{table_name}(url, etag) values(#{url.inspect}, #{row[CSV_ETAG_INDEX].present? ? row[CSV_ETAG_INDEX].inspect : 'null'})})
             end
           end
 
           # backfilling etags
-          connection.async_exec("UPDATE #{model.table_name}
+          connection.query("UPDATE #{model.table_name}
             SET etag = #{table_name}.etag
             FROM #{table_name}
             WHERE #{model.table_name}.etag IS NULL
@@ -73,7 +71,7 @@ class S3Inventory
 
           Discourse.stats.set("missing_s3_#{model.table_name}", missing_count)
         ensure
-          connection.exec("DROP TABLE #{table_name}") unless connection.nil?
+          connection.query("DROP TABLE #{table_name}") unless connection.nil?
         end
       end
     end
