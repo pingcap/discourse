@@ -35,12 +35,13 @@ class ThemeField < ActiveRecord::Base
       .order("Y.locale_sort_column")
   }
 
-  # TODO FIX ON (X.theme_sort_column)
   scope :find_first_locale_fields, ->(theme_ids, locale_codes) {
-    find_by_theme_ids(theme_ids)
+    ids = find_by_theme_ids(theme_ids)
       .filter_locale_fields(locale_codes)
-      .reorder("X.theme_sort_column", "Y.locale_sort_column")
-      .select("DISTINCT *")
+      .unscope(:select).select("*").unscope(:order)
+      .group_by{|x| x.theme_sort_column}.values.map{|x| x.sort_by{|x| [x.theme_sort_column, x.locale_sort_column]}[0]}
+      .map{|x| x.id}
+    self.where(id: ids)
   }
 
   def self.types
