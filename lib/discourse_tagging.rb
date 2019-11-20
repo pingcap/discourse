@@ -187,9 +187,10 @@ module DiscourseTagging
         else
           # It's possible that the selected tags violate some one-tag-per-group restrictions,
           # so filter them out by picking one from each group.
-          limit_tag_ids = TagGroupMembership.select('distinct on (tag_group_id) tag_id')
+          limit_tag_ids = TagGroupMembership.select('tag_group_id,tag_id')
             .where(tag_id: selected_tag_ids)
             .where(tag_group_id: exclude_group_ids)
+            .group_by {|x| x.tag_group_id }.values.map{|x| x[0]}
             .map(&:tag_id)
           sql = "(tags.id NOT IN (#{TAG_GROUP_TAG_IDS_SQL} WHERE (tg.parent_tag_id NOT IN (?) OR tg.id in (?))) OR tags.id IN (?))"
           query = query.where(sql, selected_tag_ids, exclude_group_ids, limit_tag_ids)
@@ -200,9 +201,10 @@ module DiscourseTagging
       exclude_group_ids = one_per_topic_group_ids(selected_tag_ids)
 
       unless exclude_group_ids.empty?
-        limit_tag_ids = TagGroupMembership.select('distinct on (tag_group_id) tag_id')
+        limit_tag_ids = TagGroupMembership.select('tag_group_id,tag_id')
           .where(tag_id: selected_tag_ids)
           .where(tag_group_id: exclude_group_ids)
+          .group_by {|x| x.tag_group_id }.values.map{|x| x[0]}
           .map(&:tag_id)
         sql = "(tags.id NOT IN (#{TAG_GROUP_TAG_IDS_SQL} WHERE (tg.id in (?))) OR tags.id IN (?))"
         query = query.where(sql, exclude_group_ids, limit_tag_ids)

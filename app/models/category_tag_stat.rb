@@ -17,12 +17,17 @@ class CategoryTagStat < ActiveRecord::Base
            SET topic_count = topic_count + 1
          WHERE tag_id in (:tag_ids)
            AND category_id = :category_id
-     RETURNING tag_id
       SQL
 
       tag_ids = topic.tags.map(&:id)
-      updated_tag_ids = DB.query_single(sql, tag_ids: tag_ids, category_id: to_category_id)
-
+      
+      DB.exec(sql, tag_ids: tag_ids, category_id: to_category_id)
+      updated_tag_ids = DB.query_single(<<~SQL, tag_ids: tag_ids, category_id: to_category_id)
+        SELECT tag_id
+          FROM #{self.table_name}
+         WHERE tag_id in (:tag_ids)
+           AND category_id = :category_id
+      SQL
       (tag_ids - updated_tag_ids).each do |tag_id|
         CategoryTagStat.create!(tag_id: tag_id, category_id: to_category_id, topic_count: 1)
       end
