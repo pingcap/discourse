@@ -31,7 +31,7 @@ class PluginStore
   end
 
   def self.get_all(plugin_name, keys)
-    rows = PluginStoreRow.where('plugin_name = ? AND key IN (?)', plugin_name, keys).to_a
+    rows = PluginStoreRow.where('plugin_name = ? AND `key` IN (?)', plugin_name, keys).to_a
 
     Hash[rows.map { |row| [row.key, cast_value(row.type_name, row.value)] }]
   end
