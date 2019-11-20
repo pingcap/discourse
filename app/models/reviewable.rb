@@ -509,7 +509,7 @@ protected
       )
     else
       # We didn't supply a version to update safely, so just increase it
-      DB.query_exec(
+      DB.exec(
         "UPDATE reviewables SET version = version + 1 WHERE id = :id",
         id: self.id
       )
