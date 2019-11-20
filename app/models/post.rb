@@ -373,29 +373,25 @@ class Post < ActiveRecord::Base
 
   def self.summary(topic_id)
     topic_id = topic_id.to_i
-
+    p_ids = DB.query_single(<<~SQL, summary_percent_filter: SiteSetting.summary_percent_filter.to_f / 100.0, summary_max_results: SiteSetting.summary_max_results)
+      (
+        SELECT posts.id
+        FROM posts
+        WHERE posts.topic_id = #{topic_id.to_i}
+        AND posts.post_number = 1
+      ) UNION
+      (
+        SELECT p1.id
+        FROM posts p1
+        WHERE p1.percent_rank <= :summary_percent_filter
+        AND p1.topic_id = #{topic_id.to_i}
+        ORDER BY p1.percent_rank
+        LIMIT :summary_max_results
+      )
+    SQL
     # percent rank has tons of ties
     where(topic_id: topic_id)
-      .where([
-        "id = ANY(
-          (
-            SELECT posts.id
-            FROM posts
-            WHERE posts.topic_id = #{topic_id.to_i}
-            AND posts.post_number = 1
-          ) UNION
-          (
-            SELECT p1.id
-            FROM posts p1
-            WHERE p1.percent_rank <= ?
-            AND p1.topic_id = #{topic_id.to_i}
-            ORDER BY p1.percent_rank
-            LIMIT ?
-          )
-        )",
-        SiteSetting.summary_percent_filter.to_f / 100.0,
-        SiteSetting.summary_max_results
-      ])
+      .where(id: p_ids)
   end
 
   def delete_post_notices
