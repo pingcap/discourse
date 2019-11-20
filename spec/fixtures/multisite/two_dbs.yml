@@ -1,5 +1,10 @@
 second:
-  adapter: mysql2
   database: discourse_test_multisite
+  prepared_statements: false
+  encoding: utf8mb4
+  socket: /tmp/mysql.sock
+  adapter: mysql2
+  username: root
+  min_messages: warning
   host_names:
     - test2.localhost
