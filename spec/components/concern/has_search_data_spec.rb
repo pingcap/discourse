@@ -5,8 +5,8 @@ require "rails_helper"
 describe HasSearchData do
   context "belongs to its model" do
     before do
-      DB.exec("create temporary table model_items(id SERIAL primary key)")
-      DB.exec("create temporary table model_item_search_data(model_item_id int primary key, search_data tsvector, raw_data text, locale text)")
+      DB.exec("create temporary table model_items(id bigint(20) NOT NULL AUTO_INCREMENT primary key)")
+      DB.exec("create temporary table model_item_search_data(model_item_id bigint(20) primary key, search_data text, raw_data text, locale text)")
 
       class ModelItem < ActiveRecord::Base
         has_one :model_item_search_data, dependent: :destroy

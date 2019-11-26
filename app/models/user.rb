@@ -534,7 +534,7 @@ class User < ActiveRecord::Base
   end
 
   def total_unread_notifications
-    @unread_total_notifications ||= notifications.where("read = false").count
+    @unread_total_notifications ||= notifications.where("`read` = false").count
   end
 
   def saw_notification_id(notification_id)
