@@ -28,18 +28,16 @@ class Notification < ActiveRecord::Base
 
   def self.ensure_consistency!
     DB.exec(<<~SQL, Notification.types[:private_message])
-      DELETE
-        FROM notifications n
-       WHERE notification_type = ?
-         AND NOT EXISTS (
-            SELECT 1
+      DELETE notifications
+        FROM notifications
+             LEFT JOIN (
+            SELECT p.post_number, t.id
               FROM posts p
               JOIN topics t ON t.id = p.topic_id
              WHERE p.deleted_at IS NULL
                AND t.deleted_at IS NULL
-               AND p.post_number = n.post_number
-               AND t.id = n.topic_id
-          )
+          ) x ON x.post_number = notifications.post_number and x.id = notifications.topic_id
+       WHERE notification_type = ? AND x.id IS NULL
     SQL
   end
 

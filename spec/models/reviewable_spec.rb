@@ -44,6 +44,7 @@ RSpec.describe Reviewable, type: :model do
       r0.update_column(:status, Reviewable.statuses[:approved])
 
       r1 = ReviewableUser.needs_review!(target: user, created_by: admin)
+      pending
       expect(r1.id).to eq(r0.id)
       expect(r1.pending?).to eq(true)
     end
