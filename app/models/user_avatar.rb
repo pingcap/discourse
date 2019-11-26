@@ -128,7 +128,7 @@ class UserAvatar < ActiveRecord::Base
       UPDATE user_avatars
       SET gravatar_upload_id = NULL
       WHERE gravatar_upload_id IN (
-        SELECT u1.gravatar_upload_id FROM user_avatars u1
+        SELECT u1.gravatar_upload_id FROM (select * from user_avatars) u1
         LEFT JOIN uploads up
           ON u1.gravatar_upload_id = up.id
         WHERE u1.gravatar_upload_id IS NOT NULL AND
@@ -140,7 +140,7 @@ class UserAvatar < ActiveRecord::Base
       UPDATE user_avatars
       SET custom_upload_id = NULL
       WHERE custom_upload_id IN (
-        SELECT u1.custom_upload_id FROM user_avatars u1
+        SELECT u1.custom_upload_id FROM (select * from user_avatars) u1
         LEFT JOIN uploads up
           ON u1.custom_upload_id = up.id
         WHERE u1.custom_upload_id IS NOT NULL AND
