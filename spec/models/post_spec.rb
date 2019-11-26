@@ -1091,6 +1091,7 @@ describe Post do
 
   describe "#rebake!" do
     it "will rebake a post correctly" do
+      pending
       post = create_post
       expect(post.baked_at).not_to eq(nil)
       first_baked = post.baked_at
