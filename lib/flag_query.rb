@@ -35,7 +35,7 @@ module FlagQuery
 
     post_ids = reviewables.map(&:target_id).uniq
 
-    posts = DB.query(<<~SQL, post_ids: post_ids)
+    posts = DB.query(<<~SQL, post_ids: post_ids.blank? ? [0] : post_ids)
       SELECT p.id,
              p.cooked as excerpt,
              p.raw,
@@ -48,7 +48,7 @@ module FlagQuery
              p.user_deleted,
              NULL as post_action_ids,
              (SELECT created_at FROM post_revisions WHERE post_id = p.id AND user_id = p.user_id ORDER BY created_at DESC LIMIT 1) AS last_revised_at,
-             (SELECT COUNT(*) FROM post_actions WHERE (disagreed_at IS NOT NULL OR agreed_at IS NOT NULL OR deferred_at IS NOT NULL) AND post_id = p.id)::int AS previous_flags_count
+             (SELECT COUNT(*) FROM post_actions WHERE (disagreed_at IS NOT NULL OR agreed_at IS NOT NULL OR deferred_at IS NOT NULL) AND post_id = p.id) AS previous_flags_count
         FROM posts p
        WHERE p.id in (:post_ids)
     SQL

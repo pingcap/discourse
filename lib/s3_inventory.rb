@@ -49,10 +49,9 @@ class S3Inventory
 
           # backfilling etags
           connection.query("UPDATE #{model.table_name}
-            SET etag = #{table_name}.etag
-            FROM #{table_name}
-            WHERE #{model.table_name}.etag IS NULL
-              AND #{model.table_name}.url = #{table_name}.url")
+            INNER JOIN #{table_name} ON #{model.table_name}.etag IS NULL
+              AND #{model.table_name}.url = #{table_name}.url
+            SET etag = #{table_name}.etag")
 
           list_missing_post_uploads if type == "original"
 
