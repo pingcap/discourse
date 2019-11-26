@@ -453,18 +453,19 @@ SQL
     # long term we want to split up topic_users and allow for this better
     builder = DB.build <<~SQL
       UPDATE topic_users t
-        SET
-          last_read_post_number = LEAST(GREATEST(last_read, last_read_post_number), max_post_number),
-          highest_seen_post_number = LEAST(max_post_number,GREATEST(t.highest_seen_post_number, last_read))
-      FROM (
+      JOIN (
         SELECT topic_id, user_id, MAX(post_number) last_read
         FROM post_timings
         GROUP BY topic_id, user_id
-      ) as X
+      ) as X 
       JOIN (
         SELECT p.topic_id, MAX(p.post_number) max_post_number from posts p
         GROUP BY p.topic_id
       ) as Y on Y.topic_id = X.topic_id
+      SET
+          last_read_post_number = LEAST(GREATEST(last_read, last_read_post_number), max_post_number),
+          highest_seen_post_number = LEAST(max_post_number,GREATEST(t.highest_seen_post_number, last_read))
+
       /*where*/
     SQL
 
