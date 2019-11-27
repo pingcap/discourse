@@ -339,7 +339,6 @@ class ThemeField < ActiveRecord::Base
     if self.will_save_change_to_value_baked? ||
         self.will_save_change_to_compiler_version? ||
         self.will_save_change_to_error?
-
       self.update_columns(value_baked: value_baked,
                           compiler_version: compiler_version,
                           error: error)
