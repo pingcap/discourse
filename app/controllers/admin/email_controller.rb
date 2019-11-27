@@ -36,8 +36,8 @@ class Admin::EmailController < Admin::AdminController
           email_logs.where("post_reply_keys.reply_key = ?", reply_key)
         else
           email_logs.where(
-            "LOWER(replace(post_reply_keys.reply_key::VARCHAR, '-', '')) LIKE ?",
-            "%#{reply_key}%".downcase
+            "LOWER(replace(post_reply_keys.reply_key, '-', '')) LIKE ?",
+            "%#{reply_key}%".downcase.gsub("-", "")
           )
         end
     end
@@ -211,7 +211,7 @@ class Admin::EmailController < Admin::AdminController
 
     logs = logs.includes(:user, post: :topic)
       .references(:user)
-      .order(created_at: :desc)
+      .order(id: :desc)
       .offset(params[:offset] || 0)
       .limit(50)
 
