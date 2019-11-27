@@ -23,7 +23,7 @@ describe InlineOneboxController do
       fab!(:topic) { Fabricate(:topic) }
 
       it "returns information for a valid link" do
-        pending
+        pending("a ha")
         get "/inline-onebox.json", params: { urls: [ topic.url ] }
         expect(response.status).to eq(200)
         json = JSON.parse(response.body)
