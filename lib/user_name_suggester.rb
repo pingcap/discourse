@@ -56,7 +56,7 @@ module UserNameSuggester
           }
           
           # increasing the search space a bit to allow for some extra noise
-          gs = 1..count.map do |c|
+          gs = (1..count).map do |c|
             "SELECT #{c} AS n"
           end.join(" UNION ")
           available = DB.query_single(<<~SQL, params).first

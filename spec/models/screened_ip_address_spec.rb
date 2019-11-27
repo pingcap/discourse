@@ -108,7 +108,6 @@ describe ScreenedIpAddress do
   describe '#watch' do
     context 'ip_address is not being watched' do
       it 'should create a new record' do
-        pending
         record = described_class.watch(ip_address)
         expect(record).not_to be_new_record
         expect(record.action_type).to eq(described_class.actions[:block])
@@ -121,7 +120,6 @@ describe ScreenedIpAddress do
       end
 
       it "a record with subnet mask exists, but doesn't match" do
-        pending
         existing = Fabricate(:screened_ip_address, ip_address: '99.232.23.124/24')
         expect { described_class.watch('99.232.55.124') }.to change { described_class.count }
       end
