@@ -12,7 +12,6 @@ describe ScreenedIpAddress do
     end
 
     it 'can set action_type using the action_name virtual attribute' do
-      pending
       expect(described_class.new(valid_params.merge(action_name: :do_nothing)).action_type).to eq(described_class.actions[:do_nothing])
       expect(described_class.new(valid_params.merge(action_name: :block)).action_type).to eq(described_class.actions[:block])
       expect(described_class.new(valid_params.merge(action_name: 'do_nothing')).action_type).to eq(described_class.actions[:do_nothing])
@@ -116,7 +115,6 @@ describe ScreenedIpAddress do
       end
 
       it 'lets action_type be overridden' do
-        pending
         record = described_class.watch(ip_address, action_type: described_class.actions[:do_nothing])
         expect(record).not_to be_new_record
         expect(record.action_type).to eq(described_class.actions[:do_nothing])

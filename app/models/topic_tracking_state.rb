@@ -148,7 +148,7 @@ class TopicTrackingState
     User.where("GREATEST(CASE
                   WHEN COALESCE(uo.new_topic_duration_minutes, :default_duration) = :always THEN u.created_at
                   WHEN COALESCE(uo.new_topic_duration_minutes, :default_duration) = :last_visit THEN COALESCE(u.previous_visit_at,u.created_at)
-                  ELSE (now() - INTERVAL 1 * COALESCE(uo.new_topic_duration_minutes, :default_duration) MINUTE)
+                  ELSE (:now - INTERVAL 1 * COALESCE(uo.new_topic_duration_minutes, :default_duration) MINUTE)
                END, us.new_since, :min_date)",
                 now: DateTime.now,
                 last_visit: User::NewTopicDuration::LAST_VISIT,

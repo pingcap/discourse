@@ -498,7 +498,7 @@ protected
     version_result = nil
 
     if version
-      DB.exec(
+      count = DB.exec(
         "UPDATE reviewables SET version = version + 1 WHERE id = :id AND version = :version",
         version: version,
         id: self.id
@@ -506,7 +506,7 @@ protected
       version_result = DB.query_single(
         "SELECT version FROM reviewables WHERE id = :id",
         id: self.id
-      )
+      ) if count > 0
     else
       # We didn't supply a version to update safely, so just increase it
       DB.exec(
@@ -519,7 +519,7 @@ protected
         id: self.id
       )
     end
-
+    
     if version_result && version_result[0]
       self.version = version_result[0]
     else
