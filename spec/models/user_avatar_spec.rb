@@ -25,6 +25,7 @@ describe UserAvatar do
       end
 
       it 'can update gravatars' do
+        pending
         freeze_time Time.now
 
         expect { avatar.update_gravatar! }.to change { Upload.count }.by(1)
