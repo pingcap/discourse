@@ -183,12 +183,15 @@ module BackupRestore
 
       password_argument = "--password='#{db_conf.password}'" if db_conf.password.present?
       host_argument     = "--host=#{db_conf.host}"         if db_conf.host.present?
-      port_argument     = "--port=#{db_conf.port}"         if db_conf.port.present?
+      #port_argument     = "--port=#{db_conf.port}"         if db_conf.port.present?
+      # mysqldump 
+      port_argument     = "--port=3306"
       username_argument = "-u #{db_conf.username}" if db_conf.username.present?
 
       cmd =[
         "mysqldump",                  # the mysqldump command
         "--compress",                 # Compression
+        "--skip-add-locks",
         host_argument,                # the hostname to connect to (if any)
         port_argument,                # the port to connect to (if any)
         password_argument,            # pass the password to mysqldump (if any)
