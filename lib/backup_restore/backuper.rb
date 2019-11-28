@@ -161,7 +161,7 @@ module BackupRestore
 
       username_argument = "-u #{db_conf.username}" if db_conf.username.present?
 
-      [ password_argument,            # pass the password to mysqldump (if any)
+      cmd =[ password_argument,            # pass the password to mysqldump (if any)
         "mysqldump",                  # the mysqldump command
         "--compress",                 # Compression
         host_argument,                # the hostname to connect to (if any)
@@ -170,6 +170,8 @@ module BackupRestore
         db_conf.database,              # the name of the database to dump
         "> '#{@dump_filename}'", # output to the dump.sql file
       ].join(" ")
+      puts cmd
+      cmd
     end
 
     def move_dump_backup
