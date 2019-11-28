@@ -186,11 +186,12 @@ module BackupRestore
       port_argument     = "--port=#{db_conf.port}"         if db_conf.port.present?
       username_argument = "-u #{db_conf.username}" if db_conf.username.present?
 
-      cmd =[ password_argument,            # pass the password to mysqldump (if any)
+      cmd =[
         "mysqldump",                  # the mysqldump command
         "--compress",                 # Compression
         host_argument,                # the hostname to connect to (if any)
         port_argument,                # the port to connect to (if any)
+        password_argument,            # pass the password to mysqldump (if any)
         username_argument,            # the username to connect as (if any)
         db_conf.database,              # the name of the database to dump
         "> '#{@dump_filename}'", # output to the dump.sql file
