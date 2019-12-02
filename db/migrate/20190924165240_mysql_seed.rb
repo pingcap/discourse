@@ -1,5 +1,6 @@
 class MysqlSeed < ActiveRecord::Migration[5.2]
   def change
+    return # tmp disable for import from pg
     execute(<<~SQL)
       INSERT INTO site_settings VALUES (1, 'uncategorized_category_id', 3, '1', '2019-09-24 13:50:22.550891', '2019-09-24 13:50:22.550891');
     SQL
