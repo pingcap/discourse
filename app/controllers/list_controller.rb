@@ -411,6 +411,9 @@ class ListController < ApplicationController
 
   def construct_url_with(action, opts, url_prefix = nil)
     method = url_prefix.blank? ? "#{action_name}_path" : "#{url_prefix}_#{action_name}_path"
+    if SiteSetting.unicode_usernames && opts[:group_name]
+      opts[:group_name] = URI.encode(opts[:group_name])
+    end
     url = if action == :prev
       public_send(method, opts.merge(prev_page_params(opts)))
     else # :next
