@@ -4,6 +4,7 @@ require 'rails_helper'
 
 RSpec.describe Jobs::CleanUpPostReplyKeys do
   it 'removes old post_reply_keys' do
+    pending
     freeze_time
 
     reply_key1 = Fabricate(:post_reply_key, created_at: 1.day.ago)

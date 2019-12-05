@@ -14,7 +14,7 @@ end
 #
 # Table name: topic_invites
 #
-#  id         :integer          not null, primary key
+#  id         :bigint           not null, primary key
 #  topic_id   :integer          not null
 #  invite_id  :integer          not null
 #  created_at :datetime         not null

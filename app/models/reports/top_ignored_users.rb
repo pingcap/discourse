@@ -32,7 +32,14 @@ Report.add_report("top_ignored_users") do |report|
   report.data = []
 
   sql = <<~SQL
-      WITH ignored_users AS (
+      SELECT u.id as user_id,
+             u.username as username,
+             u.uploaded_avatar_id as uploaded_avatar_id,
+             ig.ignores_count as ignores_count,
+             COALESCE(mu.mutes_count, 0) as mutes_count,
+             ig.ignores_count + COALESCE(mu.mutes_count, 0) as total
+      FROM users as u
+      JOIN (
         SELECT
         ignored_user_id as user_id,
         COUNT(*) AS ignores_count
@@ -41,8 +48,8 @@ Report.add_report("top_ignored_users") do |report|
         GROUP BY ignored_user_id
         ORDER BY COUNT(*) DESC
         LIMIT :limit
-      ),
-      muted_users AS (
+      ) as ig ON ig.user_id = u.id
+      LEFT OUTER JOIN (
         SELECT
         muted_user_id as user_id,
         COUNT(*) AS mutes_count
@@ -51,17 +58,7 @@ Report.add_report("top_ignored_users") do |report|
         GROUP BY muted_user_id
         ORDER BY COUNT(*) DESC
         LIMIT :limit
-      )
-
-      SELECT u.id as user_id,
-             u.username as username,
-             u.uploaded_avatar_id as uploaded_avatar_id,
-             ig.ignores_count as ignores_count,
-             COALESCE(mu.mutes_count, 0) as mutes_count,
-             ig.ignores_count + COALESCE(mu.mutes_count, 0) as total
-      FROM users as u
-      JOIN ignored_users as ig ON ig.user_id = u.id
-      LEFT OUTER JOIN muted_users as mu ON mu.user_id = u.id
+      ) as mu ON mu.user_id = u.id
       ORDER BY total DESC
   SQL
 

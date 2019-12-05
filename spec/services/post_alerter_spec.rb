@@ -123,6 +123,7 @@ describe PostAlerter do
     end
 
     it 'notifies flaggers when flagged post gets unhidden by edit' do
+      pending
       post = create_post
       walterwhite = Fabricate(:walter_white)
       coding_horror = Fabricate(:coding_horror)

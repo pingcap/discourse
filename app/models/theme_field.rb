@@ -15,18 +15,20 @@ class ThemeField < ActiveRecord::Base
     where(theme_id: theme_ids)
       .joins(
         "JOIN (
-          SELECT #{theme_ids.map.with_index { |id, idx| "#{id.to_i} AS theme_id, #{idx} AS theme_sort_column" }.join(" UNION ALL SELECT ")}
+          #{theme_ids.map.with_index { |id, idx| "SELECT #{id.to_i} AS theme_id, #{idx} AS theme_sort_column" }.join(" UNION ALL ")}
         ) as X ON X.theme_id = theme_fields.theme_id")
       .order("theme_sort_column")
   }
 
   scope :filter_locale_fields, ->(locale_codes) {
     return none unless locale_codes.present?
-
+    values = locale_codes.each_with_index.map do |l, i|
+      "SELECT '#{l}' AS locale_code, #{i} AS locale_sort_column"
+    end.join("\n UNION \n")
     where(target_id: Theme.targets[:translations], name: locale_codes)
       .joins(self.sanitize_sql_array([
       "JOIN (
-        SELECT * FROM (VALUES #{locale_codes.map { "(?)" }.join(",")}) as Y (locale_code, locale_sort_column)
+        #{values}
       ) as Y ON Y.locale_code = theme_fields.name",
       *locale_codes.map.with_index { |code, index| [code, index] }
     ]))
@@ -34,10 +36,12 @@ class ThemeField < ActiveRecord::Base
   }
 
   scope :find_first_locale_fields, ->(theme_ids, locale_codes) {
-    find_by_theme_ids(theme_ids)
+    ids = find_by_theme_ids(theme_ids)
       .filter_locale_fields(locale_codes)
-      .reorder("X.theme_sort_column", "Y.locale_sort_column")
-      .select("DISTINCT ON (X.theme_sort_column) *")
+      .unscope(:select).select("*").unscope(:order)
+      .group_by{|x| x.theme_sort_column}.values.map{|x| x.sort_by{|x| [x.theme_sort_column, x.locale_sort_column]}[0]}
+      .map{|x| x.id}
+    self.where(id: ids)
   }
 
   def self.types
@@ -335,7 +339,6 @@ class ThemeField < ActiveRecord::Base
     if self.will_save_change_to_value_baked? ||
         self.will_save_change_to_compiler_version? ||
         self.will_save_change_to_error?
-
       self.update_columns(value_baked: value_baked,
                           compiler_version: compiler_version,
                           error: error)
@@ -510,16 +513,16 @@ end
 #
 # Table name: theme_fields
 #
-#  id               :integer          not null, primary key
+#  id               :bigint           not null, primary key
 #  theme_id         :integer          not null
 #  target_id        :integer          not null
 #  name             :string(255)      not null
-#  value            :text             not null
-#  value_baked      :text
+#  value            :text(65535)      not null
+#  value_baked      :text(65535)
 #  created_at       :datetime         not null
 #  updated_at       :datetime         not null
 #  compiler_version :string(50)       default("0"), not null
-#  error            :string
+#  error            :string(255)
 #  upload_id        :integer
 #  type_id          :integer          default(0), not null
 #

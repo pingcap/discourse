@@ -42,7 +42,7 @@ end
 #
 # Table name: group_archived_messages
 #
-#  id         :integer          not null, primary key
+#  id         :bigint           not null, primary key
 #  group_id   :integer          not null
 #  topic_id   :integer          not null
 #  created_at :datetime         not null

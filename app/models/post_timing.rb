@@ -33,14 +33,13 @@ class PostTiming < ActiveRecord::Base
   end
 
   def self.record_new_timing(args)
-    DB.exec("INSERT INTO post_timings (topic_id, user_id, post_number, msecs)
-              SELECT :topic_id, :user_id, :post_number, :msecs
-              ON CONFLICT DO NOTHING",
+    DB.exec("INSERT IGNORE INTO post_timings (topic_id, user_id, post_number, msecs)
+              SELECT :topic_id, :user_id, :post_number, :msecs",
             args)
     # concurrency is hard, we are not running serialized so this can possibly
     # still happen, if it happens we just don't care, its an invalid record anyway
-    Post.where(['topic_id = :topic_id and post_number = :post_number', args]).update_all 'reads = reads + 1'
-    UserStat.where(user_id: args[:user_id]).update_all 'posts_read_count = posts_read_count + 1'
+    Post.where(['topic_id = :topic_id and post_number = :post_number', args]).update_all '`reads` = `reads` + 1'
+    UserStat.where(user_id: args[:user_id]).update_all '`posts_read_count` = `posts_read_count` + 1'
   end
 
   # Increases a timer if a row exists, otherwise create it
@@ -138,13 +137,11 @@ class PostTiming < ActiveRecord::Base
     if join_table.length > 0
       sql = <<~SQL
       UPDATE post_timings t
-      SET msecs = t.msecs + x.msecs
-      FROM (#{join_table.join(" UNION ALL ")}) x
-      WHERE x.topic_id = t.topic_id AND
+      INNER JOIN (#{join_table.join(" UNION ALL ")}) x ON x.topic_id = t.topic_id AND
             x.post_number = t.post_number AND
             x.user_id = t.user_id
-      RETURNING x.idx
-SQL
+      SET t.msecs = t.msecs + x.msecs 
+      SQL
 
       existing = Set.new(DB.query_single(sql))
 

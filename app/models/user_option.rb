@@ -6,6 +6,7 @@ class UserOption < ActiveRecord::Base
   before_create :set_defaults
 
   after_save :update_tracked_topics
+  default_value_for :theme_ids, []
 
   def self.ensure_consistency!
     sql = <<~SQL
@@ -216,7 +217,7 @@ end
 #  theme_key_seq                    :integer          default(0), not null
 #  allow_private_messages           :boolean          default(TRUE), not null
 #  homepage_id                      :integer
-#  theme_ids                        :integer          default([]), not null, is an Array
+#  theme_ids                        :json             not null
 #  hide_profile_and_presence        :boolean          default(FALSE), not null
 #  text_size_key                    :integer          default(0), not null
 #  text_size_seq                    :integer          default(0), not null

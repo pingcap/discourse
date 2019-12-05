@@ -33,7 +33,7 @@ class TopicsBulkAction
   def find_group
     return unless @options[:group]
 
-    group = Group.where('name ilike ?', @options[:group]).first
+    group = Group.where('LOWER(name) like ?', @options[:group].downcase).first
     raise Discourse::InvalidParameters.new(:group) unless group
     unless group.group_users.where(user_id: @user.id).exists?
       raise Discourse::InvalidParameters.new(:group)
@@ -70,9 +70,8 @@ class TopicsBulkAction
   def dismiss_posts
     sql = "
     UPDATE topic_users tu
-    SET highest_seen_post_number = t.highest_post_number , last_read_post_number = highest_post_number
-    FROM topics t
-    WHERE t.id = tu.topic_id AND tu.user_id = :user_id AND t.id IN (:topic_ids)
+           INNER JOIN topics t ON t.id = tu.topic_id AND tu.user_id = :user_id AND t.id IN (:topic_ids)
+    SET tu.highest_seen_post_number = t.highest_post_number , tu.last_read_post_number = t.highest_post_number
     "
 
     DB.exec(sql, user_id: @user.id, topic_ids: @topic_ids)

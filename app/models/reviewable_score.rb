@@ -81,14 +81,14 @@ end
 #  user_id               :integer          not null
 #  reviewable_score_type :integer          not null
 #  status                :integer          not null
-#  score                 :float            default(0.0), not null
-#  take_action_bonus     :float            default(0.0), not null
+#  score                 :float(24)        default(0.0), not null
+#  take_action_bonus     :float(24)        default(0.0), not null
 #  reviewed_by_id        :integer
 #  reviewed_at           :datetime
 #  meta_topic_id         :integer
 #  created_at            :datetime         not null
 #  updated_at            :datetime         not null
-#  reason                :string
+#  reason                :string(255)
 #
 # Indexes
 #

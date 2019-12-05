@@ -29,13 +29,13 @@ end
 #
 # Table name: web_hook_events
 #
-#  id               :integer          not null, primary key
+#  id               :bigint           not null, primary key
 #  web_hook_id      :integer          not null
-#  headers          :string
-#  payload          :text
+#  headers          :string(255)
+#  payload          :text(65535)
 #  status           :integer          default(0)
-#  response_headers :string
-#  response_body    :text
+#  response_headers :string(255)
+#  response_body    :text(65535)
 #  duration         :integer          default(0)
 #  created_at       :datetime         not null
 #  updated_at       :datetime         not null

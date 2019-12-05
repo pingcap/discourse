@@ -54,14 +54,14 @@ end
 #
 # Table name: group_histories
 #
-#  id             :integer          not null, primary key
+#  id             :bigint           not null, primary key
 #  group_id       :integer          not null
 #  acting_user_id :integer          not null
 #  target_user_id :integer
 #  action         :integer          not null
-#  subject        :string
-#  prev_value     :text
-#  new_value      :text
+#  subject        :string(255)
+#  prev_value     :text(65535)
+#  new_value      :text(65535)
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
 #

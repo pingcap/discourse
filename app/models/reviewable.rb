@@ -466,7 +466,7 @@ protected
 
   def recalculate_score
     # Recalculate the pending score and return it
-    result = DB.query(<<~SQL, id: self.id, pending: ReviewableScore.statuses[:pending])
+    DB.exec(<<~SQL, id: self.id, pending: ReviewableScore.statuses[:pending])
       UPDATE reviewables
       SET score = COALESCE((
         SELECT sum(score)
@@ -474,11 +474,14 @@ protected
         WHERE rs.reviewable_id = :id
       ), 0.0)
       WHERE id = :id
-      RETURNING score
+    SQL
+
+    result = DB.query(<<~SQL, id: self.id)
+      SELECT score FROM reviewables WHERE id = :id
     SQL
 
     # Update topic score
-    DB.query(<<~SQL, topic_id: topic_id, pending: Reviewable.statuses[:pending])
+    DB.exec(<<~SQL, topic_id: topic_id, pending: Reviewable.statuses[:pending])
       UPDATE topics
       SET reviewable_score = COALESCE((
         SELECT SUM(score)
@@ -495,19 +498,28 @@ protected
     version_result = nil
 
     if version
-      version_result = DB.query_single(
-        "UPDATE reviewables SET version = version + 1 WHERE id = :id AND version = :version RETURNING version",
+      count = DB.exec(
+        "UPDATE reviewables SET version = version + 1 WHERE id = :id AND version = :version",
         version: version,
         id: self.id
       )
+      version_result = DB.query_single(
+        "SELECT version FROM reviewables WHERE id = :id",
+        id: self.id
+      ) if count > 0
     else
       # We didn't supply a version to update safely, so just increase it
+      DB.exec(
+        "UPDATE reviewables SET version = version + 1 WHERE id = :id",
+        id: self.id
+      )
+
       version_result = DB.query_single(
-        "UPDATE reviewables SET version = version + 1 WHERE id = :id RETURNING version",
+        "SELECT version FROM reviewables WHERE id = :id",
         id: self.id
       )
     end
-
+    
     if version_result && version_result[0]
       self.version = version_result[0]
     else
@@ -534,11 +546,16 @@ private
     user_ids -= [post&.user_id]
     return if user_ids.blank?
 
-    result = DB.query(<<~SQL, user_ids: user_ids)
+    DB.exec(<<~SQL, user_ids: user_ids)
       UPDATE user_stats
       SET flags_#{status} = flags_#{status} + 1
       WHERE user_id IN (:user_ids)
-      RETURNING user_id, flags_agreed + flags_disagreed + flags_ignored AS total
+    SQL
+
+    result = DB.query(<<~SQL, user_ids: user_ids)
+      SELECT user_id, flags_agreed + flags_disagreed + flags_ignored AS total
+        FROM user_stats
+       WHERE user_id IN (:user_ids)
     SQL
 
     user_ids = result.select { |r| r.total > Jobs::TruncateUserFlagStats.truncate_to }.map(&:user_id)
@@ -553,17 +570,17 @@ end
 # Table name: reviewables
 #
 #  id                      :bigint           not null, primary key
-#  type                    :string           not null
+#  type                    :string(255)      not null
 #  status                  :integer          default(0), not null
 #  created_by_id           :integer          not null
 #  reviewable_by_moderator :boolean          default(FALSE), not null
 #  reviewable_by_group_id  :integer
 #  category_id             :integer
 #  topic_id                :integer
-#  score                   :float            default(0.0), not null
+#  score                   :float(24)        default(0.0), not null
 #  potential_spam          :boolean          default(FALSE), not null
 #  target_id               :integer
-#  target_type             :string
+#  target_type             :string(255)
 #  target_created_by_id    :integer
 #  payload                 :json
 #  version                 :integer          default(0), not null

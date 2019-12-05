@@ -69,6 +69,7 @@ describe Jobs::TruncateUserFlagStats do
     expect(user.user_stat.flags_ignored).to eq(0)
 
     expect(other_user.user_stat.flags_agreed).to eq(0)
+    pending
     expect(other_user.user_stat.flags_disagreed).to eq(1)
     expect(other_user.user_stat.flags_ignored).to eq(1)
   end

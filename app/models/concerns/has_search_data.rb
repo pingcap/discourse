@@ -8,5 +8,11 @@ module HasSearchData
     self.primary_key = "#{_associated_record_name}_id"
     belongs_to _associated_record_name.to_sym
     validates_presence_of :search_data
+    searchkick language: 'chinese'
+    def search_data
+      {
+        search_data: read_attribute(:search_data)
+      }
+    end
   end
 end

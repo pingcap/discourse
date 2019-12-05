@@ -171,11 +171,10 @@ class UserUpdater
 
       # SQL is easier here than figuring out how to do the same in AR
       DB.exec(<<~SQL, now: Time.now, user_id: user.id, desired_ids: desired_ids)
-        INSERT into muted_users(user_id, muted_user_id, created_at, updated_at)
+        INSERT IGNORE into muted_users(user_id, muted_user_id, created_at, updated_at)
         SELECT :user_id, id, :now, :now
         FROM users
         WHERE id in (:desired_ids)
-        ON CONFLICT DO NOTHING
       SQL
     end
   end
@@ -193,11 +192,10 @@ class UserUpdater
 
       # SQL is easier here than figuring out how to do the same in AR
       DB.exec(<<~SQL, now: Time.now, user_id: user.id, desired_ids: desired_ids)
-        INSERT into ignored_users(user_id, ignored_user_id, created_at, updated_at)
+        INSERT IGNORE into ignored_users(user_id, ignored_user_id, created_at, updated_at)
         SELECT :user_id, id, :now, :now
         FROM users
         WHERE id in (:desired_ids)
-        ON CONFLICT DO NOTHING
       SQL
     end
   end

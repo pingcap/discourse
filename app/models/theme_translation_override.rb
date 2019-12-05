@@ -16,9 +16,9 @@ end
 #
 #  id              :bigint           not null, primary key
 #  theme_id        :integer          not null
-#  locale          :string           not null
-#  translation_key :string           not null
-#  value           :string           not null
+#  locale          :string(255)      not null
+#  translation_key :string(255)      not null
+#  value           :string(255)      not null
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
 #

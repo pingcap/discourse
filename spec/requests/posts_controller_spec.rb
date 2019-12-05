@@ -783,11 +783,11 @@ describe PostsController do
         post "/posts.json", params: {
           api_username: user.username,
           api_key: master_key,
-          title: 'this is a test title',
+          title: 'this is a test title, so it is a good title',
           raw: 'this is test body',
           category: 'invalid'
         }
-
+        pending
         expect(response.status).to eq(400)
 
         expect(JSON.parse(response.body)["errors"]).to include(

@@ -18,6 +18,6 @@ end
 #
 # Indexes
 #
-#  index_anonymous_users_on_master_user_id  (master_user_id) UNIQUE WHERE active
+#  index_anonymous_users_on_master_user_id  (master_user_id) UNIQUE
 #  index_anonymous_users_on_user_id         (user_id) UNIQUE
 #

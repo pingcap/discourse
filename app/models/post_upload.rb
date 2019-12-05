@@ -9,7 +9,7 @@ end
 #
 # Table name: post_uploads
 #
-#  id        :integer          not null, primary key
+#  id        :bigint           not null, primary key
 #  post_id   :integer          not null
 #  upload_id :integer          not null
 #

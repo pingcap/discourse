@@ -11,8 +11,8 @@ class Admin::ScreenedIpAddressesController < Admin::AdminController
     filter = IPAddr.handle_wildcards(filter)
 
     screened_ip_addresses = ScreenedIpAddress
-    screened_ip_addresses = screened_ip_addresses.where("cidr :filter >>= ip_address", filter: filter) if filter.present?
-    screened_ip_addresses = screened_ip_addresses.limit(200).order('match_count desc')
+    screened_ip_addresses = screened_ip_addresses.where("ip_address LIKE ?", filter: filter) if filter.present?
+    screened_ip_addresses = screened_ip_addresses.limit(200)
 
     begin
       screened_ip_addresses = screened_ip_addresses.to_a

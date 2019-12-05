@@ -1,0 +1,1 @@
+Searchkick.timeout = 100

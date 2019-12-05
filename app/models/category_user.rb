@@ -72,9 +72,10 @@ class CategoryUser < ActiveRecord::Base
 
     builder = DB.build <<~SQL
       UPDATE topic_users tu
-      SET notification_level = :tracking,
-          notifications_reason_id = :auto_track_category
-      FROM topics t, category_users cu
+      INNER JOIN topics t
+      INNER JOIN category_users cu
+      SET tu.notification_level = :tracking,
+          tu.notifications_reason_id = :auto_track_category
       /*where*/
     SQL
 
@@ -107,17 +108,7 @@ class CategoryUser < ActiveRecord::Base
 
     builder = DB.build <<~SQL
       UPDATE topic_users tu
-      SET notification_level =
-        CASE WHEN should_track THEN :tracking
-             WHEN should_watch THEN :watching
-             ELSE notification_level
-        END,
-      notifications_reason_id =
-        CASE WHEN should_track THEN null
-             WHEN should_watch THEN :auto_watch_category
-             ELSE notifications_reason_id
-             END
-      FROM (
+      INNER JOIN (
         SELECT tu1.topic_id,
                tu1.user_id,
                CASE WHEN
@@ -134,6 +125,16 @@ class CategoryUser < ActiveRecord::Base
         LEFT JOIN category_users cu ON cu.category_id = t.category_id AND cu.user_id = tu1.user_id AND cu.notification_level = :watching
         /*where2*/
       ) as X
+      SET notification_level =
+        CASE WHEN should_track THEN :tracking
+             WHEN should_watch THEN :watching
+             ELSE notification_level
+        END,
+      notifications_reason_id =
+        CASE WHEN should_track THEN null
+             WHEN should_watch THEN :auto_watch_category
+             ELSE notifications_reason_id
+             END
 
       /*where*/
     SQL
@@ -166,12 +167,10 @@ class CategoryUser < ActiveRecord::Base
 
   def self.ensure_consistency!
     DB.exec <<~SQL
-      DELETE FROM category_users
-        WHERE user_id IN (
-          SELECT cu.user_id FROM category_users cu
-          LEFT JOIN users u ON u.id = cu.user_id
-          WHERE u.id IS NULL
-        )
+      DELETE category_users 
+        FROM category_users
+             LEFT JOIN users u ON u.id = category_users.user_id
+       WHERE u.id IS NULL
     SQL
   end
 
@@ -181,7 +180,7 @@ end
 #
 # Table name: category_users
 #
-#  id                 :integer          not null, primary key
+#  id                 :bigint           not null, primary key
 #  category_id        :integer          not null
 #  user_id            :integer          not null
 #  notification_level :integer          not null

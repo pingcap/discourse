@@ -53,7 +53,7 @@ class CategoryList
       categories.left_outer_joins(:featured_topics)
         .where(topics: { category_id: allowed_category_ids })
         .group('categories.id')
-        .order("max(topics.bumped_at) DESC NULLS LAST")
+        .order("max(topics.bumped_at) DESC")
         .order('categories.id ASC')
     end
   end

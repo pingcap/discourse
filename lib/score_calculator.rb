@@ -32,17 +32,16 @@ class ScoreCalculator
     @weightings.each_key { |k| components << "COALESCE(posts.#{k}, 0) * :#{k}" }
     components = components.join(" + ")
 
-    builder = DB.build <<SQL
+    builder = DB.build <<~SQL
        UPDATE posts p
-        SET score = x.score
-       FROM (
+       INNER JOIN (
         SELECT posts.id, #{components} as score FROM posts
         join topics on posts.topic_id = topics.id
         /*where*/
         limit #{limit}
-       ) AS x
-       WHERE x.id = p.id
-SQL
+       ) AS x ON x.id = p.id
+        SET p.score = x.score
+    SQL
 
     builder.where("posts.score IS NULL OR posts.score <> #{components}", @weightings)
 
@@ -53,6 +52,7 @@ SQL
   end
 
   def update_posts_rank(opts)
+    return #TODO FIX
     limit = 20000
 
     builder = DB.build <<~SQL
@@ -85,16 +85,16 @@ SQL
   def update_topics_rank(opts)
     builder = DB.build <<~SQL
       UPDATE topics AS topics
-      SET has_summary = (topics.like_count >= :likes_required AND
-                         topics.posts_count >= :posts_required AND
-                         x.max_score >= :score_required),
-          score = x.avg_score
-      FROM (SELECT p.topic_id,
+      INNER JOIN (SELECT p.topic_id,
                    MAX(p.score) AS max_score,
                    AVG(p.score) AS avg_score
             FROM posts AS p
-            GROUP BY p.topic_id) AS x
-            /*where*/
+            GROUP BY p.topic_id) AS x ON x.topic_id = topics.id
+      SET has_summary = (topics.like_count >= :likes_required AND
+                         topics.posts_count >= :posts_required AND
+                         x.max_score >= :score_required),
+          topics.score = x.avg_score
+      /*where*/
     SQL
 
     defaults = {
@@ -104,7 +104,6 @@ SQL
     }
 
     builder.where(<<~SQL, defaults)
-      x.topic_id = topics.id AND
       (
         (topics.score <> x.avg_score OR topics.score IS NULL) OR
         (topics.has_summary IS NULL OR topics.has_summary <> (

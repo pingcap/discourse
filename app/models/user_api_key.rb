@@ -77,16 +77,16 @@ end
 #
 # Table name: user_api_keys
 #
-#  id               :integer          not null, primary key
+#  id               :bigint           not null, primary key
 #  user_id          :integer          not null
-#  client_id        :string           not null
-#  key              :string           not null
-#  application_name :string           not null
-#  push_url         :string
+#  client_id        :string(255)      not null
+#  key              :string(255)      not null
+#  application_name :string(255)      not null
+#  push_url         :string(255)
 #  created_at       :datetime         not null
 #  updated_at       :datetime         not null
 #  revoked_at       :datetime
-#  scopes           :text             default([]), not null, is an Array
+#  scopes           :json             not null
 #  last_used_at     :datetime         not null
 #
 # Indexes

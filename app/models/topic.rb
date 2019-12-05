@@ -303,7 +303,7 @@ class Topic < ActiveRecord::Base
   end
 
   def best_post
-    posts.where(post_type: Post.types[:regular], user_deleted: false).order('score desc nulls last').limit(1).first
+    posts.where(post_type: Post.types[:regular], user_deleted: false).order('score desc').limit(1).first
   end
 
   def has_flags?
@@ -464,7 +464,7 @@ class Topic < ActiveRecord::Base
   MAX_SIMILAR_BODY_LENGTH ||= 200
 
   def self.similar_to(title, raw, user = nil)
-    return [] if title.blank?
+    return [] # TODO FIX
     raw = raw.presence || ""
 
     search_data = "#{title} #{raw[0...MAX_SIMILAR_BODY_LENGTH]}".strip
@@ -514,11 +514,14 @@ class Topic < ActiveRecord::Base
 
     if opts[:whisper]
 
-      result = DB.query_single(<<~SQL, highest, topic_id)
+      DB.exec(<<~SQL, highest, topic_id)
         UPDATE topics
         SET highest_staff_post_number = ? + 1
         WHERE id = ?
-        RETURNING highest_staff_post_number
+      SQL
+
+      result = DB.query_single(<<~SQL, topic_id)
+        SELECT highest_staff_post_number FROM topics WHERE id = ?
       SQL
 
       result.first.to_i
@@ -528,14 +531,17 @@ class Topic < ActiveRecord::Base
       reply_sql = opts[:reply] ? ", reply_count = reply_count + 1" : ""
       posts_sql = opts[:post]  ? ", posts_count = posts_count + 1" : ""
 
-      result = DB.query_single(<<~SQL, highest: highest, topic_id: topic_id)
+      DB.exec(<<~SQL, highest: highest, topic_id: topic_id)
         UPDATE topics
         SET highest_staff_post_number = :highest + 1,
             highest_post_number = :highest + 1
             #{reply_sql}
             #{posts_sql}
         WHERE id = :topic_id
-        RETURNING highest_post_number
+      SQL
+
+      result = DB.query_single(<<~SQL, topic_id)
+        SELECT highest_post_number FROM topics WHERE id = ?
       SQL
 
       result.first.to_i
@@ -623,7 +629,7 @@ class Topic < ActiveRecord::Base
     # ignore small_action replies for private messages
     post_type = archetype == Archetype.private_message ? " AND post_type <> #{Post.types[:small_action]}" : ''
 
-    result = DB.query_single(<<~SQL, topic_id: topic_id)
+    DB.exec(<<~SQL, topic_id: topic_id)
       UPDATE topics
       SET
         highest_staff_post_number = (
@@ -653,7 +659,10 @@ class Topic < ActiveRecord::Base
                 #{post_type}
         )
       WHERE id = :topic_id
-      RETURNING highest_post_number
+    SQL
+
+    result = DB.query_single(<<~SQL, topic_id)
+      SELECT highest_post_number FROM topics WHERE id = ?
     SQL
 
     highest_post_number = result.first.to_i
@@ -1187,7 +1196,7 @@ class Topic < ActiveRecord::Base
     # OR if you have it archived as a user explicitly
 
     sql = <<~SQL
-      SELECT 1
+      SELECT 1 FROM one_row_table
       WHERE
         (
         SELECT count(*) FROM topic_allowed_groups tg
@@ -1214,9 +1223,9 @@ class Topic < ActiveRecord::Base
   end
 
   TIME_TO_FIRST_RESPONSE_SQL ||= <<-SQL
-    SELECT AVG(t.hours)::float AS "hours", t.created_at AS "date"
+    SELECT AVG(t.hours) AS "hours", t.created_at AS "date"
     FROM (
-      SELECT t.id, t.created_at::date AS created_at, EXTRACT(EPOCH FROM MIN(p.created_at) - t.created_at)::float / 3600.0 AS "hours"
+      SELECT t.id, date(t.created_at) AS created_at, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id
       /*where*/
@@ -1227,9 +1236,9 @@ class Topic < ActiveRecord::Base
   SQL
 
   TIME_TO_FIRST_RESPONSE_TOTAL_SQL ||= <<-SQL
-    SELECT AVG(t.hours)::float AS "hours"
+    SELECT AVG(t.hours) AS "hours"
     FROM (
-      SELECT t.id, EXTRACT(EPOCH FROM MIN(p.created_at) - t.created_at)::float / 3600.0 AS "hours"
+      SELECT t.id, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id
       /*where*/
@@ -1250,7 +1259,7 @@ class Topic < ActiveRecord::Base
     builder.where("p.user_id != t.user_id")
     builder.where("p.user_id in (:user_ids)", user_ids: opts[:user_ids]) if opts[:user_ids]
     builder.where("p.post_type = :post_type", post_type: Post.types[:regular])
-    builder.where("EXTRACT(EPOCH FROM p.created_at - t.created_at) > 0")
+    builder.where("UNIX_TIMESTAMP(p.created_at) - UNIX_TIMESTAMP(t.created_at) > 0")
     builder.query_hash
   end
 
@@ -1266,7 +1275,7 @@ class Topic < ActiveRecord::Base
   WITH_NO_RESPONSE_SQL ||= <<-SQL
     SELECT COUNT(*) as count, tt.created_at AS "date"
     FROM (
-      SELECT t.id, t.created_at::date AS created_at, MIN(p.post_number) first_reply
+      SELECT t.id, date(t.created_at) AS created_at, MIN(p.post_number) first_reply
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id AND p.user_id != t.user_id AND p.deleted_at IS NULL AND p.post_type = #{Post.types[:regular]}
       /*where*/
@@ -1471,8 +1480,8 @@ end
 #
 # Table name: topics
 #
-#  id                        :integer          not null, primary key
-#  title                     :string           not null
+#  id                        :bigint           not null, primary key
+#  title                     :string(255)      not null
 #  last_posted_at            :datetime
 #  created_at                :datetime         not null
 #  updated_at                :datetime         not null
@@ -1487,7 +1496,7 @@ end
 #  avg_time                  :integer
 #  deleted_at                :datetime
 #  highest_post_number       :integer          default(0), not null
-#  image_url                 :string
+#  image_url                 :string(255)
 #  like_count                :integer          default(0), not null
 #  incoming_link_count       :integer          default(0), not null
 #  category_id               :integer
@@ -1497,15 +1506,15 @@ end
 #  archived                  :boolean          default(FALSE), not null
 #  bumped_at                 :datetime         not null
 #  has_summary               :boolean          default(FALSE), not null
-#  archetype                 :string           default("regular"), not null
+#  archetype                 :string(255)      default("regular"), not null
 #  featured_user4_id         :integer
 #  notify_moderators_count   :integer          default(0), not null
 #  spam_count                :integer          default(0), not null
 #  pinned_at                 :datetime
-#  score                     :float
-#  percent_rank              :float            default(1.0), not null
-#  subtype                   :string
-#  slug                      :string
+#  score                     :float(24)
+#  percent_rank              :float(24)        default(1.0), not null
+#  subtype                   :string(255)
+#  slug                      :string(255)
 #  deleted_by_id             :integer
 #  participant_count         :integer          default(1)
 #  word_count                :integer
@@ -1514,19 +1523,18 @@ end
 #  pinned_until              :datetime
 #  fancy_title               :string(400)
 #  highest_staff_post_number :integer          default(0), not null
-#  featured_link             :string
-#  reviewable_score          :float            default(0.0), not null
+#  featured_link             :string(255)
+#  reviewable_score          :float(24)        default(0.0), not null
 #
 # Indexes
 #
 #  idx_topics_front_page                   (deleted_at,visible,archetype,category_id,id)
-#  idx_topics_user_id_deleted_at           (user_id) WHERE (deleted_at IS NULL)
-#  idxtopicslug                            (slug) WHERE ((deleted_at IS NULL) AND (slug IS NOT NULL))
+#  idx_topics_user_id_deleted_at           (user_id)
+#  idxtopicslug                            (slug)
 #  index_topics_on_bumped_at               (bumped_at)
-#  index_topics_on_created_at_and_visible  (created_at,visible) WHERE ((deleted_at IS NULL) AND ((archetype)::text <> 'private_message'::text))
+#  index_topics_on_created_at_and_visible  (created_at,visible)
 #  index_topics_on_id_and_deleted_at       (id,deleted_at)
-#  index_topics_on_lower_title             (lower((title)::text))
-#  index_topics_on_pinned_at               (pinned_at) WHERE (pinned_at IS NOT NULL)
-#  index_topics_on_pinned_globally         (pinned_globally) WHERE pinned_globally
-#  index_topics_on_updated_at_public       (updated_at,visible,highest_staff_post_number,highest_post_number,category_id,created_at,id) WHERE (((archetype)::text <> 'private_message'::text) AND (deleted_at IS NULL))
+#  index_topics_on_pinned_at               (pinned_at)
+#  index_topics_on_pinned_globally         (pinned_globally)
+#  index_topics_on_updated_at_public       (updated_at,visible,highest_staff_post_number,highest_post_number,category_id,created_at,id)
 #

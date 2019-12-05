@@ -8,9 +8,9 @@ class IncomingEmail < ActiveRecord::Base
   scope :errored,  -> { where("NOT is_bounce AND error IS NOT NULL") }
 
   scope :addressed_to, -> (email) do
-    where(<<~SQL, email: "%#{email}%")
-      incoming_emails.to_addresses ILIKE :email OR
-      incoming_emails.cc_addresses ILIKE :email
+    where(<<~SQL, email: "%#{email}%".downcase)
+      LOWER(incoming_emails.to_addresses) LIKE :email OR
+      LOWER(incoming_emails.cc_addresses) LIKE :email
     SQL
   end
 
@@ -20,8 +20,8 @@ class IncomingEmail < ActiveRecord::Base
           SELECT 1
           FROM user_emails
           WHERE user_emails.user_id = :user_id AND
-                (incoming_emails.to_addresses ILIKE '%' || user_emails.email || '%' OR
-                 incoming_emails.cc_addresses ILIKE '%' || user_emails.email || '%')
+                (LOWER(incoming_emails.to_addresses) LIKE CONCAT('%', LOWER(user_emails.email), '%') OR
+                 LOWER(incoming_emails.cc_addresses) LIKE CONCAT('%', LOWER(user_emails.email), '%'))
       )
     SQL
   end
@@ -31,20 +31,20 @@ end
 #
 # Table name: incoming_emails
 #
-#  id                :integer          not null, primary key
+#  id                :bigint           not null, primary key
 #  user_id           :integer
 #  topic_id          :integer
 #  post_id           :integer
-#  raw               :text
-#  error             :text
-#  message_id        :text
-#  from_address      :text
-#  to_addresses      :text
-#  cc_addresses      :text
-#  subject           :text
+#  raw               :text(65535)
+#  error             :text(65535)
+#  message_id        :text(65535)
+#  from_address      :text(65535)
+#  to_addresses      :text(65535)
+#  cc_addresses      :text(65535)
+#  subject           :text(65535)
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
-#  rejection_message :text
+#  rejection_message :text(65535)
 #  is_auto_generated :boolean          default(FALSE)
 #  is_bounce         :boolean          default(FALSE), not null
 #
@@ -54,5 +54,5 @@ end
 #  index_incoming_emails_on_error       (error)
 #  index_incoming_emails_on_message_id  (message_id)
 #  index_incoming_emails_on_post_id     (post_id)
-#  index_incoming_emails_on_user_id     (user_id) WHERE (user_id IS NOT NULL)
+#  index_incoming_emails_on_user_id     (user_id)
 #

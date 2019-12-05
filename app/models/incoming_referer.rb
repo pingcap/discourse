@@ -25,11 +25,12 @@ end
 #
 # Table name: incoming_referers
 #
-#  id                 :integer          not null, primary key
-#  path               :string(1000)     not null
+#  id                 :bigint           not null, primary key
+#  path               :text(65535)      not null
 #  incoming_domain_id :integer          not null
+#  md5_path           :string(255)
 #
 # Indexes
 #
-#  index_incoming_referers_on_path_and_incoming_domain_id  (path,incoming_domain_id) UNIQUE
+#  index_incoming_referers_on_path_and_incoming_domain_id  (md5_path,incoming_domain_id) UNIQUE
 #

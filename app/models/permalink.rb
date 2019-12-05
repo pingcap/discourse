@@ -88,7 +88,7 @@ class Permalink < ActiveRecord::Base
       .includes(:topic, :post, :category)
       .order('permalinks.created_at desc')
 
-    permalinks.where!('url ILIKE :url OR external_url ILIKE :url', url: "%#{url}%") if url.present?
+    permalinks.where!('LOWER(url) LIKE :url OR LOWER(external_url) LIKE :url', url: "%#{url}%".downcase) if url.present?
     permalinks.limit!(100)
     permalinks.to_a
   end
@@ -98,16 +98,17 @@ end
 #
 # Table name: permalinks
 #
-#  id           :integer          not null, primary key
-#  url          :string(1000)     not null
+#  id           :bigint           not null, primary key
+#  url          :text(65535)      not null
 #  topic_id     :integer
 #  post_id      :integer
 #  category_id  :integer
 #  created_at   :datetime         not null
 #  updated_at   :datetime         not null
-#  external_url :string(1000)
+#  external_url :text(65535)
+#  md5_url      :string(255)
 #
 # Indexes
 #
-#  index_permalinks_on_url  (url) UNIQUE
+#  index_permalinks_on_url  (md5_url) UNIQUE
 #

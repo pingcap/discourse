@@ -9,7 +9,7 @@ end
 #
 # Table name: muted_users
 #
-#  id            :integer          not null, primary key
+#  id            :bigint           not null, primary key
 #  user_id       :integer          not null
 #  muted_user_id :integer          not null
 #  created_at    :datetime         not null

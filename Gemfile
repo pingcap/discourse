@@ -4,7 +4,7 @@ source 'https://rubygems.org'
 # if there is a super emergency and rubygems is playing up, try
 #source 'http://production.cf.rubygems.org'
 
-gem 'bootsnap', require: false, platform: :mri
+#gem 'bootsnap', require: false, platform: :mri
 
 def rails_master?
   ENV["RAILS_MASTER"] == '1'
@@ -92,8 +92,7 @@ gem 'omniauth-oauth2', require: false
 gem 'omniauth-google-oauth2'
 
 gem 'oj'
-gem 'pg'
-gem 'mini_sql'
+gem 'mini_sql', github: 'hooopo/mini_sql'
 gem 'pry-rails', require: false
 gem 'r2', '~> 0.2.5', require: false
 gem 'rake'
@@ -205,9 +204,9 @@ gem 'rqrcode'
 gem 'sshkey', require: false
 
 gem 'rchardet', require: false
+gem 'mysql2'
 
 if ENV["IMPORT"] == "1"
-  gem 'mysql2'
   gem 'redcarpet'
   gem 'sqlite3', '~> 1.3', '>= 1.3.13'
   gem 'ruby-bbcode-to-md', git: 'https://github.com/nlalonde/ruby-bbcode-to-md'
@@ -219,3 +218,9 @@ end
 gem 'webpush', require: false
 gem 'colored2', require: false
 gem 'maxminddb'
+gem 'marginalia'
+gem "default_value_for"
+gem 'searchkick', "~> 3.1.3"
+gem 'dotenv-rails', require: 'dotenv/rails-now'
+gem "sentry-raven"
+gem "activerecord-import"

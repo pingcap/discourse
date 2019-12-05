@@ -226,13 +226,13 @@ end
 #
 # Table name: user_auth_tokens
 #
-#  id              :integer          not null, primary key
+#  id              :bigint           not null, primary key
 #  user_id         :integer          not null
-#  auth_token      :string           not null
-#  prev_auth_token :string           not null
-#  user_agent      :string
+#  auth_token      :string(255)      not null
+#  prev_auth_token :string(255)      not null
+#  user_agent      :string(255)
 #  auth_token_seen :boolean          default(FALSE), not null
-#  client_ip       :inet
+#  client_ip       :string(255)
 #  rotated_at      :datetime         not null
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null

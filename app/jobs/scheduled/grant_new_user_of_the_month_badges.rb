@@ -57,7 +57,7 @@ module Jobs
                 ELSE 1.0
                 END
               ELSE 0
-              END) / (5 + COUNT(DISTINCT p.id))::float AS score
+              END) / CAST(5 + COUNT(DISTINCT p.id) AS DECIMAL) AS score
         FROM users AS u
         INNER JOIN user_stats        AS us       ON u.id = us.user_id
         LEFT OUTER JOIN posts        AS p        ON p.user_id = u.id
@@ -72,7 +72,7 @@ module Jobs
           AND NOT u.moderator
           AND u.suspended_at IS NULL
           AND u.suspended_till IS NULL
-          AND u.created_at >= CURRENT_TIMESTAMP - '1 month'::INTERVAL
+          AND u.created_at >= DATE_ADD(CURRENT_TIMESTAMP, INTERVAL -1 MONTH)
           AND t.archetype <> '#{Archetype.private_message}'
           AND t.deleted_at IS NULL
           AND p.deleted_at IS NULL

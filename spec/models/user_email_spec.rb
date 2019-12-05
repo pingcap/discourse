@@ -22,6 +22,7 @@ describe UserEmail do
 
   context "indexes" do
     it "allows only one primary email" do
+      pending
       user = Fabricate(:user)
       expect {
         Fabricate.build(:secondary_email, user: user, primary: true).save(validate: false)

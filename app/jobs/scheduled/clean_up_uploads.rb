@@ -10,7 +10,7 @@ module Jobs
       # always remove invalid upload records
       Upload
         .by_users
-        .where("retain_hours IS NULL OR created_at < current_timestamp - interval '1 hour' * retain_hours")
+        .where("retain_hours IS NULL OR created_at < DATE_ADD(current_timestamp, interval (-1 * retain_hours) hour)")
         .where("created_at < ?", grace_period.hour.ago)
         .where(url: "")
         .find_each(&:destroy!)
@@ -48,11 +48,11 @@ module Jobs
       end.compact.uniq
 
       result = Upload.by_users
-        .where("uploads.retain_hours IS NULL OR uploads.created_at < current_timestamp - interval '1 hour' * uploads.retain_hours")
+        .where("uploads.retain_hours IS NULL OR uploads.created_at < DATE_ADD(current_timestamp, interval (-1 * uploads.retain_hours) hour)")
         .where("uploads.created_at < ?", grace_period.hour.ago)
         .joins(<<~SQL)
           LEFT JOIN site_settings ss
-          ON NULLIF(ss.value, '')::integer = uploads.id
+          ON CAST(NULLIF(ss.value, '') AS SIGNED) = uploads.id
           AND ss.data_type = #{SiteSettings::TypeSupervisor.types[:upload].to_i}
         SQL
         .joins("LEFT JOIN post_uploads pu ON pu.upload_id = uploads.id")
@@ -80,7 +80,7 @@ module Jobs
       result.find_each do |upload|
         if upload.sha1.present?
           encoded_sha = Base62.encode(upload.sha1.hex)
-          next if ReviewableQueuedPost.pending.where("payload->>'raw' LIKE '%#{upload.sha1}%' OR payload->>'raw' LIKE '%#{encoded_sha}%'").exists?
+          next if ReviewableQueuedPost.pending.where("payload->>'$.raw' LIKE '%#{upload.sha1}%' OR payload->>'raw' LIKE '%#{encoded_sha}%'").exists?
           next if Draft.where("data LIKE '%#{upload.sha1}%' OR data LIKE '%#{encoded_sha}%'").exists?
           upload.destroy
         else

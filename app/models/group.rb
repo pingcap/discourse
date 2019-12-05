@@ -336,12 +336,10 @@ class Group < ActiveRecord::Base
       when :trust_level_0, :trust_level_1, :trust_level_2, :trust_level_3, :trust_level_4
         "SELECT id FROM users WHERE id <= 0 OR trust_level < #{id - 10} OR staged"
       end
-
+      
     DB.exec <<-SQL
       DELETE FROM group_users
-            USING (#{remove_subquery}) X
-            WHERE group_id = #{group.id}
-              AND user_id = X.id
+            WHERE group_id = #{group.id} AND user_id IN (#{remove_subquery})
     SQL
 
     # Add people to groups
@@ -383,17 +381,14 @@ class Group < ActiveRecord::Base
 
   def self.reset_all_counters!
     DB.exec <<-SQL
-      WITH X AS (
-          SELECT group_id
+      UPDATE groups
+        JOIN (SELECT group_id
                , COUNT(user_id) users
             FROM group_users
         GROUP BY group_id
-      )
-      UPDATE groups
-         SET user_count = X.users
-        FROM X
-       WHERE id = X.group_id
-         AND user_count <> X.users
+             ) X ON X.group_id = groups.id
+         SET groups.user_count = X.users
+       WHERE groups.user_count <> X.users
     SQL
   end
 
@@ -426,7 +421,7 @@ class Group < ActiveRecord::Base
 
   def self.search_groups(name, groups: nil)
     (groups || Group).where(
-      "name ILIKE :term_like OR full_name ILIKE :term_like", term_like: "%#{name}%"
+      "LOWER(name) LIKE :term_like OR LOWER(full_name) LIKE :term_like", term_like: "%#{name}%".downcase
     )
   end
 
@@ -551,7 +546,7 @@ class Group < ActiveRecord::Base
   end
 
   def self.find_by_email(email)
-    self.where("string_to_array(incoming_email, '|') @> ARRAY[?]", Email.downcase(email)).first
+    self.where("incoming_email LIKE ?", EscapeLike.escape_like(Email.downcase(email))).first
   end
 
   def bulk_add(user_ids)
@@ -772,31 +767,31 @@ end
 #
 # Table name: groups
 #
-#  id                                 :integer          not null, primary key
-#  name                               :string           not null
+#  id                                 :bigint           not null, primary key
+#  name                               :string(255)      not null
 #  created_at                         :datetime         not null
 #  updated_at                         :datetime         not null
 #  automatic                          :boolean          default(FALSE), not null
 #  user_count                         :integer          default(0), not null
-#  automatic_membership_email_domains :text
+#  automatic_membership_email_domains :text(65535)
 #  automatic_membership_retroactive   :boolean          default(FALSE)
 #  primary_group                      :boolean          default(FALSE), not null
-#  title                              :string
+#  title                              :string(255)
 #  grant_trust_level                  :integer
-#  incoming_email                     :string
+#  incoming_email                     :string(255)
 #  has_messages                       :boolean          default(FALSE), not null
-#  flair_url                          :string
-#  flair_bg_color                     :string
-#  flair_color                        :string
-#  bio_raw                            :text
-#  bio_cooked                         :text
+#  flair_url                          :string(255)
+#  flair_bg_color                     :string(255)
+#  flair_color                        :string(255)
+#  bio_raw                            :text(65535)
+#  bio_cooked                         :text(65535)
 #  allow_membership_requests          :boolean          default(FALSE), not null
-#  full_name                          :string
+#  full_name                          :string(255)
 #  default_notification_level         :integer          default(3), not null
 #  visibility_level                   :integer          default(0), not null
 #  public_exit                        :boolean          default(FALSE), not null
 #  public_admission                   :boolean          default(FALSE), not null
-#  membership_request_template        :text
+#  membership_request_template        :text(65535)
 #  messageable_level                  :integer          default(0)
 #  mentionable_level                  :integer          default(0)
 #

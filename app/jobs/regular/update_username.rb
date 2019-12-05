@@ -70,7 +70,7 @@ module Jobs
         old_username: @old_username,
         new_username: @new_username
       }
-
+      return # TODO fix
       DB.exec(<<~SQL, params)
         UPDATE notifications
         SET data = (data :: JSONB ||
@@ -94,7 +94,7 @@ module Jobs
                                         ELSE NULL END
                         )
                     )) :: JSON
-        WHERE data ILIKE '%' || :old_username || '%'
+        WHERE LOWER(data) LIKE CONCAT('%', :old_username, '%')
       SQL
     end
 

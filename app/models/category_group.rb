@@ -16,7 +16,7 @@ end
 #
 # Table name: category_groups
 #
-#  id              :integer          not null, primary key
+#  id              :bigint           not null, primary key
 #  category_id     :integer          not null
 #  group_id        :integer          not null
 #  created_at      :datetime         not null

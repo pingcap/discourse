@@ -344,7 +344,7 @@ class TopicQuery
 
   def list_private_messages_group(user)
     list = private_messages_for(user, :group)
-    group_id = Group.where('name ilike ?', @options[:group_name]).pluck(:id).first
+    group_id = Group.where('LOWER(name) like ?', @options[:group_name].downcase).pluck(:id).first
     list = list.joins("LEFT JOIN group_archived_messages gm ON gm.topic_id = topics.id AND
                       gm.group_id = #{group_id.to_i}")
     list = list.where("gm.id IS NULL")
@@ -353,7 +353,7 @@ class TopicQuery
 
   def list_private_messages_group_archive(user)
     list = private_messages_for(user, :group)
-    group_id = Group.where('name ilike ?', @options[:group_name]).pluck(:id).first
+    group_id = Group.where('LOWER(name) like ?', @options[:group_name].downcase).pluck(:id).first
     list = list.joins("JOIN group_archived_messages gm ON gm.topic_id = topics.id AND
                       gm.group_id = #{group_id.to_i}")
     create_list(:private_messages, {}, list)
@@ -553,9 +553,9 @@ class TopicQuery
               OR #{user.staff?}
             )
           )
-          AND group_id IN (SELECT id FROM groups WHERE name ilike ?)
+          AND group_id IN (SELECT id FROM groups WHERE LOWER(name) like ?)
         )",
-        @options[:group_name]
+        @options[:group_name].downcase
       )
     elsif type == :user
       result = result.includes(:allowed_users)
@@ -631,7 +631,7 @@ class TopicQuery
 
     if sort_column.start_with?('custom_fields')
       field = sort_column.split('.')[1]
-      return result.order("(SELECT CASE WHEN EXISTS (SELECT true FROM topic_custom_fields tcf WHERE tcf.topic_id::integer = topics.id::integer AND tcf.name = '#{field}') THEN (SELECT value::integer FROM topic_custom_fields tcf WHERE tcf.topic_id::integer = topics.id::integer AND tcf.name = '#{field}') ELSE 0 END) #{sort_dir}")
+      return result.order("(SELECT CASE WHEN EXISTS (SELECT true FROM topic_custom_fields tcf WHERE CAST(tcf.topic_id AS SIGNED) = CAST(topics.id AS SIGNED) AND tcf.name = '#{field}') THEN (SELECT CAST(value AS SIGNED) FROM topic_custom_fields tcf WHERE CAST(tcf.topic_id AS SIGNED) = CAST(topics.id AS SIGNED) AND tcf.name = '#{field}') ELSE 0 END) #{sort_dir}")
     end
 
     result.order("topics.#{sort_column} #{sort_dir}")
@@ -981,7 +981,7 @@ class TopicQuery
       base_messages
         .joins("
           LEFT JOIN (
-            SELECT * FROM topic_allowed_groups _tg
+            SELECT _tg.topic_id FROM topic_allowed_groups _tg
             LEFT JOIN group_users gu
             ON gu.user_id = #{@user.id.to_i}
             AND gu.group_id = _tg.group_id

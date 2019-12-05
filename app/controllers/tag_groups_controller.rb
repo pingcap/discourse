@@ -56,7 +56,7 @@ class TagGroupsController < ApplicationController
 
   def search
     matches = if params[:q].present?
-      TagGroup.where('lower(name) ILIKE ?', "%#{params[:q].strip}%")
+      TagGroup.where('lower(name) LIKE ?', "%#{params[:q].strip}%".downcase)
     else
       TagGroup.all
     end

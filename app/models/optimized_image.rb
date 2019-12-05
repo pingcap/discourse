@@ -362,15 +362,15 @@ end
 #
 # Table name: optimized_images
 #
-#  id        :integer          not null, primary key
+#  id        :bigint           not null, primary key
 #  sha1      :string(40)       not null
 #  extension :string(10)       not null
 #  width     :integer          not null
 #  height    :integer          not null
 #  upload_id :integer          not null
-#  url       :string           not null
+#  url       :string(255)      not null
 #  filesize  :integer
-#  etag      :string
+#  etag      :string(255)
 #  version   :integer
 #
 # Indexes

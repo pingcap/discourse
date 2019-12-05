@@ -16,7 +16,7 @@ class Notification < ActiveRecord::Base
     .where('topics.id IS NULL OR topics.deleted_at IS NULL') }
 
   scope :filter_by_display_username_and_type, ->(username, notification_type) {
-    where("data::json ->> 'display_username' = ?", username)
+    where("data->'$.display_username' = ?", username)
       .where(notification_type: notification_type)
       .order(created_at: :desc)
   }
@@ -28,18 +28,16 @@ class Notification < ActiveRecord::Base
 
   def self.ensure_consistency!
     DB.exec(<<~SQL, Notification.types[:private_message])
-      DELETE
-        FROM notifications n
-       WHERE notification_type = ?
-         AND NOT EXISTS (
-            SELECT 1
+      DELETE notifications
+        FROM notifications
+             LEFT JOIN (
+            SELECT p.post_number, t.id
               FROM posts p
               JOIN topics t ON t.id = p.topic_id
              WHERE p.deleted_at IS NULL
                AND t.deleted_at IS NULL
-               AND p.post_number = n.post_number
-               AND t.id = n.topic_id
-          )
+          ) x ON x.post_number = notifications.post_number and x.id = notifications.topic_id
+       WHERE notification_type = ? AND x.id IS NULL
     SQL
   end
 
@@ -175,7 +173,7 @@ class Notification < ActiveRecord::Base
          WHERE
            n.notification_type = 6 AND
            n.user_id = #{user.id.to_i} AND
-           NOT read
+           NOT `read`
         ORDER BY n.id ASC
         LIMIT ?
       SQL
@@ -232,7 +230,7 @@ end
 #
 # Table name: notifications
 #
-#  id                :integer          not null, primary key
+#  id                :bigint           not null, primary key
 #  notification_type :integer          not null
 #  user_id           :integer          not null
 #  data              :string(1000)     not null
@@ -245,10 +243,10 @@ end
 #
 # Indexes
 #
-#  idx_notifications_speedup_unread_count                       (user_id,notification_type) WHERE (NOT read)
+#  idx_notifications_speedup_unread_count                       (user_id,notification_type)
 #  index_notifications_on_post_action_id                        (post_action_id)
-#  index_notifications_on_read_or_n_type                        (user_id,id DESC,read,topic_id) UNIQUE WHERE (read OR (notification_type <> 6))
+#  index_notifications_on_read_or_n_type                        (user_id,id,read,topic_id) UNIQUE
 #  index_notifications_on_user_id_and_created_at                (user_id,created_at)
-#  index_notifications_on_user_id_and_id                        (user_id,id) UNIQUE WHERE ((notification_type = 6) AND (NOT read))
+#  index_notifications_on_user_id_and_id                        (user_id,id) UNIQUE
 #  index_notifications_on_user_id_and_topic_id_and_post_number  (user_id,topic_id,post_number)
 #

@@ -286,6 +286,7 @@ class TopicUser < ActiveRecord::Base
     INSERT_TOPIC_USER_SQL_STAFF = INSERT_TOPIC_USER_SQL.gsub("highest_post_number", "highest_staff_post_number")
 
     def update_last_read(user, topic_id, post_number, new_posts_read, msecs, opts = {})
+      return #TODO FIX
       return if post_number.blank?
       msecs = 0 if msecs.to_i < 0
 
@@ -383,8 +384,7 @@ class TopicUser < ActiveRecord::Base
 
     builder = DB.build <<~SQL
       UPDATE topic_users tu
-      SET #{action_type_name} = x.state
-      FROM (
+      INNER JOIN (
         SELECT CASE WHEN EXISTS (
           SELECT 1
           FROM post_actions pa
@@ -400,8 +400,8 @@ class TopicUser < ActiveRecord::Base
         ) THEN true ELSE false END state, tu2.topic_id, tu2.user_id
         FROM topic_users tu2
         /*where*/
-      ) x
-      WHERE x.topic_id = tu.topic_id AND x.user_id = tu.user_id AND x.state != tu.#{action_type_name}
+      ) x ON x.topic_id = tu.topic_id AND x.user_id = tu.user_id AND x.state != tu.#{action_type_name}
+      SET #{action_type_name} = x.state
     SQL
 
     if user_id
@@ -453,18 +453,19 @@ SQL
     # long term we want to split up topic_users and allow for this better
     builder = DB.build <<~SQL
       UPDATE topic_users t
-        SET
-          last_read_post_number = LEAST(GREATEST(last_read, last_read_post_number), max_post_number),
-          highest_seen_post_number = LEAST(max_post_number,GREATEST(t.highest_seen_post_number, last_read))
-      FROM (
+      JOIN (
         SELECT topic_id, user_id, MAX(post_number) last_read
         FROM post_timings
         GROUP BY topic_id, user_id
-      ) as X
+      ) as X 
       JOIN (
         SELECT p.topic_id, MAX(p.post_number) max_post_number from posts p
         GROUP BY p.topic_id
       ) as Y on Y.topic_id = X.topic_id
+      SET
+          last_read_post_number = LEAST(GREATEST(last_read, last_read_post_number), max_post_number),
+          highest_seen_post_number = LEAST(max_post_number,GREATEST(t.highest_seen_post_number, last_read))
+
       /*where*/
     SQL
 
@@ -490,6 +491,7 @@ end
 #
 # Table name: topic_users
 #
+#  id                       :bigint           not null, primary key
 #  user_id                  :integer          not null
 #  topic_id                 :integer          not null
 #  posted                   :boolean          default(FALSE), not null
@@ -502,7 +504,6 @@ end
 #  notifications_reason_id  :integer
 #  total_msecs_viewed       :integer          default(0), not null
 #  cleared_pinned_at        :datetime
-#  id                       :integer          not null, primary key
 #  last_emailed_post_number :integer
 #  liked                    :boolean          default(FALSE)
 #  bookmarked               :boolean          default(FALSE)

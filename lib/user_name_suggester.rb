@@ -44,8 +44,7 @@ module UserNameSuggester
 
         count = DB.query_single(<<~SQL, like: "#{normalized}%", similar: similar).first
           SELECT count(*)  FROM users
-          WHERE username_lower LIKE :like AND
-            username_lower SIMILAR TO :similar
+          WHERE username_lower LIKE :like
         SQL
 
         if count > 0
@@ -55,14 +54,15 @@ module UserNameSuggester
             name: normalized,
             allowed_normalized: allowed_username || ''
           }
-
+          
           # increasing the search space a bit to allow for some extra noise
+          gs = (1..count).map do |c|
+            "SELECT #{c} AS n"
+          end.join(" UNION ")
           available = DB.query_single(<<~SQL, params).first
-            WITH numbers AS (SELECT generate_series(1, :count) AS n)
-
-            SELECT n FROM numbers
+            SELECT n FROM (#{gs}) AS numbers
             LEFT JOIN users ON (
-              username_lower = :name || n::varchar
+              username_lower = concat(:name, cast(n AS char))
             ) AND (
               username_lower <> :allowed_normalized
             )

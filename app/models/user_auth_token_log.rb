@@ -8,15 +8,15 @@ end
 #
 # Table name: user_auth_token_logs
 #
-#  id                 :integer          not null, primary key
-#  action             :string           not null
+#  id                 :bigint           not null, primary key
+#  action             :string(255)      not null
 #  user_auth_token_id :integer
 #  user_id            :integer
-#  client_ip          :inet
-#  user_agent         :string
-#  auth_token         :string
+#  client_ip          :string(255)
+#  user_agent         :string(255)
+#  auth_token         :string(255)
 #  created_at         :datetime
-#  path               :string
+#  path               :string(255)
 #
 # Indexes
 #

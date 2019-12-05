@@ -370,13 +370,13 @@ end
 #
 # Table name: uploads
 #
-#  id                :integer          not null, primary key
+#  id                :bigint           not null, primary key
 #  user_id           :integer          not null
-#  original_filename :string           not null
+#  original_filename :string(255)      not null
 #  filesize          :integer          not null
 #  width             :integer
 #  height            :integer
-#  url               :string           not null
+#  url               :string(255)      not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  sha1              :string(40)
@@ -385,12 +385,11 @@ end
 #  extension         :string(10)
 #  thumbnail_width   :integer
 #  thumbnail_height  :integer
-#  etag              :string
+#  etag              :string(255)
 #
 # Indexes
 #
 #  index_uploads_on_etag        (etag)
-#  index_uploads_on_extension   (lower((extension)::text))
 #  index_uploads_on_id_and_url  (id,url)
 #  index_uploads_on_sha1        (sha1) UNIQUE
 #  index_uploads_on_url         (url)

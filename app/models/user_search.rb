@@ -50,11 +50,9 @@ class UserSearch
 
     if @term.present?
       if SiteSetting.enable_names? && @term !~ /[_\.-]/
-        query = Search.ts_query(term: @term, ts_config: "simple")
 
-        users = users.includes(:user_search_data)
-          .references(:user_search_data)
-          .where("user_search_data.search_data @@ #{query}")
+        users = users
+          .where("username_lower LIKE :term_like", term_like: @term_like)
           .order(DB.sql_fragment("CASE WHEN username_lower LIKE ? THEN 0 ELSE 1 END ASC", @term_like))
 
       else
@@ -110,11 +108,7 @@ class UserSearch
   def search
     ids = search_ids
     return User.where("0=1") if ids.empty?
-
-    User.joins("JOIN (SELECT unnest uid, row_number() OVER () AS rn
-      FROM unnest('{#{ids.join(",")}}'::int[])
-    ) x on uid = users.id")
-      .order("rn")
+    User.where(id: ids).order("FIELD(id, #{ids.join(',')})")
   end
 
 end

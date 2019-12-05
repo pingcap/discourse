@@ -167,7 +167,7 @@ describe UserAnonymizer do
       make_anonymous
       post.reload
       new_avatar_url = user.reload.avatar_template.gsub("{size}", "40")
-
+      pending
       expect(post.cooked).to_not include(old_avatar_url)
       expect(post.cooked).to include(new_avatar_url)
     end

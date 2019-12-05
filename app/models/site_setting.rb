@@ -213,10 +213,10 @@ end
 #
 # Table name: site_settings
 #
-#  id         :integer          not null, primary key
-#  name       :string           not null
+#  id         :bigint           not null, primary key
+#  name       :string(255)      not null
 #  data_type  :integer          not null
-#  value      :text
+#  value      :text(65535)
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
 #

@@ -456,9 +456,9 @@ class PostAlerter
 
     if SiteSetting.allow_user_api_key_scopes.split("|").include?("push") && SiteSetting.allowed_user_api_push_urls.present?
       clients = user.user_api_keys
-        .where("('push' = ANY(scopes) OR 'notifications' = ANY(scopes))")
+        .where("CAST(scopes AS CHAR) LIKE '%push%' OR CAST(scopes AS CHAR) LIKE '%notifications%'")
         .where("push_url IS NOT NULL")
-        .where("position(push_url IN ?) > 0", SiteSetting.allowed_user_api_push_urls)
+        .where("LOCATE(push_url, ?) > 0", SiteSetting.allowed_user_api_push_urls)
         .where("revoked_at IS NULL")
         .pluck(:client_id, :push_url)
 
@@ -640,7 +640,7 @@ class PostAlerter
           username, Notification.types[:liked]
         )
         .where(
-          "created_at > ? AND data::json ->> 'username2' IS NULL",
+          "created_at > ? AND data->'$.username2' IS NULL",
           consolidation_window
         )
 

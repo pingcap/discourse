@@ -66,8 +66,8 @@ class MethodProfiler
 
   def self.ensure_discourse_instrumentation!
     @@instrumentation_setup ||= begin
-      MethodProfiler.patch(PG::Connection, [
-        :exec, :async_exec, :exec_prepared, :send_query_prepared, :query, :exec_params
+      MethodProfiler.patch(Mysql2::Client, [
+        :query, :async_result, :affected_rows, :next_result, :prepare
       ], :sql)
 
       MethodProfiler.patch(Redis::Client, [

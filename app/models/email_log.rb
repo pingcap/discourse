@@ -27,6 +27,11 @@ class EmailLog < ActiveRecord::Base
     User.where(id: user_id).update_all("last_emailed_at = CURRENT_TIMESTAMP") if user_id.present?
   end
 
+  before_save do
+    key = self.read_attribute(:bounce_key)
+    self.bounce_key = SecureRandom.uuid if key.blank?
+  end
+
   def self.unique_email_per_post(post, user)
     return yield unless post && user
 
@@ -78,20 +83,20 @@ end
 #
 # Table name: email_logs
 #
-#  id         :integer          not null, primary key
-#  to_address :string           not null
-#  email_type :string           not null
+#  id         :bigint           not null, primary key
+#  to_address :string(255)      not null
+#  email_type :string(255)      not null
 #  user_id    :integer
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
 #  post_id    :integer
-#  bounce_key :uuid
+#  bounce_key :string(255)
 #  bounced    :boolean          default(FALSE), not null
-#  message_id :string
+#  message_id :string(255)
 #
 # Indexes
 #
-#  index_email_logs_on_bounce_key  (bounce_key) UNIQUE WHERE (bounce_key IS NOT NULL)
+#  index_email_logs_on_bounce_key  (bounce_key) UNIQUE
 #  index_email_logs_on_bounced     (bounced)
 #  index_email_logs_on_created_at  (created_at)
 #  index_email_logs_on_message_id  (message_id)

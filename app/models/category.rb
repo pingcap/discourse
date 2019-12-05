@@ -170,11 +170,10 @@ class Category < ActiveRecord::Base
 
     DB.exec <<~SQL
       UPDATE categories c
-         SET topic_count = x.topic_count,
-             post_count = x.post_count
-        FROM (#{topics_with_post_count}) x
-       WHERE x.category_id = c.id
-         AND (c.topic_count <> x.topic_count OR c.post_count <> x.post_count)
+        JOIN (#{topics_with_post_count}) x ON x.category_id = c.id
+         SET c.topic_count = x.topic_count,
+             c.post_count = x.post_count
+       WHERE (c.topic_count <> x.topic_count OR c.post_count <> x.post_count)
     SQL
 
     # Yes, there are a lot of queries happening below.
@@ -413,7 +412,7 @@ class Category < ActiveRecord::Base
 
     auto_bumps = CategoryCustomField
       .where(name: Category::NUM_AUTO_BUMP_DAILY)
-      .where('NULLIF(value, \'\')::int > 0')
+      .where('CAST(NULLIF(value, \'\') AS SIGNED) > 0')
       .pluck(:category_id)
 
     if (auto_bumps.length > 0)
@@ -539,7 +538,7 @@ class Category < ActiveRecord::Base
   end
 
   def self.find_by_email(email)
-    self.where("string_to_array(email_in, '|') @> ARRAY[?]", Email.downcase(email)).first
+    self.where("email_in is not null and LOCATE(?, LOWER(email_in)) > 0", Email.downcase(email)).first
   end
 
   def has_children?
@@ -684,9 +683,9 @@ class Category < ActiveRecord::Base
 
     sql = <<~SQL
       UPDATE categories c
-      SET topic_id = NULL
+      SET c.topic_id = NULL
       WHERE c.id IN (
-        SELECT c2.id FROM categories c2
+        SELECT c2.id FROM (SELECT * FROM categories) c2
         LEFT JOIN topics t ON t.id = c2.topic_id AND t.deleted_at IS NULL
         WHERE t.id IS NULL AND c2.topic_id IS NOT NULL
       )
@@ -731,7 +730,7 @@ end
 #
 # Table name: categories
 #
-#  id                                :integer          not null, primary key
+#  id                                :bigint           not null, primary key
 #  name                              :string(50)       not null
 #  color                             :string(6)        default("0088CC"), not null
 #  topic_id                          :integer
@@ -742,11 +741,11 @@ end
 #  topics_year                       :integer          default(0)
 #  topics_month                      :integer          default(0)
 #  topics_week                       :integer          default(0)
-#  slug                              :string           not null
-#  description                       :text
+#  slug                              :string(255)      not null
+#  description                       :text(65535)
 #  text_color                        :string(6)        default("FFFFFF"), not null
 #  read_restricted                   :boolean          default(FALSE), not null
-#  auto_close_hours                  :float
+#  auto_close_hours                  :float(24)
 #  post_count                        :integer          default(0), not null
 #  latest_post_id                    :integer
 #  latest_topic_id                   :integer
@@ -755,16 +754,16 @@ end
 #  posts_year                        :integer          default(0)
 #  posts_month                       :integer          default(0)
 #  posts_week                        :integer          default(0)
-#  email_in                          :string
+#  email_in                          :string(255)
 #  email_in_allow_strangers          :boolean          default(FALSE)
 #  topics_day                        :integer          default(0)
 #  posts_day                         :integer          default(0)
 #  allow_badges                      :boolean          default(TRUE), not null
 #  name_lower                        :string(50)       not null
 #  auto_close_based_on_last_post     :boolean          default(FALSE)
-#  topic_template                    :text
+#  topic_template                    :text(65535)
 #  contains_messages                 :boolean
-#  sort_order                        :string
+#  sort_order                        :string(255)
 #  sort_ascending                    :boolean
 #  uploaded_logo_id                  :integer
 #  uploaded_background_id            :integer
@@ -782,6 +781,7 @@ end
 #  search_priority                   :integer          default(0)
 #  allow_global_tags                 :boolean          default(FALSE), not null
 #  reviewable_by_group_id            :integer
+#  virtual_parent_category_id        :string(255)
 #
 # Indexes
 #
@@ -789,5 +789,5 @@ end
 #  index_categories_on_reviewable_by_group_id  (reviewable_by_group_id)
 #  index_categories_on_search_priority         (search_priority)
 #  index_categories_on_topic_count             (topic_count)
-#  unique_index_categories_on_name             (COALESCE(parent_category_id, '-1'::integer), name) UNIQUE
+#  unique_index_categories_on_name             (virtual_parent_category_id,name) UNIQUE
 #

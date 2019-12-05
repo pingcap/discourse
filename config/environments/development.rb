@@ -34,7 +34,25 @@ Discourse::Application.configure do
   config.handlebars.precompile = false
 
   # we recommend you use mailcatcher https://github.com/sj26/mailcatcher
-  config.action_mailer.smtp_settings = { address: "localhost", port: 1025 }
+  # config.action_mailer.smtp_settings = { address: "localhost", port: 1025 }
+  if GlobalSetting.smtp_address
+    settings = {
+      address: GlobalSetting.smtp_address,
+      port: GlobalSetting.smtp_port,
+      domain: GlobalSetting.smtp_domain,
+      user_name: GlobalSetting.smtp_user_name,
+      password: GlobalSetting.smtp_password,
+      authentication: GlobalSetting.smtp_authentication,
+      enable_starttls_auto: GlobalSetting.smtp_enable_start_tls
+    }
+
+    settings[:openssl_verify_mode] = GlobalSetting.smtp_openssl_verify_mode if GlobalSetting.smtp_openssl_verify_mode
+
+    config.action_mailer.smtp_settings = settings.reject { |_, y| y.nil? }
+  else
+    config.action_mailer.delivery_method = :sendmail
+    config.action_mailer.sendmail_settings = { arguments: '-i' }
+  end
 
   config.action_mailer.raise_delivery_errors = true
 

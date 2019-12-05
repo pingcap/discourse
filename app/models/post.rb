@@ -109,9 +109,9 @@ class Post < ActiveRecord::Base
 
     case type
     when 'string'
-      where('raw ILIKE ?', "%#{pattern}%")
+      where('LOWER(raw) LIKE ?', "%#{pattern}%".downcase)
     when 'regex'
-      where('raw ~* ?', "(?n)#{pattern}")
+      where('raw REGEXP ?', "(?n)#{pattern}")
     end
   }
 
@@ -373,29 +373,25 @@ class Post < ActiveRecord::Base
 
   def self.summary(topic_id)
     topic_id = topic_id.to_i
-
+    p_ids = DB.query_single(<<~SQL, summary_percent_filter: SiteSetting.summary_percent_filter.to_f / 100.0, summary_max_results: SiteSetting.summary_max_results)
+      (
+        SELECT posts.id
+        FROM posts
+        WHERE posts.topic_id = #{topic_id.to_i}
+        AND posts.post_number = 1
+      ) UNION
+      (
+        SELECT p1.id
+        FROM posts p1
+        WHERE p1.percent_rank <= :summary_percent_filter
+        AND p1.topic_id = #{topic_id.to_i}
+        ORDER BY p1.percent_rank
+        LIMIT :summary_max_results
+      )
+    SQL
     # percent rank has tons of ties
     where(topic_id: topic_id)
-      .where([
-        "id = ANY(
-          (
-            SELECT posts.id
-            FROM posts
-            WHERE posts.topic_id = #{topic_id.to_i}
-            AND posts.post_number = 1
-          ) UNION
-          (
-            SELECT p1.id
-            FROM posts p1
-            WHERE p1.percent_rank <= ?
-            AND p1.topic_id = #{topic_id.to_i}
-            ORDER BY p1.percent_rank
-            LIMIT ?
-          )
-        )",
-        SiteSetting.summary_percent_filter.to_f / 100.0,
-        SiteSetting.summary_max_results
-      ])
+      .where(id: p_ids)
   end
 
   def delete_post_notices
@@ -833,15 +829,14 @@ class Post < ActiveRecord::Base
     return if user_id.blank?
 
     DB.exec(<<~SQL, user_id)
-      WITH user_quoted_posts AS (
-        SELECT post_id
-          FROM quoted_posts
-         WHERE quoted_post_id IN (SELECT id FROM posts WHERE user_id = ?)
-      )
       UPDATE posts
          SET baked_version = NULL
        WHERE baked_version IS NOT NULL
-         AND id IN (SELECT post_id FROM user_quoted_posts)
+         AND id IN (SELECT post_id FROM (
+        SELECT post_id
+          FROM quoted_posts
+         WHERE quoted_post_id IN (SELECT id FROM posts WHERE user_id = ?)
+      ) t)
     SQL
   end
 
@@ -1010,12 +1005,12 @@ end
 #
 # Table name: posts
 #
-#  id                      :integer          not null, primary key
+#  id                      :bigint           not null, primary key
 #  user_id                 :integer
 #  topic_id                :integer          not null
 #  post_number             :integer          not null
-#  raw                     :text             not null
-#  cooked                  :text             not null
+#  raw                     :text(65535)      not null
+#  cooked                  :text(65535)      not null
 #  created_at              :datetime         not null
 #  updated_at              :datetime         not null
 #  reply_to_post_number    :integer
@@ -1027,7 +1022,7 @@ end
 #  incoming_link_count     :integer          default(0), not null
 #  bookmark_count          :integer          default(0), not null
 #  avg_time                :integer
-#  score                   :float
+#  score                   :float(24)
 #  reads                   :integer          default(0), not null
 #  post_type               :integer          default(1), not null
 #  sort_order              :integer
@@ -1041,11 +1036,11 @@ end
 #  last_version_at         :datetime         not null
 #  user_deleted            :boolean          default(FALSE), not null
 #  reply_to_user_id        :integer
-#  percent_rank            :float            default(1.0)
+#  percent_rank            :float(24)        default(1.0)
 #  notify_user_count       :integer          default(0), not null
 #  like_score              :integer          default(0), not null
 #  deleted_by_id           :integer
-#  edit_reason             :string
+#  edit_reason             :string(255)
 #  word_count              :integer
 #  version                 :integer          default(1), not null
 #  cook_method             :integer          default(1), not null
@@ -1056,19 +1051,19 @@ end
 #  self_edits              :integer          default(0), not null
 #  reply_quoted            :boolean          default(FALSE), not null
 #  via_email               :boolean          default(FALSE), not null
-#  raw_email               :text
+#  raw_email               :text(65535)
 #  public_version          :integer          default(1), not null
-#  action_code             :string
-#  image_url               :string
+#  action_code             :string(255)
+#  image_url               :string(255)
 #  locked_by_id            :integer
 #
 # Indexes
 #
-#  idx_posts_created_at_topic_id             (created_at,topic_id) WHERE (deleted_at IS NULL)
-#  idx_posts_deleted_posts                   (topic_id,post_number) WHERE (deleted_at IS NOT NULL)
-#  idx_posts_user_id_deleted_at              (user_id) WHERE (deleted_at IS NULL)
-#  index_for_rebake_old                      (id) WHERE (((baked_version IS NULL) OR (baked_version < 2)) AND (deleted_at IS NULL))
-#  index_posts_on_id_and_baked_version       (id DESC,baked_version) WHERE (deleted_at IS NULL)
+#  idx_posts_created_at_topic_id             (created_at,topic_id)
+#  idx_posts_deleted_posts                   (topic_id,post_number)
+#  idx_posts_user_id_deleted_at              (user_id)
+#  index_for_rebake_old                      (id)
+#  index_posts_on_id_and_baked_version       (id,baked_version)
 #  index_posts_on_reply_to_post_number       (reply_to_post_number)
 #  index_posts_on_topic_id_and_percent_rank  (topic_id,percent_rank)
 #  index_posts_on_topic_id_and_post_number   (topic_id,post_number) UNIQUE

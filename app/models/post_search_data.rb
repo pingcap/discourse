@@ -9,13 +9,12 @@ end
 # Table name: post_search_data
 #
 #  post_id     :integer          not null, primary key
-#  search_data :tsvector
-#  raw_data    :text
-#  locale      :string
+#  search_data :text(65535)
+#  raw_data    :text(65535)
+#  locale      :string(255)
 #  version     :integer          default(0)
 #
 # Indexes
 #
-#  idx_search_post                                           (search_data) USING gin
 #  index_post_search_data_on_post_id_and_version_and_locale  (post_id,version,locale)
 #

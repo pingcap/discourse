@@ -12,7 +12,7 @@ end
 #  id         :bigint           not null, primary key
 #  group_id   :integer
 #  user_id    :integer
-#  reason     :text
+#  reason     :text(65535)
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
 #

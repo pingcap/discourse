@@ -7,8 +7,8 @@ end
 #
 # Table name: onceoff_logs
 #
-#  id         :integer          not null, primary key
-#  job_name   :string
+#  id         :bigint           not null, primary key
+#  job_name   :string(255)
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
 #

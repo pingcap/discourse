@@ -209,8 +209,8 @@ class UserAction < ActiveRecord::Base
       LEFT JOIN post_custom_fields pc ON pc.post_id = a.target_post_id AND pc.name = 'action_code_who'
       /*where*/
       /*order_by*/
-      /*offset*/
       /*limit*/
+      /*offset*/
     SQL
 
     apply_common_filters(builder, user_id, guardian, ignore_private_messages)
@@ -306,21 +306,21 @@ class UserAction < ActiveRecord::Base
 
     # nuke all dupes, using magic
     builder = DB.build <<~SQL
-      DELETE FROM user_actions USING user_actions ua2
+      DELETE ua FROM user_actions ua INNER JOIN user_actions ua2 ON ua2.id = ua.id 
       /*where*/
     SQL
 
     builder.where <<~SQL
-      user_actions.action_type = ua2.action_type AND
-      user_actions.user_id = ua2.user_id AND
-      user_actions.acting_user_id = ua2.acting_user_id AND
-      user_actions.target_post_id = ua2.target_post_id AND
-      user_actions.target_post_id > 0 AND
-      user_actions.id > ua2.id
+      ua.action_type = ua2.action_type AND
+      ua.user_id = ua2.user_id AND
+      ua.acting_user_id = ua2.acting_user_id AND
+      ua.target_post_id = ua2.target_post_id AND
+      ua.target_post_id > 0 AND
+      ua.id > ua2.id
     SQL
 
     if post_ids
-      builder.where("user_actions.target_post_id in (:post_ids)", post_ids: post_ids)
+      builder.where("ua.target_post_id in (:post_ids)", post_ids: post_ids)
     end
 
     builder.exec
@@ -418,7 +418,7 @@ end
 #
 # Table name: user_actions
 #
-#  id              :integer          not null, primary key
+#  id              :bigint           not null, primary key
 #  action_type     :integer          not null
 #  user_id         :integer          not null
 #  target_topic_id :integer
@@ -435,6 +435,6 @@ end
 #  index_user_actions_on_acting_user_id              (acting_user_id)
 #  index_user_actions_on_action_type_and_created_at  (action_type,created_at)
 #  index_user_actions_on_target_post_id              (target_post_id)
-#  index_user_actions_on_target_user_id              (target_user_id) WHERE (target_user_id IS NOT NULL)
+#  index_user_actions_on_target_user_id              (target_user_id)
 #  index_user_actions_on_user_id_and_action_type     (user_id,action_type)
 #

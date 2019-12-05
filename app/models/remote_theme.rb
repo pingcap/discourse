@@ -258,21 +258,21 @@ end
 #
 # Table name: remote_themes
 #
-#  id                        :integer          not null, primary key
-#  remote_url                :string           not null
-#  remote_version            :string
-#  local_version             :string
-#  about_url                 :string
-#  license_url               :string
+#  id                        :bigint           not null, primary key
+#  remote_url                :string(255)      not null
+#  remote_version            :string(255)
+#  local_version             :string(255)
+#  about_url                 :string(255)
+#  license_url               :string(255)
 #  commits_behind            :integer
 #  remote_updated_at         :datetime
 #  created_at                :datetime         not null
 #  updated_at                :datetime         not null
-#  private_key               :text
-#  branch                    :string
-#  last_error_text           :text
-#  authors                   :string
-#  theme_version             :string
-#  minimum_discourse_version :string
-#  maximum_discourse_version :string
+#  private_key               :text(65535)
+#  branch                    :string(255)
+#  last_error_text           :text(65535)
+#  authors                   :string(255)
+#  theme_version             :string(255)
+#  minimum_discourse_version :string(255)
+#  maximum_discourse_version :string(255)
 #

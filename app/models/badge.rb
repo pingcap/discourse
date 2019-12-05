@@ -144,25 +144,20 @@ class Badge < ActiveRecord::Base
 
   def self.ensure_consistency!
     DB.exec <<~SQL
-      DELETE FROM user_badges
-            USING user_badges ub
-        LEFT JOIN users u ON u.id = ub.user_id
-            WHERE u.id IS NULL
-              AND user_badges.id = ub.id
+      DELETE user_badges 
+        FROM user_badges  
+             LEFT JOIN users u ON u.id = user_badges.user_id 
+       WHERE u.id IS NULL
     SQL
 
     DB.exec <<~SQL
-      WITH X AS (
-          SELECT badge_id
+      UPDATE badges
+        JOIN (SELECT badge_id
                , COUNT(user_id) users
             FROM user_badges
-        GROUP BY badge_id
-      )
-      UPDATE badges
-         SET grant_count = X.users
-        FROM X
-       WHERE id = X.badge_id
-         AND grant_count <> X.users
+        GROUP BY badge_id) X ON X.badge_id = badges.id
+         SET badges.grant_count = X.users
+       WHERE badges.grant_count <> X.users
     SQL
   end
 
@@ -253,19 +248,19 @@ end
 #
 # Table name: badges
 #
-#  id                :integer          not null, primary key
-#  name              :string           not null
-#  description       :text
+#  id                :bigint           not null, primary key
+#  name              :string(255)      not null
+#  description       :text(65535)
 #  badge_type_id     :integer          not null
 #  grant_count       :integer          default(0), not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  allow_title       :boolean          default(FALSE), not null
 #  multiple_grant    :boolean          default(FALSE), not null
-#  icon              :string           default("fa-certificate")
+#  icon              :string(255)      default("fa-certificate")
 #  listable          :boolean          default(TRUE)
 #  target_posts      :boolean          default(FALSE)
-#  query             :text
+#  query             :text(65535)
 #  enabled           :boolean          default(TRUE), not null
 #  auto_revoke       :boolean          default(TRUE), not null
 #  badge_grouping_id :integer          default(5), not null
@@ -273,7 +268,7 @@ end
 #  show_posts        :boolean          default(FALSE), not null
 #  system            :boolean          default(FALSE), not null
 #  image             :string(255)
-#  long_description  :text
+#  long_description  :text(65535)
 #
 # Indexes
 #

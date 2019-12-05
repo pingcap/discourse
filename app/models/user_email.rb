@@ -52,16 +52,18 @@ end
 #
 # Table name: user_emails
 #
-#  id         :integer          not null, primary key
-#  user_id    :integer          not null
-#  email      :string(513)      not null
-#  primary    :boolean          default(FALSE), not null
-#  created_at :datetime         not null
-#  updated_at :datetime         not null
+#  id          :bigint           not null, primary key
+#  user_id     :integer          not null
+#  email       :string(513)      not null
+#  primary     :boolean          default(FALSE), not null
+#  created_at  :datetime         not null
+#  updated_at  :datetime         not null
+#  lower_email :string(255)
 #
 # Indexes
 #
-#  index_user_emails_on_email                (lower((email)::text)) UNIQUE
+#  index_user_emails_on_email                (email) UNIQUE
+#  index_user_emails_on_lower_email          (lower_email) UNIQUE
 #  index_user_emails_on_user_id              (user_id)
-#  index_user_emails_on_user_id_and_primary  (user_id,primary) UNIQUE WHERE "primary"
+#  index_user_emails_on_user_id_and_primary  (user_id,primary) UNIQUE
 #

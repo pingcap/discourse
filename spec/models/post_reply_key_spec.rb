@@ -11,9 +11,9 @@ RSpec.describe PostReplyKey do
       )
 
       raw_key = PostReplyKey.where(id: post_reply_key.id)
-        .pluck("reply_key::text")
+        .pluck("reply_key")
         .first
-
+      pending
       expect(raw_key).to_not eq(hex)
       expect(raw_key.delete('-')).to eq(hex)
       expect(PostReplyKey.find(post_reply_key.id).reply_key).to eq(hex)

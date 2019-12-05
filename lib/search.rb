@@ -33,59 +33,6 @@ class Search
     %w(topic category user private_messages tags)
   end
 
-  def self.ts_config(locale = SiteSetting.default_locale)
-    # if adding a text search configuration, you should check PG beforehand:
-    # SELECT cfgname FROM pg_ts_config;
-    # As an aside, dictionaries can be listed by `\dFd`, the
-    # physical locations are in /usr/share/postgresql/<version>/tsearch_data.
-    # But it may not appear there based on pg extension configuration.
-    # base docker config
-    #
-    case locale.split("_")[0].to_sym
-    when :da then 'danish'
-    when :nl then 'dutch'
-    when :en then 'english'
-    when :fi then 'finnish'
-    when :fr then 'french'
-    when :de then 'german'
-    when :hu then 'hungarian'
-    when :it then 'italian'
-    when :nb then 'norwegian'
-    when :pt then 'portuguese'
-    when :ro then 'romanian'
-    when :ru then 'russian'
-    when :es then 'spanish'
-    when :sv then 'swedish'
-    when :tr then 'turkish'
-    else 'simple' # use the 'simple' stemmer for other languages
-    end
-  end
-
-  def self.prepare_data(search_data, purpose = :query)
-    purpose ||= :query
-
-    data = search_data.dup
-    data.force_encoding("UTF-8")
-    if purpose != :topic
-      # TODO cppjieba_rb is designed for chinese, we need something else for Japanese
-      # Korean appears to be safe cause words are already space seperated
-      # For Japanese we should investigate using kakasi
-      if ['zh_TW', 'zh_CN', 'ja'].include?(SiteSetting.default_locale) || SiteSetting.search_tokenize_chinese_japanese_korean
-        require 'cppjieba_rb' unless defined? CppjiebaRb
-        mode = (purpose == :query ? :query : :mix)
-        data = CppjiebaRb.segment(search_data, mode: mode)
-        data = CppjiebaRb.filter_stop_word(data).join(' ')
-      else
-        data.squish!
-      end
-
-      if SiteSetting.search_ignore_accents
-        data = strip_diacritics(data)
-      end
-    end
-    data
-  end
-
   def self.word_to_date(str)
 
     if str =~ /^[0-9]{1,3}$/
@@ -169,8 +116,8 @@ class Search
     term = process_advanced_search!(term)
 
     if term.present?
-      @term = Search.prepare_data(term, Topic === @search_context ? :topic : nil)
-      @original_term = PG::Connection.escape_string(@term)
+      @term = term
+      @original_term = Mysql2::Client.escape(@term)
     end
 
     if @search_pms && @guardian.user
@@ -314,7 +261,7 @@ class Search
   end
 
   advanced_filter(/^badge:(.*)$/) do |posts, match|
-    badge_id = Badge.where('name ilike ? OR id = ?', match, match.to_i).pluck(:id).first
+    badge_id = Badge.where('LOWER(name) like ? OR id = ?', match.downcase, match.to_i).pluck(:id).first
     if badge_id
       posts.where('posts.user_id IN (SELECT ub.user_id FROM user_badges ub WHERE ub.badge_id = ?)', badge_id)
     else
@@ -387,8 +334,8 @@ class Search
       match = match[1..-1]
     end
 
-    category_ids = Category.where('slug ilike ? OR name ilike ? OR id = ?',
-                                  match, match, match.to_i).pluck(:id)
+    category_ids = Category.where('LOWER(slug) like ? OR LOWER(name) like ? OR id = ?',
+                                  match.downcase, match.downcase, match.to_i).pluck(:id)
     if category_ids.present?
 
       unless exact
@@ -461,16 +408,15 @@ class Search
       else
         # a bit yucky but we got to add the term back in
         if match.to_s.length >= SiteSetting.min_search_term_length
-          posts.where("posts.id IN (
-            SELECT post_id FROM post_search_data pd1
-            WHERE pd1.search_data @@ #{Search.ts_query(term: "##{match}")})")
+          p_ids = PostSearchData.search(match).results.map{ |x| x.post_id }
+          posts.where("posts.id" => p_ids)
         end
       end
     end
   end
 
   advanced_filter(/^group:(.+)$/) do |posts, match|
-    group_id = Group.where('name ilike ? OR (id = ? AND id > 0)', match, match.to_i).pluck(:id).first
+    group_id = Group.where('LOWER(name) like ? OR (id = ? AND id > 0)', match.downcase, match.to_i).pluck(:id).first
     if group_id
       posts.where("posts.user_id IN (select gu.user_id from group_users gu where gu.group_id = ?)", group_id)
     else
@@ -680,9 +626,9 @@ class Search
     # however the scope from the query below is leaking in to Category, this works around
     # the issue while we figure out what is up in Rails
     secure_category_ids
-
+    c_ids = CategorySearchData.search(term).hits.map{|x| x['_id'].to_i }
     categories = Category.includes(:category_search_data)
-      .where("category_search_data.search_data @@ #{ts_query}")
+      .where("category_search_data.category_id" => c_ids)
       .references(:category_search_data)
       .order("topics_month DESC")
       .secured(@guardian)
@@ -695,12 +641,12 @@ class Search
 
   def user_search
     return if SiteSetting.hide_user_profiles_from_public && !@guardian.user
-
+    u_ids = UserSearchData.search(term).hits.map{ |x| x['_id'].to_i }
     users = User.includes(:user_search_data)
       .references(:user_search_data)
       .where(active: true)
       .where(staged: false)
-      .where("user_search_data.search_data @@ #{ts_query("simple")}")
+      .where("user_search_data.user_id" => u_ids)
       .order("CASE WHEN username_lower = '#{@original_term.downcase}' THEN 0 ELSE 1 END")
       .order("last_posted_at DESC")
       .limit(limit)
@@ -713,16 +659,16 @@ class Search
   def groups_search
     groups = Group
       .visible_groups(@guardian.user, "name ASC", include_everyone: false)
-      .where("name ILIKE :term OR full_name ILIKE :term", term: "%#{@term}%")
+      .where("LOWER(name) LIKE :term OR full_name LIKE :term", term: "%#{@term}%".downcase)
 
     groups.each { |group| @results.add(group) }
   end
 
   def tags_search
     return unless SiteSetting.tagging_enabled
-
+    t_ids = TagSearchData.search(term).hits.map{|x| x['_id'].to_i}
     tags = Tag.includes(:tag_search_data)
-      .where("tag_search_data.search_data @@ #{ts_query}")
+      .where("tag_search_data.tag_id" => t_ids)
       .references(:tag_search_data)
       .order("name asc")
       .limit(limit)
@@ -768,18 +714,14 @@ class Search
         end
 
         posts = posts.joins('JOIN users u ON u.id = posts.user_id')
-        posts = posts.where("posts.raw  || ' ' || u.username || ' ' || COALESCE(u.name, '') ilike ?", "%#{term_without_quote}%")
+        posts = posts.where("LOWER(CONCAT(posts.raw, ' ', u.username, ' ', COALESCE(u.name, ''))) like ?", "%#{term_without_quote}%".downcase)
       else
-        # A is for title
-        # B is for category
-        # C is for tags
-        # D is for cooked
-        weights = @in_title ? 'A' : (SiteSetting.tagging_enabled ? 'ABCD' : 'ABD')
-        posts = posts.where("post_search_data.search_data @@ #{ts_query(weight_filter: weights)}")
+        p_ids = PostSearchData.search(@term).hits.map{|x| x['_id'].to_i}
+        posts = posts.where("post_search_data.post_id" => p_ids)
         exact_terms = @term.scan(Regexp.new(PHRASE_MATCH_REGEXP_PATTERN)).flatten
 
         exact_terms.each do |exact|
-          posts = posts.where("posts.raw ilike :exact OR topics.title ilike :exact", exact: "%#{exact}%")
+          posts = posts.where("LOWER(posts.raw) like :exact OR LOWER(topics.title) like :exact", exact: "%#{exact}%".downcase)
         end
       end
     end
@@ -842,35 +784,11 @@ class Search
         posts = posts.order("posts.like_count DESC")
       end
     else
-      # 1|32 divides the rank by 1 + logarithm of the document length and
-      # scales the range from zero to one
-      data_ranking = <<~SQL
-      (
-        TS_RANK_CD(
-          post_search_data.search_data,
-          #{ts_query(weight_filter: weights)},
-          1|32
-        ) *
-        (
-          CASE categories.search_priority
-          WHEN #{Searchable::PRIORITIES[:very_low]}
-          THEN #{SiteSetting.category_search_priority_very_low_weight}
-          WHEN #{Searchable::PRIORITIES[:low]}
-          THEN #{SiteSetting.category_search_priority_low_weight}
-          WHEN #{Searchable::PRIORITIES[:high]}
-          THEN #{SiteSetting.category_search_priority_high_weight}
-          WHEN #{Searchable::PRIORITIES[:very_high]}
-          THEN #{SiteSetting.category_search_priority_very_high_weight}
-          ELSE 1
-          END
-        )
-      )
-      SQL
 
       if opts[:aggregate_search]
-        posts = posts.order("MAX(#{data_ranking}) DESC")
+        posts = posts.order("MAX(posts.id) DESC")
       else
-        posts = posts.order("#{data_ranking} DESC")
+        posts = posts.order("posts.id DESC")
       end
 
       posts = posts.order("topics.bumped_at DESC")
@@ -894,45 +812,8 @@ class Search
     SQL
   end
 
-  def self.default_ts_config
-    "'#{Search.ts_config}'"
-  end
-
-  def default_ts_config
-    self.class.default_ts_config
-  end
-
-  def self.ts_query(term: , ts_config:  nil, joiner: "&", weight_filter: nil)
-
-    data = DB.query_single(
-      "SELECT TO_TSVECTOR(:config, :term)",
-      config: 'simple',
-      term: term
-    ).first
-
-    ts_config = ActiveRecord::Base.connection.quote(ts_config) if ts_config
-    all_terms = data.scan(/'([^']+)'\:\d+/).flatten
-    all_terms.map! do |t|
-      t.split(/[\)\(&']/).find(&:present?)
-    end.compact!
-
-    query = ActiveRecord::Base.connection.quote(
-      all_terms
-        .map { |t| "'#{PG::Connection.escape_string(t)}':*#{weight_filter}" }
-        .join(" #{joiner} ")
-    )
-
-    "TO_TSQUERY(#{ts_config || default_ts_config}, #{query})"
-  end
-
-  def ts_query(ts_config = nil, weight_filter: nil)
-    @ts_query_cache ||= {}
-    @ts_query_cache["#{ts_config || default_ts_config} #{@term} #{weight_filter}"] ||=
-      Search.ts_query(term: @term, ts_config: ts_config, weight_filter: weight_filter)
-  end
-
   def wrap_rows(query)
-    "SELECT *, row_number() over() row_number FROM (#{query.to_sql}) xxx"
+    "SELECT *, 1 row_number FROM (#{query.to_sql}) xxx"
   end
 
   def aggregate_post_sql(opts)

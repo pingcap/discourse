@@ -204,7 +204,7 @@ class User < ActiveRecord::Base
     if filter.is_a?(Array)
       where('username_lower ~* ?', "(#{filter.join('|')})")
     else
-      where('username_lower ILIKE ?', "%#{filter}%")
+      where('username_lower LIKE ?', "%#{filter}%".downcase)
     end
   end
 
@@ -225,8 +225,8 @@ class User < ActiveRecord::Base
       )
     else
       users.where(
-        'username_lower ILIKE :filter OR lower(user_emails.email) ILIKE :filter',
-        filter: "%#{filter}%"
+        'username_lower LIKE :filter OR lower(user_emails.email) LIKE :filter',
+        filter: "%#{filter}%".downcase
       )
     end
   end
@@ -483,7 +483,7 @@ class User < ActiveRecord::Base
          WHERE t.deleted_at IS NULL
            AND n.notification_type = :type
            AND n.user_id = :user_id
-           AND NOT read
+           AND NOT `read`
     SQL
 
     # to avoid coalesce we do to_i
@@ -519,7 +519,7 @@ class User < ActiveRecord::Base
             n.notification_type <> :pm AND
             n.user_id = :user_id AND
             n.id > :seen_notification_id AND
-            NOT read
+            NOT `read`
           LIMIT :limit
         ) AS X
       SQL
@@ -534,7 +534,7 @@ class User < ActiveRecord::Base
   end
 
   def total_unread_notifications
-    @unread_total_notifications ||= notifications.where("read = false").count
+    @unread_total_notifications ||= notifications.where("`read` = false").count
   end
 
   def saw_notification_id(notification_id)
@@ -571,7 +571,7 @@ class User < ActiveRecord::Base
           t.deleted_at IS NULL AND
           n.notification_type = :type AND
           n.user_id = :user_id AND
-          NOT read
+          NOT `read`
         ORDER BY n.id DESC
         LIMIT 20
       ) AS x
@@ -581,7 +581,7 @@ class User < ActiveRecord::Base
        LEFT JOIN topics t ON n.topic_id = t.id
        WHERE
         t.deleted_at IS NULL AND
-        (n.notification_type <> :type OR read) AND
+        (n.notification_type <> :type OR `read`) AND
         n.user_id = :user_id
        ORDER BY n.id DESC
        LIMIT 20
@@ -1206,7 +1206,7 @@ class User < ActiveRecord::Base
   end
 
   def emails
-    self.user_emails.order("user_emails.primary DESC NULLS LAST").pluck(:email)
+    self.user_emails.order("user_emails.primary DESC").pluck(:email)
   end
 
   def secondary_emails
@@ -1510,7 +1510,7 @@ class User < ActiveRecord::Base
       UPDATE users
       SET uploaded_avatar_id = NULL
       WHERE uploaded_avatar_id IN (
-        SELECT u1.uploaded_avatar_id FROM users u1
+        SELECT u1.uploaded_avatar_id FROM (select * from users) u1
         LEFT JOIN uploads up
           ON u1.uploaded_avatar_id = up.id
         WHERE u1.uploaded_avatar_id IS NOT NULL AND
@@ -1525,11 +1525,11 @@ end
 #
 # Table name: users
 #
-#  id                        :integer          not null, primary key
+#  id                        :bigint           not null, primary key
 #  username                  :string(60)       not null
 #  created_at                :datetime         not null
 #  updated_at                :datetime         not null
-#  name                      :string
+#  name                      :string(255)
 #  seen_notification_id      :integer          default(0), not null
 #  last_posted_at            :datetime
 #  password_hash             :string(64)
@@ -1549,13 +1549,13 @@ end
 #  date_of_birth             :date
 #  views                     :integer          default(0), not null
 #  flag_level                :integer          default(0), not null
-#  ip_address                :inet
+#  ip_address                :string(255)
 #  moderator                 :boolean          default(FALSE)
-#  title                     :string
+#  title                     :string(255)
 #  uploaded_avatar_id        :integer
 #  locale                    :string(10)
 #  primary_group_id          :integer
-#  registration_ip_address   :inet
+#  registration_ip_address   :string(255)
 #  staged                    :boolean          default(FALSE), not null
 #  first_seen_at             :datetime
 #  silenced_till             :datetime
@@ -1564,8 +1564,8 @@ end
 #
 # Indexes
 #
-#  idx_users_admin                    (id) WHERE admin
-#  idx_users_moderator                (id) WHERE moderator
+#  idx_users_admin                    (id)
+#  idx_users_moderator                (id)
 #  index_users_on_last_posted_at      (last_posted_at)
 #  index_users_on_last_seen_at        (last_seen_at)
 #  index_users_on_uploaded_avatar_id  (uploaded_avatar_id)

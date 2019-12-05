@@ -11,8 +11,8 @@ end
 #
 #  id              :bigint           not null, primary key
 #  poll_id         :bigint
-#  digest          :string           not null
-#  html            :text             not null
+#  digest          :string(255)      not null
+#  html            :text(65535)      not null
 #  anonymous_votes :integer
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
@@ -21,8 +21,4 @@ end
 #
 #  index_poll_options_on_poll_id             (poll_id)
 #  index_poll_options_on_poll_id_and_digest  (poll_id,digest) UNIQUE
-#
-# Foreign Keys
-#
-#  fk_rails_...  (poll_id => polls.id)
 #

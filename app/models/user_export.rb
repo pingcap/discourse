@@ -38,8 +38,8 @@ end
 #
 # Table name: user_exports
 #
-#  id         :integer          not null, primary key
-#  file_name  :string           not null
+#  id         :bigint           not null, primary key
+#  file_name  :string(255)      not null
 #  user_id    :integer          not null
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
