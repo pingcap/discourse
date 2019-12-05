@@ -411,12 +411,24 @@ class ListController < ApplicationController
 
   def construct_url_with(action, opts, url_prefix = nil)
     method = url_prefix.blank? ? "#{action_name}_path" : "#{url_prefix}_#{action_name}_path"
-    url = if action == :prev
-      public_send(method, opts.merge(prev_page_params(opts)))
-    else # :next
-      public_send(method, opts.merge(next_page_params(opts)))
+
+    page_params =
+      case action
+      when :prev
+        prev_page_params
+      when :next
+        next_page_params
+      else
+        raise "unreachable"
+      end
+
+    opts = opts.dup
+    if SiteSetting.unicode_usernames && opts[:group_name]
+      opts[:group_name] = URI.encode(opts[:group_name])
     end
-    url.sub('.json?', '?')
+    opts.delete(:category) if page_params.include?(:category_slug_path_with_id)
+
+    public_send(method, opts.merge(page_params)).sub('.json?', '?')
   end
 
   def get_excluded_category_ids(current_category = nil)
