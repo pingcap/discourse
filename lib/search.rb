@@ -716,7 +716,11 @@ class Search
         posts = posts.joins('JOIN users u ON u.id = posts.user_id')
         posts = posts.where("LOWER(CONCAT(posts.raw, ' ', u.username, ' ', COALESCE(u.name, ''))) like ?", "%#{term_without_quote}%".downcase)
       else
-        p_ids = PostSearchData.search(@term).hits.map{|x| x['_id'].to_i}
+        hits = PostSearchData.search(@term).hits.map{|x| [x['_id'].to_i, x['_score']]}
+        p_ids = hits.map { |x| x[0] }
+        @id_with_scores = hits[0..50].map do |hit|
+          %Q{SELECT #{hit[0]} AS _id, #{hit[1]} AS _score}
+        end.join(" UNION ")
         posts = posts.where("post_search_data.post_id" => p_ids)
         exact_terms = @term.scan(Regexp.new(PHRASE_MATCH_REGEXP_PATTERN)).flatten
 
@@ -784,11 +788,11 @@ class Search
         posts = posts.order("posts.like_count DESC")
       end
     else
-
+      posts = posts.joins("left join (#{@id_with_scores}) AS r ON r._id = posts.id")
       if opts[:aggregate_search]
-        posts = posts.order("MAX(posts.id) DESC")
+        posts = posts.order("MAX(r._score) DESC")
       else
-        posts = posts.order("posts.id DESC")
+        posts = posts.order("r._score DESC")
       end
 
       posts = posts.order("topics.bumped_at DESC")
