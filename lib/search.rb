@@ -721,6 +721,7 @@ class Search
         @id_with_scores = hits[0..50].map do |hit|
           %Q{SELECT #{hit[0]} AS _id, #{hit[1]} AS _score}
         end.join(" UNION ")
+        @id_with_scores = "SELECT 0 AS _id, 0 AS _score" if @id_with_scores.blank?
         posts = posts.where("post_search_data.post_id" => p_ids)
         exact_terms = @term.scan(Regexp.new(PHRASE_MATCH_REGEXP_PATTERN)).flatten
 
