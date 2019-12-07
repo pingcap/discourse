@@ -51,6 +51,7 @@ Report.add_report("flags_status") do |report|
 
   flag_types = PostActionType.flag_types
 
+
   sql = <<~SQL
   SELECT
   sd.staff_username,
@@ -73,113 +74,70 @@ Report.add_report("flags_status") do |report|
   pa.disagreed_by_id,
   pa.deferred_by_id,
   COALESCE(pa.disagreed_at, pa.agreed_at, pa.deferred_at) AS responded_at
-  FROM (
-  SELECT id,
-  post_action_type_id,
-  created_at,
-  agreed_at,
-  disagreed_at,
-  deferred_at,
-  agreed_by_id,
-  disagreed_by_id,
-  deferred_by_id,
-  post_id,
-  user_id,
-  COALESCE(disagreed_at, agreed_at, deferred_at) AS responded_at
-  FROM post_actions
-  WHERE post_action_type_id IN (#{flag_types.values.join(',')})
-    AND created_at >= '#{report.start_date}'
-    AND created_at <= '#{report.end_date}'
-  ORDER BY created_at DESC
-  ) pa
-  FULL OUTER JOIN (
-  SELECT pa.id,
-  u.id AS staff_id,
-  u.username_lower AS staff_username,
-  u.uploaded_avatar_id AS staff_avatar_id
-  FROM (
-  SELECT id,
-  post_action_type_id,
-  created_at,
-  agreed_at,
-  disagreed_at,
-  deferred_at,
-  agreed_by_id,
-  disagreed_by_id,
-  deferred_by_id,
-  post_id,
-  user_id,
-  COALESCE(disagreed_at, agreed_at, deferred_at) AS responded_at
-  FROM post_actions
-  WHERE post_action_type_id IN (#{flag_types.values.join(',')})
-    AND created_at >= '#{report.start_date}'
-    AND created_at <= '#{report.end_date}'
-  ORDER BY created_at DESC
-  ) pa
-  JOIN users u
-  ON u.id = COALESCE(pa.agreed_by_id, pa.disagreed_by_id, pa.deferred_by_id)
-  ) sd
-  ON sd.id = pa.id
-  FULL OUTER JOIN (
-  SELECT pa.id,
-  u.id AS flagger_id,
-  u.username_lower AS flagger_username,
-  u.uploaded_avatar_id AS flagger_avatar_id
-  FROM (
-  SELECT id,
-  post_action_type_id,
-  created_at,
-  agreed_at,
-  disagreed_at,
-  deferred_at,
-  agreed_by_id,
-  disagreed_by_id,
-  deferred_by_id,
-  post_id,
-  user_id,
-  COALESCE(disagreed_at, agreed_at, deferred_at) AS responded_at
-  FROM post_actions
-  WHERE post_action_type_id IN (#{flag_types.values.join(',')})
-    AND created_at >= '#{report.start_date}'
-    AND created_at <= '#{report.end_date}'
-  ORDER BY created_at DESC
-  ) pa
-  JOIN users u
-  ON u.id = pa.user_id
-  ) fd
-  ON fd.id = pa.id
-  FULL OUTER JOIN (
-  SELECT pa.id,
-  p.user_id AS poster_id,
-  p.topic_id as topic_id,
-  p.post_number as post_number,
-  u.username_lower AS poster_username,
-  u.uploaded_avatar_id AS poster_avatar_id
-  FROM (
-  SELECT id,
-  post_action_type_id,
-  created_at,
-  agreed_at,
-  disagreed_at,
-  deferred_at,
-  agreed_by_id,
-  disagreed_by_id,
-  deferred_by_id,
-  post_id,
-  user_id,
-  COALESCE(disagreed_at, agreed_at, deferred_at) AS responded_at
-  FROM post_actions
-  WHERE post_action_type_id IN (#{flag_types.values.join(',')})
-    AND created_at >= '#{report.start_date}'
-    AND created_at <= '#{report.end_date}'
-  ORDER BY created_at DESC
-  ) pa
-  JOIN posts p
-  ON p.id = pa.post_id
-  JOIN users u
-  ON u.id = p.user_id
-  ) pd
-  ON pd.id = pa.id
+  FROM period_actions pa, staff_data sd, flagger_data fd, poster_data pd
+  WHERE sd.id = pa.id AND fd.id = pa.id AND pd.id = pa.id
+  SQL
+
+  DB.exec(<<~SQL)
+    CREATE TEMPORARY TABLE IF NOT EXISTS period_actions AS (
+      SELECT id,
+      post_action_type_id,
+      created_at,
+      agreed_at,
+      disagreed_at,
+      deferred_at,
+      agreed_by_id,
+      disagreed_by_id,
+      deferred_by_id,
+      post_id,
+      user_id,
+      COALESCE(disagreed_at, agreed_at, deferred_at) AS responded_at
+      FROM post_actions
+      WHERE post_action_type_id IN (#{flag_types.values.join(',')})
+        AND created_at >= '#{report.start_date.to_s(:db)}'
+        AND created_at <= '#{report.end_date.to_s(:db)}'
+      ORDER BY created_at DESC
+    )
+  SQL
+
+  DB.exec(<<~SQL)
+    CREATE TEMPORARY TABLE IF NOT EXISTS poster_data AS (
+      SELECT pa.id,
+      p.user_id AS poster_id,
+      p.topic_id as topic_id,
+      p.post_number as post_number,
+      u.username_lower AS poster_username,
+      u.uploaded_avatar_id AS poster_avatar_id
+      FROM period_actions pa
+      JOIN posts p
+      ON p.id = pa.post_id
+      JOIN users u
+      ON u.id = p.user_id
+    )
+  SQL
+
+  DB.exec(<<~SQL)
+    CREATE TEMPORARY TABLE IF NOT EXISTS flagger_data AS (
+      SELECT pa.id,
+      u.id AS flagger_id,
+      u.username_lower AS flagger_username,
+      u.uploaded_avatar_id AS flagger_avatar_id
+      FROM period_actions pa
+      JOIN users u
+      ON u.id = pa.user_id
+    )
+  SQL
+
+  DB.exec(<<~SQL)
+    CREATE TEMPORARY TABLE IF NOT EXISTS staff_data AS (
+      SELECT pa.id,
+      u.id AS staff_id,
+      u.username_lower AS staff_username,
+      u.uploaded_avatar_id AS staff_avatar_id
+      FROM period_actions pa
+      JOIN users u
+      ON u.id = COALESCE(pa.agreed_by_id, pa.disagreed_by_id, pa.deferred_by_id)
+    )
   SQL
 
   DB.query(sql).each do |row|

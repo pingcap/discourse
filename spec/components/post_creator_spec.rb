@@ -652,7 +652,6 @@ describe PostCreator do
     context 'success' do
       it 'create correctly' do
         post = creator.create
-        binding.pry
         expect(Post.count).to eq(1)
         expect(Topic.count).to eq(1)
         expect(post.reply_to_post_number).to eq(4)
