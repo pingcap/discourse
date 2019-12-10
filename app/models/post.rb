@@ -754,19 +754,17 @@ class Post < ActiveRecord::Base
   end
 
   def reply_history(max_replies = 100, guardian = nil)
-    post_ids = DB.query_single(<<~SQL, post_id: id, topic_id: topic_id)
-    WITH RECURSIVE breadcrumb(id, reply_to_post_number) AS (
-          SELECT p.id, p.reply_to_post_number FROM posts AS p
-            WHERE p.id = :post_id
-          UNION
-             SELECT p.id, p.reply_to_post_number FROM posts AS p, breadcrumb
-               WHERE breadcrumb.reply_to_post_number = p.post_number
-                 AND p.topic_id = :topic_id
-        )
-    SELECT id from breadcrumb
-    WHERE id <> :post_id
-    ORDER by id
-    SQL
+    list = []
+    current_parent = reply_to_post
+    loop do
+      if current_parent && list.size < max_replies
+        list.prepend current_parent if current_parent.persisted?
+      else
+        break
+      end
+      current_parent = current_parent.reply_to_post
+    end
+    post_ids = list.map { |x| x.id }
 
     # [1,2,3][-10,-1] => nil
     post_ids = (post_ids[(0 - max_replies)..-1] || post_ids)
@@ -778,32 +776,19 @@ class Post < ActiveRecord::Base
 
   def reply_ids(guardian = nil, only_replies_to_single_post: true)
     builder = DB.build(<<~SQL)
-      WITH RECURSIVE breadcrumb(id, level) AS (
-        SELECT :post_id, 0
-        UNION
-        SELECT reply_id, level + 1
-        FROM post_replies AS r
-          JOIN breadcrumb AS b ON (r.post_id = b.id)
-        WHERE r.post_id <> r.reply_id
-              AND b.level < :max_reply_level
-      ), breadcrumb_with_count AS (
-          SELECT
-            id,
-            level,
-            COUNT(*) AS count
-          FROM post_replies AS r
-            JOIN breadcrumb AS b ON (r.reply_id = b.id)
-          WHERE r.reply_id <> r.post_id
-          GROUP BY id, level
-      )
-      SELECT id, level
-      FROM breadcrumb_with_count
+      SELECT id, level FROM (
+        SELECT id, level, count(*) as count FROM (
+          SELECT reply_id AS id, length(@pv) - length((replace(@pv, ',', '')))  AS level
+            FROM (
+                   SELECT * FROM post_replies ORDER BY post_id, reply_id) pr,         
+                   (SELECT @pv := :post_id) init 
+           WHERE find_in_set(post_id, @pv) 
+                 AND length(@pv := concat(@pv, ',', reply_id))
+        ) tmp GROUP BY id, level
+      ) tmp1
       /*where*/
       ORDER BY id
     SQL
-
-    builder.where("level > 0")
-
     # ignore posts that aren't replies to exactly one post
     # for example it skips a post when it contains 2 quotes (which are replies) from different posts
     builder.where("count = 1") if only_replies_to_single_post
