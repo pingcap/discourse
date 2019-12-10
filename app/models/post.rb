@@ -489,7 +489,7 @@ class Post < ActiveRecord::Base
     save!
 
     Topic.where(
-      "id = :topic_id AND NOT EXISTS(SELECT 1 FROM POSTS WHERE topic_id = :topic_id AND NOT hidden)",
+      "id = :topic_id AND NOT EXISTS(SELECT 1 FROM posts WHERE topic_id = :topic_id AND NOT hidden)",
       topic_id: topic_id
     ).update_all(visible: false)
 
