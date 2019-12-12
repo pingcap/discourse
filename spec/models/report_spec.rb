@@ -819,7 +819,7 @@ describe Report do
       class Report
         def self.report_timeout_test(report)
           report.error = wrap_slow_query(1) do
-            ActiveRecord::Base.connection.execute("SELECT pg_sleep(5)")
+            ActiveRecord::Base.connection.execute("SELECT sleep(5)")
           end
         end
       end
