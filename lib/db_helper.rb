@@ -7,9 +7,8 @@ class DbHelper
   REMAP_SQL ||= <<~SQL
     SELECT table_name, column_name
       FROM information_schema.columns
-     WHERE table_schema = 'public'
-       AND is_updatable = 'YES'
-       AND (data_type LIKE 'char%' OR data_type LIKE 'text%')
+     WHERE table_schema = :schema
+       AND (data_type LIKE '%char%' OR data_type LIKE '%text%')
   ORDER BY table_name, column_name
   SQL
 
@@ -26,7 +25,7 @@ class DbHelper
 
     text_columns = Hash.new { |h, k| h[k] = [] }
 
-    DB.query(REMAP_SQL).each do |r|
+    DB.query(REMAP_SQL, schema: ActiveRecord::Base.connection.instance_eval{|x| @config[:database]}).each do |r|
       unless triggers.include?(Migration::BaseDropper.readonly_trigger_name(r.table_name, r.column_name))
         text_columns[r.table_name] << r.column_name
       end
@@ -58,7 +57,7 @@ class DbHelper
 
     text_columns = Hash.new { |h, k| h[k] = [] }
 
-    DB.query(REMAP_SQL).each do |r|
+    DB.query(REMAP_SQL, schema: ActiveRecord::Base.connection.instance_eval{|x| @config[:database]}).each do |r|
       unless triggers.include?(Migration::BaseDropper.readonly_trigger_name(r.table_name, r.column_name))
         text_columns[r.table_name] << r.column_name
       end
