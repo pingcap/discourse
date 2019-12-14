@@ -190,13 +190,13 @@ module BackupRestore
 
       cmd =[
         "mysqldump",                  # the mysqldump command
-        "--compress",                 # Compression
         "--skip-add-locks",
         host_argument,                # the hostname to connect to (if any)
         port_argument,                # the port to connect to (if any)
         password_argument,            # pass the password to mysqldump (if any)
         username_argument,            # the username to connect as (if any)
         db_conf.database,              # the name of the database to dump
+        " | gzip ",
         "> '#{@dump_filename}'", # output to the dump.sql file
       ].join(" ")
       puts cmd
