@@ -141,15 +141,27 @@ class Auth::DefaultCurrentUserProvider
       needs_rotation = @user_token.auth_token_seen ? rotated_at < UserAuthToken::ROTATE_TIME.ago : rotated_at < UserAuthToken::URGENT_ROTATE_TIME.ago
 
       if needs_rotation
+        Rails.logger.debug("rotation")
+        Rails.logger.debug(user.id)
+        Rails.logger.debug(@user_token.inspect)
+        Rails.logger.debug(@user_token.auth_token_seen)
+        Rails.logger.debug(@user_token.rotated_at)
+        Rails.logger.debug(UserAuthToken::ROTATE_TIME.ago)
+        Rails.logger.debug(UserAuthToken::URGENT_ROTATE_TIME.ago)
+
         if @user_token.rotate!(user_agent: @env['HTTP_USER_AGENT'],
                                client_ip: @request.ip,
                                path: @env['REQUEST_PATH'])
           cookies[TOKEN_COOKIE] = cookie_hash(@user_token.unhashed_auth_token)
+          Rails.logger.debug("rotate TRUE")
+        else
+          Rails.logger.debug("rotate FALSE")
         end
       end
     end
 
     if !user && cookies.key?(TOKEN_COOKIE)
+      Rails.logger.debug("DELETE COOKIE FROM DefaultCurrentUserProvider/161")
       cookies.delete(TOKEN_COOKIE)
     end
   end
