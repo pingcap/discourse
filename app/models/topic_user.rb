@@ -245,50 +245,64 @@ class TopicUser < ActiveRecord::Base
 
     # Update the last read and the last seen post count, but only if it doesn't exist.
     # This would be a lot easier if psql supported some kind of upsert
-    UPDATE_TOPIC_USER_SQL = "UPDATE topic_users
-                                    SET
-                                      last_read_post_number = GREATEST(:post_number, tu.last_read_post_number),
-                                      highest_seen_post_number = t.highest_post_number,
-                                      total_msecs_viewed = LEAST(tu.total_msecs_viewed + :msecs,86400000),
-                                      notification_level =
-                                         case when tu.notifications_reason_id is null and (tu.total_msecs_viewed + :msecs) >
-                                            coalesce(uo.auto_track_topics_after_msecs,:threshold) and
-                                            coalesce(uo.auto_track_topics_after_msecs, :threshold) >= 0
-                                            and t.archetype = 'regular' then
-                                              :tracking
-                                         else
-                                            tu.notification_level
-                                         end
-                                  FROM topic_users tu
-                                  join topics t on t.id = tu.topic_id
-                                  join users u on u.id = :user_id
-                                  join user_options uo on uo.user_id = :user_id
-                                  WHERE
-                                       tu.topic_id = topic_users.topic_id AND
-                                       tu.user_id = topic_users.user_id AND
-                                       tu.topic_id = :topic_id AND
-                                       tu.user_id = :user_id
-                                  RETURNING
-                                    topic_users.notification_level, tu.notification_level old_level, tu.last_read_post_number
-                                "
+    UPDATE_TOPIC_USER_SQL = <<~SQL
+     UPDATE topic_users
+            INNER JOIN topic_users tu ON tu.topic_id = topic_users.topic_id 
+              AND tu.user_id = topic_users.user_id 
+              AND tu.topic_id = :topic_id 
+              AND tu.user_id = :user_id
+            INNER JOIN topics t ON t.id = tu.topic_id
+            INNER JOIN users u ON u.id = :user_id
+            INNER JOIN user_options uo ON uo.user_id = :user_id
+        SET
+          topic_users.last_read_post_number = GREATEST(:post_number, tu.last_read_post_number),
+          topic_users.highest_seen_post_number = t.highest_post_number,
+          topic_users.total_msecs_viewed = LEAST(tu.total_msecs_viewed + :msecs,86400000),
+          topic_users.notification_level =
+             CASE WHEN tu.notifications_reason_id IS NULL AND (tu.total_msecs_viewed + :msecs) >
+                coalesce(uo.auto_track_topics_after_msecs,:threshold) AND
+                coalesce(uo.auto_track_topics_after_msecs, :threshold) >= 0
+                AND t.archetype = 'regular' THEN
+                  :tracking
+             ELSE
+                tu.notification_level
+             END
+    SQL
 
     UPDATE_TOPIC_USER_SQL_STAFF = UPDATE_TOPIC_USER_SQL.gsub("highest_post_number", "highest_staff_post_number")
 
-    INSERT_TOPIC_USER_SQL = "INSERT INTO topic_users (user_id, topic_id, last_read_post_number, highest_seen_post_number, last_visited_at, first_visited_at, notification_level)
-                  SELECT :user_id, :topic_id, :post_number, ft.highest_post_number, :now, :now, :new_status
-                  FROM topics AS ft
-                  JOIN users u on u.id = :user_id
-                  WHERE ft.id = :topic_id
-                    AND NOT EXISTS(SELECT 1
-                                   FROM topic_users AS ftu
-                                   WHERE ftu.user_id = :user_id and ftu.topic_id = :topic_id)"
+    INSERT_TOPIC_USER_SQL = <<~SQL
+      INSERT INTO topic_users (
+                    user_id, 
+                    topic_id, 
+                    last_read_post_number, 
+                    highest_seen_post_number, 
+                    last_visited_at, 
+                    first_visited_at, 
+                    notification_level
+                  )
+      SELECT :user_id, 
+             :topic_id, 
+             :post_number, 
+             ft.highest_post_number, 
+             :now, 
+             :now, 
+             :new_status
+        FROM topics AS ft
+             JOIN users u ON u.id = :user_id
+       WHERE ft.id = :topic_id
+             AND NOT EXISTS(SELECT 1
+                              FROM topic_users AS ftu
+                             WHERE ftu.user_id = :user_id AND ftu.topic_id = :topic_id
+                           )
+    SQL
 
     INSERT_TOPIC_USER_SQL_STAFF = INSERT_TOPIC_USER_SQL.gsub("highest_post_number", "highest_staff_post_number")
 
     def update_last_read(user, topic_id, post_number, new_posts_read, msecs, opts = {})
-      return #TODO FIX
       return if post_number.blank?
       msecs = 0 if msecs.to_i < 0
+      old_tu = TopicUser.where(user_id: user.id, topic_id: topic_id).first
 
       args = {
         user_id: user.id,
@@ -308,15 +322,17 @@ class TopicUser < ActiveRecord::Base
       # 86400000 = 1 day
       rows =
         if user.staff?
-          DB.query(UPDATE_TOPIC_USER_SQL_STAFF, args)
+          DB.exec(UPDATE_TOPIC_USER_SQL_STAFF, args)
+          DB.query("SELECT notification_level FROM topic_users WhERE user_id = :user_id AND topic_id = :topic_id", args)
         else
-          DB.query(UPDATE_TOPIC_USER_SQL, args)
+          DB.exec(UPDATE_TOPIC_USER_SQL, args)
+          DB.query("SELECT notification_level FROM topic_users WHERE user_id = :user_id AND topic_id = :topic_id", args)
         end
 
       if rows.length == 1
-        before = rows[0].old_level.to_i
+        before = old_tu.notification_level.to_i
         after = rows[0].notification_level.to_i
-        before_last_read = rows[0].last_read_post_number.to_i
+        before_last_read = old_tu.last_read_post_number.to_i
 
         if before_last_read < post_number
           # The user read at least one new post
@@ -348,7 +364,8 @@ class TopicUser < ActiveRecord::Base
           else
             DB.exec(INSERT_TOPIC_USER_SQL, args)
           end
-        rescue PG::UniqueViolation
+        rescue Mysql2::Error => e
+          Rails.logger.warn $!
           # if record is inserted between two statements this can happen
           # we retry once to avoid failing the req
           if opts[:retry]
