@@ -184,11 +184,11 @@ class UserAuthToken < ActiveRecord::Base
     result = DB.exec("
   UPDATE user_auth_tokens
   SET
-    auth_token_seen = false,
     seen_at = null,
     user_agent = :user_agent,
     client_ip = :client_ip,
     prev_auth_token = case when auth_token_seen then auth_token else prev_auth_token end,
+    auth_token_seen = false,
     auth_token = :new_token,
     rotated_at = :now
   WHERE id = :id AND (auth_token_seen or rotated_at < :safeguard_time)
