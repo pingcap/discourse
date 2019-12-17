@@ -52,25 +52,29 @@ class ScoreCalculator
   end
 
   def update_posts_rank(opts)
-    return #TODO FIX
     limit = 20000
 
     builder = DB.build <<~SQL
       UPDATE posts
-      SET percent_rank = X.percent_rank
-      FROM (
-        SELECT posts.id, Y.percent_rank
-        FROM posts
-        JOIN (
-          SELECT id, percent_rank()
-                       OVER (PARTITION BY topic_id ORDER BY SCORE DESC) as percent_rank
-          FROM posts
-         ) Y ON Y.id = posts.id
-         JOIN topics ON posts.topic_id = topics.id
-        /*where*/
-        LIMIT #{limit}
-      ) AS X
-      WHERE posts.id = X.id
+             INNER JOIN (
+             SELECT posts.id, Y.percent_rank
+               FROM posts
+              JOIN (
+                SELECT id, case when c = 1 then 1 else (rank -1)/(c - 1) end as percent_rank
+                  FROM (select posts.id,posts.topic_id, 
+                               posts.score, count(lesser.id) + 1 as rank 
+                          from posts 
+                               left join posts as lesser on lesser.score < posts.score and lesser.topic_id = posts.topic_id 
+                      group by posts.id 
+                      order by posts.topic_id, posts.score
+                      ) as t 
+                        JOIN (select topic_id, count(*) as c from posts as pp group by 1) as g on g.topic_id = t.topic_id
+               ) Y ON Y.id = posts.id
+               JOIN topics ON posts.topic_id = topics.id
+              /*where*/
+              LIMIT #{limit}
+      ) AS X ON X.id = posts.id
+      SET posts.percent_rank = X.percent_rank
     SQL
 
     builder.where("posts.percent_rank IS NULL OR Y.percent_rank <> posts.percent_rank")
