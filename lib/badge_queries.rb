@@ -103,12 +103,13 @@ SQL
 SQL
 
   WikiEditor = <<~SQL
-  SELECT DISTINCT ON (pr.user_id) pr.user_id, pr.post_id, pr.created_at granted_at
+  SELECT pr.user_id, MIN(pr.post_id) AS post_id, MIN(pr.created_at) AS granted_at
   FROM post_revisions pr
   JOIN badge_posts p on p.id = pr.post_id
   WHERE p.wiki
       AND NOT pr.hidden
       AND (:backfill OR p.id IN (:post_ids))
+  GROUP BY pr.user_id
 SQL
 
   Welcome = <<SQL
@@ -182,7 +183,7 @@ SQL
   end
 
   def self.sharing_badge(count)
-    <<SQL
+    <<~SQL
   SELECT views.user_id, i2.post_id, current_timestamp granted_at
   FROM
   (
