@@ -108,18 +108,18 @@ class Group < ActiveRecord::Base
     unless user&.admin
       sql = <<~SQL
         groups.id IN (
-          SELECT g.id FROM groups g WHERE g.visibility_level = :public
+          SELECT g.id FROM `groups` g WHERE g.visibility_level = :public
 
           UNION ALL
 
-          SELECT g.id FROM groups g
+          SELECT g.id FROM `groups` g
           JOIN group_users gu ON gu.group_id = g.id AND
                                  gu.user_id = :user_id
           WHERE g.visibility_level = :members
 
           UNION ALL
 
-          SELECT g.id FROM groups g
+          SELECT g.id FROM `groups` g
           LEFT JOIN group_users gu ON gu.group_id = g.id AND
                                  gu.user_id = :user_id AND
                                  gu.owner
@@ -127,7 +127,7 @@ class Group < ActiveRecord::Base
 
           UNION ALL
 
-          SELECT g.id FROM groups g
+          SELECT g.id FROM `groups` g
           JOIN group_users gu ON gu.group_id = g.id AND
                                  gu.user_id = :user_id AND
                                  gu.owner
