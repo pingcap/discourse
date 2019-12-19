@@ -381,7 +381,7 @@ class Group < ActiveRecord::Base
 
   def self.reset_all_counters!
     DB.exec <<-SQL
-      UPDATE groups
+      UPDATE `groups`
         JOIN (SELECT group_id
                , COUNT(user_id) users
             FROM group_users
@@ -399,7 +399,7 @@ class Group < ActiveRecord::Base
 
   def self.refresh_has_messages!
     DB.exec <<-SQL
-      UPDATE groups g SET has_messages = false
+      UPDATE `groups` g SET has_messages = false
       WHERE NOT EXISTS (SELECT tg.id
                           FROM topic_allowed_groups tg
                     INNER JOIN topics t ON t.id = tg.topic_id
@@ -588,7 +588,7 @@ class Group < ActiveRecord::Base
 
       # update group user count
       DB.exec <<~SQL
-        UPDATE groups g
+        UPDATE `groups` g
         SET user_count =
           (SELECT COUNT(gu.user_id)
            FROM group_users gu
