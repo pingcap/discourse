@@ -1361,7 +1361,7 @@ class User < ActiveRecord::Base
 
     UNION ALL
 
-    (SELECT groups.id, false as is_user FROM groups
+    (SELECT groups.id, false as is_user FROM `groups`
     WHERE lower(groups.name) = :username)
   SQL
 

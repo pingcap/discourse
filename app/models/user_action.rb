@@ -97,7 +97,7 @@ class UserAction < ActiveRecord::Base
         FROM topics t
         JOIN topic_allowed_groups tg ON topic_id = t.id
         JOIN group_users gu ON gu.user_id = :user_id AND gu.group_id = tg.group_id
-        JOIN groups g ON g.id = gu.group_id
+        JOIN `groups` g ON g.id = gu.group_id
        WHERE deleted_at IS NULL
          AND archetype = 'private_message'
        GROUP BY g.name
