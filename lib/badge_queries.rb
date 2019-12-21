@@ -245,25 +245,53 @@ SQL
   end
 
   def self.consecutive_visits(days)
-    <<~SQL
-      WITH consecutive_visits AS (
-        SELECT user_id
-             , visited_at
-             , visited_at - (DENSE_RANK() OVER (PARTITION BY user_id ORDER BY visited_at))::int s
-          FROM user_visits
-      ), visits AS (
-        SELECT user_id
-             , MIN(visited_at) "start"
-             , DENSE_RANK() OVER (PARTITION BY user_id ORDER BY s) "rank"
-          FROM consecutive_visits
+    cv = <<~SQL
+      SELECT user_id, 
+             visited_at, 
+             date_add(visited_at, interval -dr day) AS s 
+        FROM (
+              SELECT t1.user_id, 
+                     t1.visited_at,
+                     @dense_rank := CASE 
+                                    WHEN @lag_part != t1.user_id THEN 1 
+                                    WHEN @lag_dense = t1.visited_at THEN @dense_rank 
+                                    ELSE @dense_rank + 1 
+                                    END AS dr,
+                     @lag_part := t1.user_id lag_part,
+                     @lag_dense := t1.visited_at lag_dense
+                FROM (SELECT * FROM user_visits t1 ORDER BY t1.user_id, t1.visited_at) t1,
+                     (SELECT @dense_rank := 1 , @lag_part := '' , @lag_dense := '' ) t2
+      ) AS consecutive_visits
+    SQL
+
+    groups = <<~SQL
+        SELECT user_id,
+               MIN(visited_at) AS start,
+               s
+          FROM (#{cv}) AS v
       GROUP BY user_id, s
         HAVING COUNT(*) >= #{days}
-      )
-      SELECT user_id
-           , "start" + interval '#{days} days' "granted_at"
-        FROM visits
-       WHERE "rank" = 1
+    SQL
+
+    visits = <<~SQL
+      SELECT t1.*,
+             @dense_rank := CASE 
+                            WHEN @lag_part != t1.user_id THEN 1 
+                            WHEN @lag_dense = t1.s THEN @dense_rank 
+                            ELSE @dense_rank + 1 
+                            END dr,
+             @lag_part := t1.user_id lag_part,
+             @lag_dense := t1.s lag_dense
+        FROM 
+      (SELECT * FROM (#{groups}) t1 ORDER BY t1.user_id, t1.s) t1,
+      (SELECT @dense_rank := 1 , @lag_part := '' , @lag_dense := '' ) t2
+    SQL
+
+    <<~SQL
+      SELECT user_id, 
+             start + interval #{days} day AS granted_at
+        FROM (#{visits}) AS g
+       WHERE dr = 1
     SQL
   end
-
 end
