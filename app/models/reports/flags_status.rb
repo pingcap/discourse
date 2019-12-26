@@ -74,12 +74,12 @@ Report.add_report("flags_status") do |report|
   pa.disagreed_by_id,
   pa.deferred_by_id,
   COALESCE(pa.disagreed_at, pa.agreed_at, pa.deferred_at) AS responded_at
-  FROM period_actions pa, staff_data sd, flagger_data fd, poster_data pd
+  FROM period_actions1 pa, staff_data sd, flagger_data fd, poster_data pd
   WHERE sd.id = pa.id AND fd.id = pa.id AND pd.id = pa.id
   SQL
 
   DB.exec(<<~SQL)
-    CREATE TEMPORARY TABLE IF NOT EXISTS period_actions AS (
+    CREATE TEMPORARY TABLE IF NOT EXISTS period_actions1 AS (
       SELECT id,
       post_action_type_id,
       created_at,
@@ -108,7 +108,7 @@ Report.add_report("flags_status") do |report|
       p.post_number as post_number,
       u.username_lower AS poster_username,
       u.uploaded_avatar_id AS poster_avatar_id
-      FROM period_actions pa
+      FROM period_actions1 pa
       JOIN posts p
       ON p.id = pa.post_id
       JOIN users u
@@ -122,7 +122,7 @@ Report.add_report("flags_status") do |report|
       u.id AS flagger_id,
       u.username_lower AS flagger_username,
       u.uploaded_avatar_id AS flagger_avatar_id
-      FROM period_actions pa
+      FROM period_actions1 pa
       JOIN users u
       ON u.id = pa.user_id
     )
@@ -134,7 +134,7 @@ Report.add_report("flags_status") do |report|
       u.id AS staff_id,
       u.username_lower AS staff_username,
       u.uploaded_avatar_id AS staff_avatar_id
-      FROM period_actions pa
+      FROM period_actions1 pa
       JOIN users u
       ON u.id = COALESCE(pa.agreed_by_id, pa.disagreed_by_id, pa.deferred_by_id)
     )

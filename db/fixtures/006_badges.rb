@@ -96,7 +96,6 @@ Badge.seed do |b|
   b.multiple_grant = false
   b.target_posts = true
   b.show_posts = true
-  # TODO Fix
   b.query = BadgeQueries::FirstLink
   b.default_badge_grouping_id = BadgeGrouping::GettingStarted
   b.trigger = Badge::Trigger::PostRevision

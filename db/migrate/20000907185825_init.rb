@@ -1275,8 +1275,6 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
       t.index ["topic_id", "name"], name: "index_topic_custom_fields_on_topic_id_and_name"
-      # TODO FIX
-      #t.index ["value", "name"], name: "topic_custom_fields_value_key_idx", where: "((value IS NOT NULL) AND (char_length(value) < 400))"
     end
 
     create_table "topic_embeds", force: :cascade do |t|

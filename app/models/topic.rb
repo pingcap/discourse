@@ -464,42 +464,53 @@ class Topic < ActiveRecord::Base
   MAX_SIMILAR_BODY_LENGTH ||= 200
 
   def self.similar_to(title, raw, user = nil)
-    return [] # TODO FIX
     raw = raw.presence || ""
 
     search_data = "#{title} #{raw[0...MAX_SIMILAR_BODY_LENGTH]}".strip
-    filter_words = Search.prepare_data(search_data)
-    ts_query = Search.ts_query(term: filter_words, joiner: "|")
-
+    
+    hits = Searchkick.search(
+      search_data, 
+      model: TopicSearchData, 
+      similar: true, 
+      fields: [:search_data],
+      per_page: SiteSetting.max_similar_results * 3
+    ).hits.map{|x| [x['_id'].to_i, x['_score']]}
+    ids = hits.map { |x| x[0] }
+    id_with_scores = hits.map do |hit|
+      %Q{SELECT #{hit[0]} AS _id, #{hit[1]} AS _score}
+    end.join(" UNION ")
+    id_with_scores = "SELECT 0 AS _id, 0 AS _score" if id_with_scores.blank?
     candidates = Topic
-      .visible
+    candidates = candidates.joins("left join (#{id_with_scores}) AS r ON r._id = topics.id")
+    candidates = candidates.visible
       .listable_topics
       .secured(Guardian.new(user))
       .joins("JOIN topic_search_data s ON topics.id = s.topic_id")
       .joins("LEFT JOIN categories c ON topics.id = c.topic_id")
-      .where("search_data @@ #{ts_query}")
       .where("c.topic_id IS NULL")
-      .order("ts_rank(search_data, #{ts_query}) DESC")
+      .where("topics.id" => ids)
+      .order("r._score DESC")
       .limit(SiteSetting.max_similar_results * 3)
-
+    
     candidate_ids = candidates.pluck(:id)
 
     return [] if candidate_ids.blank?
 
     similars = Topic
       .joins("JOIN posts AS p ON p.topic_id = topics.id AND p.post_number = 1")
+      .joins("left join (#{id_with_scores}) AS r ON r._id = topics.id")
       .where("topics.id IN (?)", candidate_ids)
-      .order("similarity DESC")
+      .order("r._score DESC")
       .limit(SiteSetting.max_similar_results)
 
     if raw.present?
       similars
-        .select(sanitize_sql_array(["topics.*, similarity(topics.title, :title) + similarity(p.raw, :raw) AS similarity, p.cooked AS blurb", title: title, raw: raw]))
-        .where("similarity(topics.title, :title) + similarity(p.raw, :raw) > 0.2", title: title, raw: raw)
+        .select(sanitize_sql_array(["topics.*, p.cooked AS blurb", title: title, raw: raw]))
+        .where("r._score > 8", title: title, raw: raw)
     else
       similars
-        .select(sanitize_sql_array(["topics.*, similarity(topics.title, :title) AS similarity, p.cooked AS blurb", title: title]))
-        .where("similarity(topics.title, :title) > 0.2", title: title)
+        .select(sanitize_sql_array(["topics.*, p.cooked AS blurb", title: title]))
+        .where("r._score > 8", title: title)
     end
   end
 
