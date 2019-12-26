@@ -11,11 +11,9 @@ class UserStat < ActiveRecord::Base
   end
 
   def self.update_first_unread(last_seen, limit: 10_000)
-    return # TODO FIX
     DB.exec(<<~SQL, min_date: last_seen, limit: limit, now: 10.minutes.ago)
       UPDATE user_stats us
-      SET first_unread_at = COALESCE(Y.min_date, :now)
-      FROM (
+      INNER JOIN (
         SELECT u1.id user_id,
            X.min min_date
         FROM users u1
@@ -28,16 +26,20 @@ class UserStat < ActiveRecord::Base
            JOIN user_stats AS us ON us.user_id = u.id
            JOIN user_options AS uo ON uo.user_id = u.id
            JOIN categories c ON c.id = topics.category_id
+           LEFT JOIN (SELECT c2.id AS cid, gu.user_id
+                     FROM categories c2
+                     JOIN category_groups cg ON cg.category_id = c2.id
+                     JOIN group_users gu ON cg.group_id = gu.group_id
+                     WHERE c2.read_restricted ) as cc ON cc.user_id = u.id and cc.cid = c.id
            WHERE u.id IN (
                SELECT id
                FROM users
                WHERE last_seen_at IS NOT NULL
                 AND last_seen_at > :min_date
                 ORDER BY last_seen_at DESC
-                LIMIT :limit
               )
              AND topics.archetype <> 'private_message'
-             AND (("topics"."deleted_at" IS NULL
+             AND ((topics.deleted_at IS NULL
                    AND tu.last_read_post_number < CASE
                                                       WHEN u.admin
                                                            OR u.moderator THEN topics.highest_staff_post_number
@@ -51,13 +53,7 @@ class UserStat < ActiveRecord::Base
              AND topics.deleted_at IS NULL
              AND (NOT c.read_restricted
                   OR u.admin
-                  OR category_id IN
-                    (SELECT c2.id
-                     FROM categories c2
-                     JOIN category_groups cg ON cg.category_id = c2.id
-                     JOIN group_users gu ON gu.user_id = u.id
-                     AND cg.group_id = gu.group_id
-                     WHERE c2.read_restricted ))
+                  OR cc.cid IS NOT NULL)
              AND NOT EXISTS
                (SELECT 1
                 FROM category_users cu
@@ -74,10 +70,10 @@ class UserStat < ActiveRecord::Base
              WHERE last_seen_at IS NOT NULL
               AND last_seen_at > :min_date
               ORDER BY last_seen_at DESC
-              LIMIT :limit
             )
       ) Y
-      WHERE Y.user_id = us.user_id
+      ON Y.user_id = us.user_id
+      SET us.first_unread_at = COALESCE(Y.min_date, :now)
     SQL
   end
 
