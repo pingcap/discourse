@@ -6,7 +6,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.boolean "active", null: false
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
-      t.index ["master_user_id"], name: "index_anonymous_users_on_master_user_id", unique: true, where: "active"
+      t.index ["master_user_id"], name: "index_anonymous_users_on_master_user_id", unique: true
       t.index ["user_id"], name: "index_anonymous_users_on_user_id", unique: true
     end
 
@@ -305,7 +305,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.string "bounce_key"
       t.boolean "bounced", default: false, null: false
       t.string "message_id"
-      t.index ["bounce_key"], name: "index_email_logs_on_bounce_key", unique: true, where: "(bounce_key IS NOT NULL)"
+      t.index ["bounce_key"], name: "index_email_logs_on_bounce_key", unique: true
       t.index ["bounced"], name: "index_email_logs_on_bounced"
       t.index ["created_at"], name: "index_email_logs_on_created_at", order: :desc
       t.index ["message_id"], name: "index_email_logs_on_message_id"
@@ -509,7 +509,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["error"], name: "index_incoming_emails_on_error", length: 100
       t.index ["message_id"], name: "index_incoming_emails_on_message_id", length: 100
       t.index ["post_id"], name: "index_incoming_emails_on_post_id"
-      t.index ["user_id"], name: "index_incoming_emails_on_user_id", where: "(user_id IS NOT NULL)"
+      t.index ["user_id"], name: "index_incoming_emails_on_user_id"
     end
 
     create_table "incoming_links", force: :cascade do |t|
@@ -604,9 +604,9 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "post_action_id"
       t.index ["post_action_id"], name: "index_notifications_on_post_action_id"
       t.index ["user_id", "created_at"], name: "index_notifications_on_user_id_and_created_at"
-      t.index ["user_id", "id", "read", "topic_id"], name: "index_notifications_on_read_or_n_type", unique: true, order: { id: :desc }, where: "(read OR (notification_type <> 6))"
-      t.index ["user_id", "id"], name: "index_notifications_on_user_id_and_id", unique: true, where: "((notification_type = 6) AND (NOT read))"
-      t.index ["user_id", "notification_type"], name: "idx_notifications_speedup_unread_count", where: "(NOT read)"
+      t.index ["user_id", "id", "read", "topic_id"], name: "index_notifications_on_read_or_n_type", unique: true, order: { id: :desc }
+      t.index ["user_id", "id"], name: "index_notifications_on_user_id_and_id", unique: true
+      t.index ["user_id", "notification_type"], name: "idx_notifications_speedup_unread_count"
       t.index ["user_id", "topic_id", "post_number"], name: "index_notifications_on_user_id_and_topic_id_and_post_number"
     end
 
@@ -691,11 +691,11 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "deferred_at"
       t.datetime "disagreed_at"
       t.integer "disagreed_by_id"
-      t.index ["post_action_type_id", "disagreed_at"], name: "index_post_actions_on_post_action_type_id_and_disagreed_at", where: "(disagreed_at IS NULL)"
+      t.index ["post_action_type_id", "disagreed_at"], name: "index_post_actions_on_post_action_type_id_and_disagreed_at"
       t.index ["post_id"], name: "index_post_actions_on_post_id"
-      t.index ["user_id", "post_action_type_id", "post_id", "targets_topic"], name: "idx_unique_actions", unique: true, where: "((deleted_at IS NULL) AND (disagreed_at IS NULL) AND (deferred_at IS NULL))"
-      t.index ["user_id", "post_action_type_id"], name: "index_post_actions_on_user_id_and_post_action_type_id", where: "(deleted_at IS NULL)"
-      t.index ["user_id", "post_id", "targets_topic"], name: "idx_unique_flags", unique: true, where: "((deleted_at IS NULL) AND (disagreed_at IS NULL) AND (deferred_at IS NULL) AND (post_action_type_id = ANY (ARRAY[3, 4, 7, 8])))"
+      t.index ["user_id", "post_action_type_id", "post_id", "targets_topic"], name: "idx_unique_actions", unique: true
+      t.index ["user_id", "post_action_type_id"], name: "index_post_actions_on_user_id_and_post_action_type_id"
+      t.index ["user_id", "post_id", "targets_topic"], name: "idx_unique_flags", unique: true
       t.index ["user_id"], name: "index_post_actions_on_user_id"
     end
 
@@ -708,14 +708,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.virtual "left_value_200", type: :string, as: "LEFT(value, 200)", stored: true
       t.index "name, left_value_200", name: "index_post_custom_fields_on_name_and_value"
       t.index ["post_id", "name"], name: "index_post_custom_fields_on_post_id_and_name"
-      t.index ["post_id"], name: "idx_post_custom_fields_akismet", where: "(((name) = 'AKISMET_STATE') AND (value = 'needs_review'))"
-      t.index ["post_id"], name: "index_post_custom_fields_on_notice_args", unique: true, where: "((name) = 'notice_args')"
-      t.index ["post_id"], name: "index_post_custom_fields_on_notice_type", unique: true, where: "((name) = 'notice_type')"
-      t.index ["post_id"], name: "index_post_custom_fields_on_post_id", unique: true, where: "((name) = 'missing uploads')"
-      t.index ["post_id"], name: "index_post_id_where_missing_uploads_ignored", unique: true, where: "((name)::text = 'missing uploads ignored')"
-      t.index ["post_id"], name: "post_custom_field_broken_images_idx", unique: true, where: "((name) = 'broken_images')"
-      t.index ["post_id"], name: "post_custom_field_downloaded_images_idx", unique: true, where: "((name) = 'downloaded_images')"
-      t.index ["post_id"], name: "post_custom_field_large_images_idx", unique: true, where: "((name) = 'large_images')"
+      t.index ["post_id"], name: "idx_post_custom_fields_akismet"
+      t.index ["post_id"], name: "index_post_custom_fields_on_notice_args", unique: true
+      t.index ["post_id"], name: "index_post_custom_fields_on_notice_type", unique: true
+      t.index ["post_id"], name: "index_post_custom_fields_on_post_id", unique: true
+      t.index ["post_id"], name: "index_post_id_where_missing_uploads_ignored", unique: true
+      t.index ["post_id"], name: "post_custom_field_broken_images_idx", unique: true
+      t.index ["post_id"], name: "post_custom_field_downloaded_images_idx", unique: true
+      t.index ["post_id"], name: "post_custom_field_large_images_idx", unique: true
     end
 
     create_table "post_details", force: :cascade do |t|
@@ -846,16 +846,16 @@ class Init < ActiveRecord::Migration[5.2]
       t.string "action_code"
       t.string "image_url"
       t.integer "locked_by_id"
-      t.index ["created_at", "topic_id"], name: "idx_posts_created_at_topic_id", where: "(deleted_at IS NULL)"
-      t.index ["id", "baked_version"], name: "index_posts_on_id_and_baked_version", order: { id: :desc }, where: "(deleted_at IS NULL)"
-      t.index ["id"], name: "index_for_rebake_old", order: :desc, where: "(((baked_version IS NULL) OR (baked_version < 2)) AND (deleted_at IS NULL))"
+      t.index ["created_at", "topic_id"], name: "idx_posts_created_at_topic_id"
+      t.index ["id", "baked_version"], name: "index_posts_on_id_and_baked_version", order: { id: :desc }
+      t.index ["id"], name: "index_for_rebake_old", order: :desc
       t.index ["reply_to_post_number"], name: "index_posts_on_reply_to_post_number"
       t.index ["topic_id", "percent_rank"], name: "index_posts_on_topic_id_and_percent_rank"
-      t.index ["topic_id", "post_number"], name: "idx_posts_deleted_posts", where: "(deleted_at IS NOT NULL)"
+      t.index ["topic_id", "post_number"], name: "idx_posts_deleted_posts"
       t.index ["topic_id", "post_number"], name: "index_posts_on_topic_id_and_post_number", unique: true
       t.index ["topic_id", "sort_order"], name: "index_posts_on_topic_id_and_sort_order"
       t.index ["user_id", "created_at"], name: "index_posts_on_user_id_and_created_at"
-      t.index ["user_id"], name: "idx_posts_user_id_deleted_at", where: "(deleted_at IS NULL)"
+      t.index ["user_id"], name: "idx_posts_user_id_deleted_at"
     end
 
     create_table "push_subscriptions", force: :cascade do |t|
@@ -1361,7 +1361,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "updated_at", null: false
       t.integer "category_id"
       t.boolean "public_type", default: true
-      t.index ["topic_id"], name: "idx_topic_id_public_type_deleted_at", unique: true, where: "((public_type = true) AND (deleted_at IS NULL))"
+      t.index ["topic_id"], name: "idx_topic_id_public_type_deleted_at", unique: true
       t.index ["user_id"], name: "index_topic_timers_on_user_id"
     end
 
@@ -1443,14 +1443,14 @@ class Init < ActiveRecord::Migration[5.2]
       t.float "reviewable_score", default: 0.0, null: false
       #t.index "lower((title)::text)", name: "index_topics_on_lower_title"
       t.index ["bumped_at"], name: "index_topics_on_bumped_at", order: :desc
-      t.index ["created_at", "visible"], name: "index_topics_on_created_at_and_visible", where: "((deleted_at IS NULL) AND ((archetype)::text <> 'private_message'::text))"
+      t.index ["created_at", "visible"], name: "index_topics_on_created_at_and_visible"
       t.index ["deleted_at", "visible", "archetype", "category_id", "id"], name: "idx_topics_front_page"
       t.index ["id", "deleted_at"], name: "index_topics_on_id_and_deleted_at"
-      t.index ["pinned_at"], name: "index_topics_on_pinned_at", where: "(pinned_at IS NOT NULL)"
-      t.index ["pinned_globally"], name: "index_topics_on_pinned_globally", where: "pinned_globally"
-      t.index ["slug"], name: "idxtopicslug", where: "((deleted_at IS NULL) AND (slug IS NOT NULL))"
-      t.index ["updated_at", "visible", "highest_staff_post_number", "highest_post_number", "category_id", "created_at", "id"], name: "index_topics_on_updated_at_public", where: "(((archetype)::text <> 'private_message'::text) AND (deleted_at IS NULL))"
-      t.index ["user_id"], name: "idx_topics_user_id_deleted_at", where: "(deleted_at IS NULL)"
+      t.index ["pinned_at"], name: "index_topics_on_pinned_at"
+      t.index ["pinned_globally"], name: "index_topics_on_pinned_globally"
+      t.index ["slug"], name: "idxtopicslug"
+      t.index ["updated_at", "visible", "highest_staff_post_number", "highest_post_number", "category_id", "created_at", "id"], name: "index_topics_on_updated_at_public"
+      t.index ["user_id"], name: "idx_topics_user_id_deleted_at"
     end
 
     create_table "translation_overrides", force: :cascade do |t|
@@ -1510,7 +1510,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.index ["action_type", "created_at"], name: "index_user_actions_on_action_type_and_created_at"
       t.index ["action_type", "user_id", "target_topic_id", "target_post_id", "acting_user_id"], name: "idx_unique_rows", unique: true
       t.index ["target_post_id"], name: "index_user_actions_on_target_post_id"
-      t.index ["target_user_id"], name: "index_user_actions_on_target_user_id", where: "(target_user_id IS NOT NULL)"
+      t.index ["target_user_id"], name: "index_user_actions_on_target_user_id"
       t.index ["user_id", "action_type"], name: "index_user_actions_on_user_id_and_action_type"
       t.index ["user_id", "created_at", "action_type"], name: "idx_user_actions_speed_up_user_all"
     end
@@ -1603,8 +1603,8 @@ class Init < ActiveRecord::Migration[5.2]
       t.integer "post_id"
       t.integer "notification_id"
       t.integer "seq", default: 0, null: false
-      t.index ["badge_id", "user_id", "post_id"], name: "index_user_badges_on_badge_id_and_user_id_and_post_id", unique: true, where: "(post_id IS NOT NULL)"
-      t.index ["badge_id", "user_id", "seq"], name: "index_user_badges_on_badge_id_and_user_id_and_seq", unique: true, where: "(post_id IS NULL)"
+      t.index ["badge_id", "user_id", "post_id"], name: "index_user_badges_on_badge_id_and_user_id_and_post_id", unique: true
+      t.index ["badge_id", "user_id", "seq"], name: "index_user_badges_on_badge_id_and_user_id_and_seq", unique: true
       t.index ["badge_id", "user_id"], name: "index_user_badges_on_badge_id_and_user_id"
       t.index ["user_id"], name: "index_user_badges_on_user_id"
     end
@@ -1627,7 +1627,7 @@ class Init < ActiveRecord::Migration[5.2]
       t.virtual "lower_email", type: :string, as: "LOWER(email)", stored: true
       t.index "lower_email", unique: true
       t.index "email", name: "index_user_emails_on_email", unique: true
-      t.index ["user_id", "primary"], name: "index_user_emails_on_user_id_and_primary", unique: true, where: "\"primary\""
+      t.index ["user_id", "primary"], name: "index_user_emails_on_user_id_and_primary", unique: true
       t.index ["user_id"], name: "index_user_emails_on_user_id"
     end
 
@@ -1865,8 +1865,8 @@ class Init < ActiveRecord::Migration[5.2]
       t.datetime "silenced_till"
       t.integer "group_locked_trust_level"
       t.integer "manual_locked_trust_level"
-      t.index ["id"], name: "idx_users_admin", where: "admin"
-      t.index ["id"], name: "idx_users_moderator", where: "moderator"
+      t.index ["id"], name: "idx_users_admin"
+      t.index ["id"], name: "idx_users_moderator"
       t.index ["last_posted_at"], name: "index_users_on_last_posted_at"
       t.index ["last_seen_at"], name: "index_users_on_last_seen_at"
       t.index ["uploaded_avatar_id"], name: "index_users_on_uploaded_avatar_id"
