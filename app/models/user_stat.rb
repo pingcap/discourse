@@ -32,11 +32,14 @@ class UserStat < ActiveRecord::Base
                      JOIN group_users gu ON cg.group_id = gu.group_id
                      WHERE c2.read_restricted ) as cc ON cc.user_id = u.id and cc.cid = c.id
            WHERE u.id IN (
-               SELECT id
-               FROM users
-               WHERE last_seen_at IS NOT NULL
-                AND last_seen_at > :min_date
-                ORDER BY last_seen_at DESC
+               SELECT id FROM (
+                 SELECT id
+                 FROM users
+                 WHERE last_seen_at IS NOT NULL
+                  AND last_seen_at > :min_date
+                  ORDER BY last_seen_at DESC
+                  LIMIT :limit
+               ) l1
               )
              AND topics.archetype <> 'private_message'
              AND ((topics.deleted_at IS NULL
@@ -65,11 +68,14 @@ class UserStat < ActiveRecord::Base
                     u.username) AS X ON X.user_id = u1.id
         WHERE u1.id IN
             (
-             SELECT id
-             FROM users
-             WHERE last_seen_at IS NOT NULL
-              AND last_seen_at > :min_date
-              ORDER BY last_seen_at DESC
+              SELECT id FROM (
+               SELECT id
+               FROM users
+               WHERE last_seen_at IS NOT NULL
+                AND last_seen_at > :min_date
+                ORDER BY last_seen_at DESC
+                LIMIT :limit
+              ) l2
             )
       ) Y
       ON Y.user_id = us.user_id
