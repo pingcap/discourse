@@ -255,9 +255,9 @@ class TopicUser < ActiveRecord::Base
             INNER JOIN users u ON u.id = :user_id
             INNER JOIN user_options uo ON uo.user_id = :user_id
         SET
-          topic_users.last_read_post_number = GREATEST(:post_number, tu.last_read_post_number),
+          topic_users.last_read_post_number = GREATEST(:post_number, COALESCE(tu.last_read_post_number, 0)),
           topic_users.highest_seen_post_number = t.highest_post_number,
-          topic_users.total_msecs_viewed = LEAST(tu.total_msecs_viewed + :msecs,86400000),
+          topic_users.total_msecs_viewed = LEAST(tu.total_msecs_viewed + :msecs, 86400000),
           topic_users.notification_level =
              CASE WHEN tu.notifications_reason_id IS NULL AND (tu.total_msecs_viewed + :msecs) >
                 coalesce(uo.auto_track_topics_after_msecs,:threshold) AND
