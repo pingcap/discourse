@@ -818,7 +818,7 @@ class Search
   end
 
   def wrap_rows(query)
-    "SELECT *, 1 row_number FROM (#{query.to_sql}) xxx"
+    "SELECT *, 1 `row_number` FROM (#{query.to_sql}) xxx"
   end
 
   def aggregate_post_sql(opts)
