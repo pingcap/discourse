@@ -23,8 +23,9 @@ class TopicViewItem < ActiveRecord::Base
 
       TopicViewItem.transaction do
         # this is called real frequently, working hard to avoid exceptions
+        # TiDB issue: https://github.com/pingcap/tidb/issues/14297
         sql = "INSERT INTO topic_views (topic_id, ip_address, viewed_at, user_id)
-               SELECT :topic_id, :ip_address, :viewed_at, :user_id
+               SELECT :topic_id, :ip_address, :viewed_at, :user_id FROM dual
                WHERE NOT EXISTS (
                  SELECT 1 FROM topic_views
                  /*where*/

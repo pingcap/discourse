@@ -49,7 +49,7 @@ class TopicFeaturedUsers
       SELECT t1.id,
              t1.user_id,
              t1.last_post_date,
-         @row_number := CASE WHEN @temp = t1.id THEN @row_number + 1 ELSE 1 END rank,
+         @row_number := CASE WHEN @temp = t1.id THEN @row_number + 1 ELSE 1 END `rank`,
          @temp := t1.id tmp
       FROM 
       (SELECT * FROM (#{init}) t1 ORDER BY t1.id, t1.count DESC, t1.last_post_date DESC) t1,
