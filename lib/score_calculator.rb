@@ -60,7 +60,7 @@ class ScoreCalculator
              SELECT posts.id, Y.percent_rank
                FROM posts
               JOIN (
-                SELECT id, case when c = 1 then 1 else (`rank` -1)/(c - 1) end as percent_rank
+                SELECT id, case when c = 1 then 1 else (`rank` -1)/(c - 1) end as `percent_rank`
                   FROM (select posts.id,posts.topic_id, 
                                posts.score, count(lesser.id) + 1 as `rank`
                           from posts 
