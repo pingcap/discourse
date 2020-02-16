@@ -14,12 +14,12 @@ module Jobs
         WHERE id IN (
           SELECT ranked_requests.id
             FROM (
-                  SELECT @r := @r + 1 as row_number, id
+                  SELECT @r := @r + 1 as `row_number`, id
                     FROM web_crawler_requests, (SELECT @r := 0) t
                    WHERE date = '#{1.day.ago.strftime("%Y-%m-%d")}'
                 ORDER BY count DESC
             ) ranked_requests
-           WHERE row_number > #{WebCrawlerRequest.max_records_per_day}
+           WHERE `row_number` > #{WebCrawlerRequest.max_records_per_day}
         )
       SQL
     end

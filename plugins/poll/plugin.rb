@@ -194,7 +194,7 @@ after_initialize do
               FROM (
                 SELECT digest, 
                        user_id, 
-                       @row_number:=CASE WHEN @poll_option_id=poll_option_id THEN @row_number+1 ELSE 1 END AS row,
+                       @row_number:=CASE WHEN @poll_option_id=poll_option_id THEN @row_number+1 ELSE 1 END AS `row`,
                        @poll_option_id:=poll_option_id
                   FROM (
                     SELECT digest
@@ -208,7 +208,7 @@ after_initialize do
                   ) v, (SELECT @row_number:=0,@poll_option_id:='') AS t
                   ORDER BY poll_option_id, created_at
             ) vv
-            WHERE row BETWEEN #{offset} AND #{offset + limit}
+            WHERE `row` BETWEEN #{offset} AND #{offset + limit}
           SQL
 
           user_ids = votes.map(&:user_id).uniq

@@ -108,18 +108,18 @@ class Group < ActiveRecord::Base
     unless user&.admin
       sql = <<~SQL
         groups.id IN (
-          SELECT g.id FROM groups g WHERE g.visibility_level = :public
+          SELECT g.id FROM `groups` g WHERE g.visibility_level = :public
 
           UNION ALL
 
-          SELECT g.id FROM groups g
+          SELECT g.id FROM `groups` g
           JOIN group_users gu ON gu.group_id = g.id AND
                                  gu.user_id = :user_id
           WHERE g.visibility_level = :members
 
           UNION ALL
 
-          SELECT g.id FROM groups g
+          SELECT g.id FROM `groups` g
           LEFT JOIN group_users gu ON gu.group_id = g.id AND
                                  gu.user_id = :user_id AND
                                  gu.owner
@@ -127,7 +127,7 @@ class Group < ActiveRecord::Base
 
           UNION ALL
 
-          SELECT g.id FROM groups g
+          SELECT g.id FROM `groups` g
           JOIN group_users gu ON gu.group_id = g.id AND
                                  gu.user_id = :user_id AND
                                  gu.owner
@@ -381,7 +381,7 @@ class Group < ActiveRecord::Base
 
   def self.reset_all_counters!
     DB.exec <<-SQL
-      UPDATE groups
+      UPDATE `groups`
         JOIN (SELECT group_id
                , COUNT(user_id) users
             FROM group_users
@@ -399,7 +399,7 @@ class Group < ActiveRecord::Base
 
   def self.refresh_has_messages!
     DB.exec <<-SQL
-      UPDATE groups g SET has_messages = false
+      UPDATE `groups` g SET has_messages = false
       WHERE NOT EXISTS (SELECT tg.id
                           FROM topic_allowed_groups tg
                     INNER JOIN topics t ON t.id = tg.topic_id
@@ -588,7 +588,7 @@ class Group < ActiveRecord::Base
 
       # update group user count
       DB.exec <<~SQL
-        UPDATE groups g
+        UPDATE `groups` g
         SET user_count =
           (SELECT COUNT(gu.user_id)
            FROM group_users gu

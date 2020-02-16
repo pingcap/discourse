@@ -553,7 +553,7 @@ class TopicQuery
               OR #{user.staff?}
             )
           )
-          AND group_id IN (SELECT id FROM groups WHERE LOWER(name) like ?)
+          AND group_id IN (SELECT id FROM `groups` WHERE LOWER(name) like ?)
         )",
         @options[:group_name].downcase
       )

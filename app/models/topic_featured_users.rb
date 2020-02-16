@@ -49,11 +49,11 @@ class TopicFeaturedUsers
       SELECT t1.id,
              t1.user_id,
              t1.last_post_date,
-         @row_number := CASE WHEN @temp = t1.id THEN @row_number + 1 ELSE 1 END rank,
+         @row_number := CASE WHEN @temp = t1.id THEN @row_number + 1 ELSE 1 END `rank`,
          @temp := t1.id tmp
       FROM 
       (SELECT * FROM (#{init}) t1 ORDER BY t1.id, t1.count DESC, t1.last_post_date DESC) t1,
-      (SELECT @row_number := 1 row_number, @temp := '' temp) t2
+      (SELECT @row_number := 1 `row_number`, @temp := '' temp) t2
     SQL
 
     cte2 = <<~SQL
@@ -62,8 +62,8 @@ class TopicFeaturedUsers
          @row_number := CASE WHEN @temp = tt1.id THEN @row_number + 1 ELSE 1 END rank2,
          @temp := tt1.id tmp
       FROM 
-      (SELECT * FROM (#{cte}) tt1 WHERE rank <= #{count} ORDER BY tt1.id, last_post_date ASC) tt1,
-      (SELECT @row_number := 1 row_number, @temp := '' temp) tt2
+      (SELECT * FROM (#{cte}) tt1 WHERE `rank` <= #{count} ORDER BY tt1.id, last_post_date ASC) tt1,
+      (SELECT @row_number := 1 `row_number`, @temp := '' temp) tt2
     SQL
 
     sql = <<~SQL
