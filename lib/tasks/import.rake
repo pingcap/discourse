@@ -414,7 +414,7 @@ def update_groups
           FROM group_users
       GROUP BY group_id
     )
-    UPDATE groups
+    UPDATE `groups`
        SET user_count = X.count
       FROM X
      WHERE id = X.group_id

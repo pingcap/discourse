@@ -15,7 +15,7 @@ class PostRevision < ActiveRecord::Base
     DB.exec <<-SQL
       UPDATE post_revisions
         JOIN (
-              SELECT id, @row_number:=CASE WHEN @post_id=post_id THEN @row_number+1 ELSE 1 END AS rank,
+              SELECT id, @row_number:=CASE WHEN @post_id=post_id THEN @row_number+1 ELSE 1 END AS `rank`,
                      @post_id:=post_id 
               FROM post_revisions, (SELECT @row_number:=0,@post_id:='') AS t 
               ORDER BY  post_id, number, created_at, updated_at
