@@ -21,7 +21,7 @@ class UserProfileView < ActiveRecord::Base
 
       self.transaction do
         sql = "INSERT INTO user_profile_views (user_profile_id, ip_address, viewed_at, user_id)
-               SELECT :user_profile_id, :ip_address, :viewed_at, :user_id
+               SELECT :user_profile_id, :ip_address, :viewed_at, :user_id FROM DUAL
                WHERE NOT EXISTS (
                   SELECT 1 FROM user_profile_views
                   /*where*/
