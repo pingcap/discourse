@@ -812,7 +812,7 @@ class Search
   def categories_ignored(posts)
     posts.where(<<~SQL, Searchable::PRIORITIES[:ignore])
     categories.id NOT IN (
-      SELECT categories.id WHERE categories.search_priority = ?
+      SELECT categories.id FROM DUAL WHERE categories.search_priority = ?
     )
     SQL
   end
@@ -852,7 +852,7 @@ class Search
 
     posts_eager_loads(Post)
       .joins("JOIN (#{post_sql}) x ON x.id = posts.topic_id AND x.post_number = posts.post_number")
-      .order('row_number')
+      .order('`row_number`')
   end
 
   def aggregate_search(opts = {})
