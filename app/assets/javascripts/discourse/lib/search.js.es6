@@ -145,7 +145,7 @@ export function searchForTerm(term, opts) {
     };
   }
 
-  let promise = ajax("/search/query", { data: data });
+  let promise = ajax("https://search.asktug.com/api/search", { data: { q: term} });
 
   promise.then(results => {
     return translateResults(results, opts);

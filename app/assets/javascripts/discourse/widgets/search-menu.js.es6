@@ -97,7 +97,7 @@ export default createWidget("search-menu", {
     const ctx = contextEnabled ? this.searchContext() : null;
     const type = ctx ? Ember.get(ctx, "type") : null;
 
-    let url = "/search";
+    let url = "https://search.astug.com";
     const params = [];
 
     if (searchData.term) {
