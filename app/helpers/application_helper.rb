@@ -279,7 +279,7 @@ module ApplicationHelper
       url: Discourse.base_url,
       potentialAction: {
         '@type' => 'SearchAction',
-        target: "#{Discourse.base_url}/search?q={search_term_string}",
+        target: "https://search.asktug.com/?q={search_term_string}",
         'query-input' => 'required name=search_term_string',
       }
     }
