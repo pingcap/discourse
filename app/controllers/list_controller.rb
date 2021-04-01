@@ -417,7 +417,15 @@ class ListController < ApplicationController
     url = if action == :prev
       public_send(method, opts.merge(prev_page_params(opts)))
     else # :next
-      public_send(method, opts.merge(next_page_params(opts)))
+      if method == "topics_private_messages_path"
+        # 因为 Discourse 在处理这个 URL 的时候对中文进行了多次编码
+        # 详细问题参考 https://community-product.atlassian.net/secure/RapidBoard.jspa?rapidView=1&projectKey=CPT&modal=detail&selectedIssue=CPT-65
+        # 抱歉，因为我对 Ruby 不熟悉，只能先解决问题 # TODO
+        opts2 = opts.merge(next_page_params(opts))
+        "/topics/private-messages/#{opts2[:username]}?page=#{opts2[:page]}"
+      else
+         public_send(method, opts.merge(next_page_params(opts)))
+      end
     end
     url.sub('.json?', '?')
   end
