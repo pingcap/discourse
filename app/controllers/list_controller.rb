@@ -423,6 +423,9 @@ class ListController < ApplicationController
         # 抱歉，因为我对 Ruby 不熟悉，只能先解决问题 # TODO
         opts2 = opts.merge(next_page_params(opts))
         "/topics/private-messages/#{opts2[:username]}?page=#{opts2[:page]}"
+      elsif method == "topics_private_messages_sent_path"
+        opts2 = opts.merge(next_page_params(opts))
+        "/topics/private-messages-sent/#{opts2[:username]}?page=#{opts2[:page]}"
       else
          public_send(method, opts.merge(next_page_params(opts)))
       end
