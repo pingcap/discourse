@@ -14,5 +14,12 @@ module HasSearchData
         search_data: read_attribute(:search_data)
       }
     end
+
+    # The length of a single piece of data allowed by ElasticSearch is 32766 bytes
+    # Just skip the big post
+    def should_index?
+      search_data.to_s.bytes.size < 32766
+    end
+
   end
 end
