@@ -174,11 +174,13 @@ class PostsController < ApplicationController
     @manager_params = create_params
     @manager_params[:first_post_checks] = !is_api?
 
-    # if send msg to group, then create post async, mock response result.
-    # TODO fix page missing when async job performed long time.
-    if @manager_params[:target_group_names].present?
+    # The asynchronous process is triggered when the target user is greater than 600, 
+    # because after the asynchronous process is used, the page may get 404, try to reduce
+    if @manager_params[:target_group_names].present? && Group.where(name: @manager_params[:target_group_names].split(",")).map{|x| x.users}.flatten.size > 600
       result = NewPostResult.new(:created_post, true)
       manager = Jobs::AsyncNewPostManager.new.execute(current_user, @manager_params)
+      sleep 8
+      result.post= current_user.posts.last
       json = serialize_data(result, NewPostResultSerializer, root: false)
       backwards_compatible_json(json, result.success?)
     else
