@@ -174,20 +174,29 @@ class PostsController < ApplicationController
     @manager_params = create_params
     @manager_params[:first_post_checks] = !is_api?
 
-    manager = NewPostManager.new(current_user, @manager_params)
-
-    if is_api?
-      memoized_payload = DistributedMemoizer.memoize(signature_for(@manager_params), 120) do
-        result = manager.perform
-        MultiJson.dump(serialize_data(result, NewPostResultSerializer, root: false))
-      end
-
-      parsed_payload = JSON.parse(memoized_payload)
-      backwards_compatible_json(parsed_payload, parsed_payload['success'])
-    else
-      result = manager.perform
+    # if send msg to group, then create post async, mock response result.
+    # TODO fix page missing when async job performed long time.
+    if @manager_params[:target_group_names].present?
+      result = NewPostResult.new(:created_post, true)
+      manager = Jobs::AsyncNewPostManager.new.execute(current_user, @manager_params)
       json = serialize_data(result, NewPostResultSerializer, root: false)
       backwards_compatible_json(json, result.success?)
+    else
+      manager = NewPostManager.new(current_user, @manager_params)
+
+      if is_api?
+        memoized_payload = DistributedMemoizer.memoize(signature_for(@manager_params), 120) do
+          result = manager.perform
+          MultiJson.dump(serialize_data(result, NewPostResultSerializer, root: false))
+        end
+
+        parsed_payload = JSON.parse(memoized_payload)
+        backwards_compatible_json(parsed_payload, parsed_payload['success'])
+      else
+        result = manager.perform
+        json = serialize_data(result, NewPostResultSerializer, root: false)
+        backwards_compatible_json(json, result.success?)
+      end
     end
   end
 
