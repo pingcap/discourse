@@ -178,8 +178,8 @@ class PostsController < ApplicationController
     # because after the asynchronous process is used, the page may get 404, try to reduce
     if @manager_params[:target_group_names].present? && Group.where(name: @manager_params[:target_group_names].split(",")).map{|x| x.users}.flatten.size > 600
       result = NewPostResult.new(:created_post, true)
-      manager = AsyncNewPost.perform_async(current_user.id, @manager_params)
-      
+      manager = Jobs::AsyncNewPostManager.new.execute(current_user, @manager_params)
+      sleep 8
       result.post= current_user.posts.last
       json = serialize_data(result, NewPostResultSerializer, root: false)
       backwards_compatible_json(json, result.success?)
