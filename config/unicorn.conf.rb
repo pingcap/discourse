@@ -35,7 +35,7 @@ else
   stderr_path "#{discourse_path}/log/unicorn.stderr.log"
   stdout_path "#{discourse_path}/log/unicorn.stdout.log"
   # nuke workers after 30 seconds instead of 60 seconds (the default)
-  timeout 30
+  timeout 3000
 end
 
 # important for Ruby 2.0
