@@ -99,6 +99,9 @@ GEM
     capistrano-sidekiq (1.0.3)
       capistrano (>= 3.9.0)
       sidekiq (>= 3.4, < 6.0)
+    capistrano-unicorn-nginx (3.3.2)
+      capistrano (>= 3.1)
+      sshkit (>= 1.2.0)
     capistrano-yarn (2.0.2)
       capistrano (~> 3.0)
     certified (1.0.0)
@@ -487,6 +490,7 @@ DEPENDENCIES
   capistrano (~> 3.14.1)
   capistrano-rails (~> 1.1)
   capistrano-sidekiq (~> 1.0)
+  capistrano-unicorn-nginx (= 3.3.2)
   capistrano-yarn
   certified
   colored2

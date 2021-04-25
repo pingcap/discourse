@@ -155,6 +155,7 @@ group :development do
   gem "capistrano-rails", "~> 1.1"
   gem "capistrano-yarn", require: false
   gem "capistrano-sidekiq", "~> 1.0", require: false
+  gem 'capistrano-unicorn-nginx', '3.3.2'
 
   # waiting on 2.7.5 per: https://github.com/ctran/annotate_models/pull/595
   if rails_master?
