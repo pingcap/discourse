@@ -8,7 +8,7 @@ template = <<~HBS
   {{testing value="hello"}}
 HBS
 
-ctx = MiniRacer::Context.new(timeout: 15000)
+ctx = MiniRacer::Context.new(timeout: (ENV['COMPILE_TIMEOUT'] || 15000).to_i)
 ctx.eval("var self = this; #{File.read("#{Rails.root}/vendor/assets/javascripts/babel.js")}")
 ctx.eval(File.read(Ember::Source.bundled_path_for('ember-template-compiler.js')))
 ctx.eval("module = {}; exports = {};")
