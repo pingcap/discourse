@@ -413,9 +413,6 @@ class TopicQuery
     per_page = options[:per_page] || per_page_setting
     limit = per_page unless options[:limit] == false
     page = options[:page].to_i
-    Rails.logger.warn "pinned"
-    Rails.logger.warn "pinned -> #{pinned_topics.to_a.map{|x| x.id}}"
-    Rails.logger.warn pinned_topics.to_sql
 
     if page == 0
       (pinned_topics + unpinned_topics)[0...limit] if limit
@@ -439,7 +436,6 @@ class TopicQuery
     end
 
     topics = topics.to_a
-
 
     if options[:preload_posters]
       user_ids = []
