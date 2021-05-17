@@ -672,7 +672,7 @@ zh_CN:
         normal_option_title: "如果用户回复、引用或提到你，你将会收到消息。"
       activity_stream: "活动"
       preferences: "设置"
-      profile_hidden: "此用户公共信息已被影藏"
+      profile_hidden: "此用户公共信息已被隐藏"
       expand_profile: "展开"
       collapse_profile: "折叠"
       bookmarks: "收藏"
