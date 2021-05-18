@@ -302,7 +302,7 @@ zh_CN:
       admins: "管理面板"
       moderators: "版主"
       staff: "管理人员"
-      trust_level_0: "信任等级0"
+      trust_level_0: "所有人"
       trust_level_1: "信任等级1"
       trust_level_2: "信任等级2"
       trust_level_3: "信任等级3"
