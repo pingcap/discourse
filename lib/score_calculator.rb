@@ -43,7 +43,7 @@ class ScoreCalculator
         SET p.score = x.score
     SQL
 
-    builder.where("posts.score IS NULL OR posts.score <> #{components}", @weightings)
+    builder.where("posts.score IS NULL OR ABS(#{components} - posts.score) > 1e-5 ", @weightings)
 
     filter_topics(builder, opts)
 
@@ -77,7 +77,7 @@ class ScoreCalculator
       SET posts.percent_rank = X.percent_rank
     SQL
 
-    builder.where("posts.percent_rank IS NULL OR Y.percent_rank <> posts.percent_rank")
+    builder.where("posts.percent_rank IS NULL OR ABS(Y.percent_rank - posts.percent_rank) > 1e-5 ")
 
     filter_topics(builder, opts)
 
