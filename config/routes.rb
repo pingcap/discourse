@@ -77,9 +77,9 @@ Discourse::Application.routes.draw do
       end
     end
 
-    get "reports" => "reports#index"
-    get "reports/bulk" => "reports#bulk"
-    get "reports/:type" => "reports#show"
+    get "reports" => "reports#index", constraints: AdminConstraint.new
+    get "reports/bulk" => "reports#bulk", constraints: AdminConstraint.new
+    get "reports/:type" => "reports#show", constraints: AdminConstraint.new
 
     resources :groups, constraints: AdminConstraint.new do
       collection do
