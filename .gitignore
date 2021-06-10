@@ -127,3 +127,5 @@ vendor/bundle/*
 
 # Vagrant
 .vagrant
+
+/plugins/discourse-topic-enhancement

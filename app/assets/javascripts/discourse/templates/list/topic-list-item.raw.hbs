@@ -19,7 +19,10 @@
     {{~#if topic.featured_link}}
     {{~topic-featured-link topic}}
     {{~/if}}
-    {{~raw-plugin-outlet name="topic-list-after-title"}}
+    {{plugin-outlet name="topic-list-after-title" args=(hash topic=topic)}}
+    {{~#if topic.is_enhancement}}
+    <b class="enhancement-badge">enhancement<b>
+    {{~/if}}
     {{~#if showTopicPostBadges}}
     {{~raw "topic-post-badges" unread=topic.unread newPosts=topic.displayNewPosts unseen=topic.unseen url=topic.lastUnreadUrl newDotText=newDotText}}
     {{~/if}}
