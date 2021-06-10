@@ -19,7 +19,7 @@
     {{~#if topic.featured_link}}
     {{~topic-featured-link topic}}
     {{~/if}}
-    {{plugin-outlet name="topic-list-after-title" args=(hash topic=topic)}}
+    {{~raw-plugin-outlet name="topic-list-after-title"}}
     {{~#if topic.is_enhancement}}
     <b class="enhancement-badge">enhancement<b>
     {{~/if}}
