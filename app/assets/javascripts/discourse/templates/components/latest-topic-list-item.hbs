@@ -9,6 +9,9 @@
     {{topic-link topic}}
     {{#if topic.featured_link}}
       {{topic-featured-link topic}}
+    {{/if}} 
+    {{#if topic.is_enhancement}}
+      <span class="enhancement-badge">Enhancement</span>
     {{/if}}
     {{topic-post-badges newPosts=topic.totalUnread unseen=topic.unseen url=topic.lastUnreadUrl}}
   </div>
