@@ -21,7 +21,7 @@
     {{~/if}}
     {{~raw-plugin-outlet name="topic-list-after-title"}}
     {{~#if topic.is_enhancement}}
-    {{~tc-urgent-badge}}
+    {{~raw "components/tc-urgent-badge"}}
     {{~/if}}
     {{~#if showTopicPostBadges}}
     {{~raw "topic-post-badges" unread=topic.unread newPosts=topic.displayNewPosts unseen=topic.unseen url=topic.lastUnreadUrl newDotText=newDotText}}
