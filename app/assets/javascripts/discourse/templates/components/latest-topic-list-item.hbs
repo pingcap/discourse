@@ -11,7 +11,7 @@
       {{topic-featured-link topic}}
     {{/if}} 
     {{#if topic.is_enhancement}}
-      <b data-html-tooltip="<b>tip</b>" class="enhancement-badge">已加急</b>
+      {{tc-urgent-badge}}
     {{/if}}
     {{topic-post-badges newPosts=topic.totalUnread unseen=topic.unseen url=topic.lastUnreadUrl}}
   </div>

@@ -1,0 +1,23 @@
+/*
+ * The `tc-` prefix represents `tidb-community` preventing style pollution.
+ */
+
+/*
+ * Topic badges are shown after topic's title
+ */
+.tc-topic-badge {
+    display: inline-block;
+    padding: 2px 6px;
+
+    font-size: $font-up-2;
+
+    border: 1px;
+    border-radius: 2px;
+    border-color: currentColor;
+
+    &-red {
+        color: #cf1322;
+        background: #fff1f0;
+        border-color: #ffa39e;
+    }
+}

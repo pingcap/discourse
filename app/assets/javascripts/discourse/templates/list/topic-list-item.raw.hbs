@@ -21,7 +21,7 @@
     {{~/if}}
     {{~raw-plugin-outlet name="topic-list-after-title"}}
     {{~#if topic.is_enhancement}}
-    <b data-html-tooltip="<b>tip</b>" class="enhancement-badge">已加急<b>
+    {{~tc-urgent-badge}}
     {{~/if}}
     {{~#if showTopicPostBadges}}
     {{~raw "topic-post-badges" unread=topic.unread newPosts=topic.displayNewPosts unseen=topic.unseen url=topic.lastUnreadUrl newDotText=newDotText}}
