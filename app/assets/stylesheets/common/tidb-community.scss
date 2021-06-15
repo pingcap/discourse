@@ -22,3 +22,14 @@
         border-color: #ffa39e;
     }
 }
+
+/*
+ * Some common overwrites for tidb community content.
+ */
+.tc-content {
+    a {
+        color: #354ede;
+        text-decoration: none;
+        cursor: pointer;
+    }
+}

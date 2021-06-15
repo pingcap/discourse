@@ -21,7 +21,7 @@
     {{~/if}}
     {{~raw-plugin-outlet name="topic-list-after-title"}}
     {{~#if topic.is_enhancement}}
-    <span class="tc-topic-badge tc-topic-badge-red" data-html-tooltip="<span class='tc-tooltip'>完成团队认证，解锁加急功能</span>">已加急</span>
+    <span class="tc-topic-badge tc-topic-badge-red" data-html-tooltip="<span class='tc-content'>完成<a href='https://tidb.io/account/organization/new' target='_blank' rel='noreferrer'>团队认证</a>，解锁加急功能</span>">已加急</span>
     {{~/if}}
     {{~#if showTopicPostBadges}}
     {{~raw "topic-post-badges" unread=topic.unread newPosts=topic.displayNewPosts unseen=topic.unseen url=topic.lastUnreadUrl newDotText=newDotText}}
