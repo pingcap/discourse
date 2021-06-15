@@ -16,13 +16,27 @@ const D_ARROW_HEIGHT = 10;
 
 const D_HORIZONTAL_MARGIN = 5;
 
+const D_HIDE_TIMEOUT = 200;
+
 export const POPOVER_SELECTORS =
   "[data-html-popover], [data-html-tooltip], [data-popover], [data-tooltip]";
 
-export function hidePopover() {
-  getPopover()
+// assure not dismiss instantly after `mouseleave` triggered on target element.
+// only trigger when mouse leave target element and popover element or timeout.
+let hideTimmer = undefined;
+
+export function hidePopover(event, timeout = false) {
+  clearTimeout(hideTimmer);
+
+  if (timeout) {
+    hideTimmer = setTimeout(() => {
+      hidePopover(event, false);
+    }, D_HIDE_TIMEOUT);
+  } else {
+    getPopover()
     .fadeOut()
     .remove();
+  }
 
   return getPopover();
 }
@@ -50,6 +64,8 @@ export function showPopover(event, options = {}) {
   getPopover().fadeIn();
 
   positionPopover($enteredElement);
+
+  bindEvents();
 
   return {
     html: content => replaceHtmlContent($enteredElement, content),
@@ -171,6 +187,12 @@ function positionPopover($element) {
     arrowPosition = targetRect.left - popoverRect.left + targetRect.width / 2;
   }
   $popover.find(".d-popover-arrow").css("left", arrowPosition);
+}
+
+function bindEvents() {
+  getPopover()
+    .on('mouseenter', () => clearTimeout(hideTimmer))
+    .on('mouseleave', e => hidePopover(e, true));
 }
 
 function isRetina() {
