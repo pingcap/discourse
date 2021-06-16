@@ -1,5 +1,4 @@
 $d-popover-background: #000000bf;
-$d-popover-border: none;
 
 @-webkit-keyframes popoverFadeIn {
   from {
@@ -23,9 +22,6 @@ $d-popover-border: none;
   background-color: $d-popover-background;
   position: absolute;
   z-index: z("modal", "tooltip");
-  border-color: $d-popover-border;
-  border-style: solid;
-  border-width: 1px;
   max-width: 300px;
   -webkit-animation: popoverFadeIn 0.5s;
   animation: popoverFadeIn 0.5s;
@@ -82,7 +78,7 @@ $d-popover-border: none;
   .d-popover-top-arrow {
     border-color: transparent transparent $d-popover-border;
     top: 8px;
-    transform: translate(0, -15px);
+    transform: translate(0, -16px);
     border-width: 0 8px 8px;
 
     &:after {
