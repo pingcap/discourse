@@ -59,12 +59,20 @@ function renderAvatar(user, options) {
       }
     }
 
-    return avatarImg({
+    const verified = Ember.get(user, "is_verified");
+
+    const img = avatarImg({
       size: options.imageSize,
       extraClasses: Ember.get(user, "extras") || options.extraClasses,
       title: title || displayName,
       avatarTemplate: avatarTemplate
     });
+
+    if (verified) {
+      return "<div class='tc-verified-avatar-wrapper'>" + img + "</div>";
+    } else {
+      return img;
+    }
   } else {
     return "";
   }
