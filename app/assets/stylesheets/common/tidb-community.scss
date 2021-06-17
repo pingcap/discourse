@@ -31,3 +31,26 @@
         color: #8193ff;
     }
 }
+
+/*
+ * Avatar wrapper for verified icon
+ */
+.tc-verified-avatar-wrapper {
+    position: relative;
+    max-width: min-content;
+    max-height: min-content;
+
+    &::after {
+        content: " ";
+        display: block;
+        position: absolute;
+        width: calc(100% * 8 / 25);
+        height: calc(100% * 8 / 25);
+        right: 0;
+        bottom: 0;
+        border-radius: 50%;
+        background-image: image-url("verified.svg");
+        background-size: 100%;
+        background-repeat: no-repeat;
+    }
+}
