@@ -42,6 +42,7 @@ export function transformBasicPost(post) {
     new_user: post.trust_level === 0,
     name: post.name,
     user_title: post.user_title,
+    user_is_verified: post.user_is_verified,
     created_at: post.created_at,
     updated_at: post.updated_at,
     canDelete: post.can_delete,
