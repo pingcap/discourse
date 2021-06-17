@@ -8,5 +8,12 @@ export default htmlHelper((user, size) => {
   }
 
   const avatarTemplate = Ember.get(user, "avatar_template");
-  return avatarImg(addExtraUserClasses(user, { size, avatarTemplate }));
+  const img = avatarImg(addExtraUserClasses(user, { size, avatarTemplate }));
+  const verified = Ember.get(user, "is_verified") || Ember.get(user, "user_is_verified") || Ember.get(user, "user.is_verified")
+
+  if (verified) {
+    return "<div class='tc-verified-avatar-wrapper'>" + img + "</div>";
+  } else {
+    return img;
+  }
 });

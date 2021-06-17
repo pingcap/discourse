@@ -59,8 +59,7 @@ function renderAvatar(user, options) {
       }
     }
 
-    const nestedUser = Ember.get(user, "user");
-    const verified = Ember.get(user, "is_verified") || (nestedUser && nestedUser.is_verified)
+    const verified = Ember.get(user, "is_verified") || Ember.get(user, "user_is_verified") || Ember.get(user, "user.is_verified")
 
     const img = avatarImg({
       size: options.imageSize,
