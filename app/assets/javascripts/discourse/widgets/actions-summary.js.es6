@@ -9,7 +9,8 @@ export function avatarAtts(user) {
     template: user.avatar_template,
     username: user.username,
     post_url: user.post_url,
-    url: userPath(user.username_lower)
+    url: userPath(user.username_lower),
+    is_verified: user.is_verified
   };
 }
 

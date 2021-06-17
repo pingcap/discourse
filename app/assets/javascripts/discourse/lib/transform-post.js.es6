@@ -155,12 +155,14 @@ export default function transformPost(
     postAtts.topicCreatedAt = topic.created_at;
     postAtts.createdByUsername = createdBy.username;
     postAtts.createdByAvatarTemplate = createdBy.avatar_template;
+    postAtts.createdByIsVerified = createdBy.is_verified;
     postAtts.createdByName = createdBy.name;
 
     postAtts.lastPostUrl = topic.get("lastPostUrl");
     postAtts.lastPostUsername = details.last_poster.username;
     postAtts.lastPostAvatarTemplate = details.last_poster.avatar_template;
     postAtts.lastPostName = details.last_poster.name;
+    postAtts.lastPostIsVerified = details.last_poster.is_verified;
     postAtts.lastPostAt = topic.last_posted_at;
 
     postAtts.topicReplyCount = topic.get("replyCount");
@@ -195,6 +197,7 @@ export default function transformPost(
   if (replyToUser) {
     postAtts.replyToUsername = replyToUser.username;
     postAtts.replyToAvatarTemplate = replyToUser.avatar_template;
+    postAtts.replyToIsVerified = replyToUser.is_verified;
   }
 
   if (post.actions_summary) {

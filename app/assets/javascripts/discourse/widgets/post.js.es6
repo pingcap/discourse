@@ -45,7 +45,12 @@ export function avatarImg(wanted, attrs) {
     className
   };
 
-  return h("img", properties);
+  const img = h("img", properties);
+  if (attrs.is_verified) {
+    return h("div", { className: "tc-verified-avatar-wrapper" }, img);
+  } else {
+    return img;
+  }
 }
 
 export function avatarFor(wanted, attrs) {
@@ -166,7 +171,8 @@ createWidget("post-avatar", {
         username: attrs.username,
         name: attrs.name,
         url: attrs.usernameUrl,
-        className: "main-avatar"
+        className: "main-avatar",
+        is_verified: attrs.user_is_verified,
       });
     }
 

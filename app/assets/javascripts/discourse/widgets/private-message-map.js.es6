@@ -84,7 +84,8 @@ createWidget("pm-map-user", {
     } else {
       const avatar = avatarFor("tiny", {
         template: user.avatar_template,
-        username: user.username
+        username: user.username,
+        is_verified: user.is_verified
       });
 
       link = h(

@@ -150,7 +150,8 @@ createWidget("discourse-poll-voters", {
       return h("li", [
         avatarFor("tiny", {
           username: user.username,
-          template: user.avatar_template
+          template: user.avatar_template,
+          is_verified: user.is_verified
         }),
         " "
       ]);

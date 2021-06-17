@@ -97,7 +97,8 @@ createWidget("topic-map-summary", {
           avatarFor("tiny", {
             username: attrs.createdByUsername,
             template: attrs.createdByAvatarTemplate,
-            name: attrs.createdByName
+            name: attrs.createdByName,
+            is_verified: attrs.createdByIsVerified
           }),
           dateNode(attrs.topicCreatedAt)
         ])
@@ -118,7 +119,8 @@ createWidget("topic-map-summary", {
             avatarFor("tiny", {
               username: attrs.lastPostUsername,
               template: attrs.lastPostAvatarTemplate,
-              name: attrs.lastPostName
+              name: attrs.lastPostName,
+              is_verified: attrs.lastPostIsVerified
             }),
             dateNode(attrs.lastPostAt)
           ])
