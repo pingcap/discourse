@@ -51,7 +51,7 @@ createWidget("topic-participant", {
         username: attrs.username,
         template: attrs.avatar_template,
         name: attrs.name,
-        is_verified: attrs.user_is_verified
+        is_verified: attrs.is_verified
       })
     ];
 
