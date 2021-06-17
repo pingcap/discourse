@@ -50,7 +50,8 @@ createWidget("topic-participant", {
       avatarImg("medium", {
         username: attrs.username,
         template: attrs.avatar_template,
-        name: attrs.name
+        name: attrs.name,
+        is_verified: attrs.user_is_verified
       })
     ];
 

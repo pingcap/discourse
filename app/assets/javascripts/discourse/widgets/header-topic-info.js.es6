@@ -21,7 +21,8 @@ createWidget("topic-header-participant", {
     if (attrs.type === "user") {
       content = avatarImg("tiny", {
         template: user.avatar_template,
-        username: user.username
+        username: user.username,
+        is_verified: user.is_verified
       });
       url = user.get("path");
     } else {

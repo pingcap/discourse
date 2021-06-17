@@ -130,7 +130,8 @@ createWidget("reply-to-tab", {
       " ",
       avatarImg("small", {
         template: attrs.replyToAvatarTemplate,
-        username: attrs.replyToUsername
+        username: attrs.replyToUsername,
+        is_verified: attrs.replyToIsVerified
       }),
       " ",
       h("span", formatUsername(attrs.replyToUsername))

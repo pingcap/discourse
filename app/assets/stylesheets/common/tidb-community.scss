@@ -40,7 +40,7 @@
     max-width: min-content;
     max-height: min-content;
 
-    &::after {
+    &::before {
         content: " ";
         display: block;
         position: absolute;
@@ -52,5 +52,50 @@
         background-image: image-url("verified.svg");
         background-size: 100%;
         background-repeat: no-repeat;
+    }
+
+    // some wrapped img are floating.
+    &::after {
+        display: block;
+        content: "";
+        clear: both;
+    }
+}
+
+// some wrapped img has margins
+
+// small-action
+.small-action .small-action-desc .tc-verified-avatar-wrapper {
+    margin-right: 0.8em;
+
+    .avatar {
+        margin-right: 0;
+    }
+}
+
+// user-main
+.user-main {
+    .about.collapsed-info .details .tc-verified-avatar-wrapper {
+        margin-right: 20px;
+
+        img.avatar {
+            margin-right: 0;
+        }
+    }
+    .about:not(.collapsed-info) .details .tc-verified-avatar-wrapper {
+        margin: 0 20px 10px 0;
+
+        img.avatar {
+            margin: 0;
+        }
+    }
+}
+
+// topic-map
+.topic-map .tc-verified-avatar-wrapper {
+    margin-right: 4px;
+
+    .avatar {
+        margin-right: 0;
     }
 }

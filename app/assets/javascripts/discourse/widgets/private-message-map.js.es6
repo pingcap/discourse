@@ -75,7 +75,8 @@ createWidget("pm-map-user", {
     if (this.site && this.site.mobileView) {
       const avatar = avatarImg("tiny", {
         template: user.avatar_template,
-        username: user.username
+        username: user.username,
+        is_verified: user.is_verified
       });
       link = h("a", { attributes: { href: user.get("path") } }, [
         avatar,

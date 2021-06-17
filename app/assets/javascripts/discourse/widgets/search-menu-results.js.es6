@@ -135,7 +135,8 @@ createSearchResult({
     const userResultContents = [
       avatarImg("small", {
         template: u.avatar_template,
-        username: u.username
+        username: u.username,
+        is_verified: u.is_verified
       }),
       h("div.user-titles", userTitles)
     ];
