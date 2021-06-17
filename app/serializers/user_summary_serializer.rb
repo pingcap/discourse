@@ -21,10 +21,14 @@ class UserSummarySerializer < ApplicationSerializer
   end
 
   class UserWithCountSerializer < ApplicationSerializer
-    attributes :id, :username, :name, :count, :avatar_template
+    attributes :id, :username, :name, :count, :avatar_template, :verified
 
     def include_name?
       SiteSetting.enable_names?
+    end
+
+    def verified
+      User.where(id: id).first&.verified?
     end
 
     def avatar_template
