@@ -14,6 +14,9 @@
           {{~#if topic.featured_link~}}
           {{~topic-featured-link topic~}}
           {{~/if~}}
+          {{~#if topic.is_enhancement}}
+          <span class="tc-topic-badge tc-topic-badge-red">已加急</span>
+          {{~/if}}
           {{~#if topic.unseen~}}
           &nbsp;<span class="badge-notification new-topic"></span>
           {{~/if~}}
