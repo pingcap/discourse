@@ -37,7 +37,8 @@ createWidget("header-notifications", {
 
     let avatarAttrs = {
       template: user.get("avatar_template"),
-      username: user.get("username")
+      username: user.get("username"),
+      is_verified: user.get("is_verified")
     };
 
     if (this.siteSettings.enable_names) {
@@ -47,7 +48,10 @@ createWidget("header-notifications", {
     const contents = [
       avatarImg(
         this.settings.avatarSize,
-        addExtraUserClasses(user, avatarAttrs)
+        {
+          ...addExtraUserClasses(user, avatarAttrs),
+          is_verified: user.get("is_verified")
+        }
       )
     ];
 

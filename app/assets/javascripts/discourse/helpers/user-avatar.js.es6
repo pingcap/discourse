@@ -59,7 +59,7 @@ function renderAvatar(user, options) {
       }
     }
 
-    const verified = Ember.get(user, "is_verified") || Ember.get(user, "user_is_verified") || Ember.get(user, "user.is_verified")
+    const verified = Ember.get(user, options.verifiedPath || "is_verified") || Ember.get(user, "user_is_verified") || Ember.get(user, "user.is_verified")
 
     const img = avatarImg({
       size: options.imageSize,
