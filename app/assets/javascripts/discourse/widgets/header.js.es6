@@ -48,10 +48,7 @@ createWidget("header-notifications", {
     const contents = [
       avatarImg(
         this.settings.avatarSize,
-        {
-          ...addExtraUserClasses(user, avatarAttrs),
-          is_verified: user.get("is_verified")
-        }
+        addExtraUserClasses(user, avatarAttrs)
       )
     ];
 
