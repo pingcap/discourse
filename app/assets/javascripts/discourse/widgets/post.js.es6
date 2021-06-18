@@ -47,7 +47,7 @@ export function avatarImg(wanted, attrs) {
 
   const img = h("img", properties);
   if (attrs.is_verified) {
-    return h("div", { className: "tc-verified-avatar-wrapper" }, img);
+    return h("div.tc-verified-avatar-wrapper", [img]);
   } else {
     return img;
   }
