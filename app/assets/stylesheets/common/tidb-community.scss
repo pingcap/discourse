@@ -76,6 +76,15 @@
 
 // user-main
 .user-main {
+
+    .about .primary .tc-verified-avatar-wrapper {
+        margin: 0 0 12px;
+
+        .avatar {
+            margin: 0;
+        }
+    }
+
     .about.collapsed-info .details .tc-verified-avatar-wrapper {
         margin-right: 20px;
 
@@ -125,4 +134,11 @@
         top: 0;
         left: 0;
     }
+}
+
+// some layout fixes
+
+// user list
+table.users-list.grid tr.user td.username .tc-verified-avatar-wrapper {
+    display: inline-block;
 }
