@@ -142,3 +142,7 @@
 table.users-list.grid tr.user td.username .tc-verified-avatar-wrapper {
     display: inline-block;
 }
+
+div.poll .tc-verified-avatar-wrapper img {
+    max-width: unset !important;
+}
