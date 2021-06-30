@@ -11,6 +11,7 @@ module Jobs
         current_reminder_count = topic.custom_fields["helper_reminder"].to_i
         if current_reminder_count == 0
           topic.custom_fields["helper_reminder"] = 1
+          topic.save_custom_fields
           SystemMessage.create_from_system_user(
             topic.user,
             :helper_reminder,
@@ -21,6 +22,7 @@ module Jobs
 
         if current_reminder_count == 1
           topic.custom_fields["helper_reminder"] = 2
+          topic.save_custom_fields
           SystemMessage.create_from_system_user(
             topic.user,
             :helper_reminder2,
