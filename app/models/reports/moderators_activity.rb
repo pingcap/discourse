@@ -97,6 +97,15 @@ Report.add_report("moderators_activity") do |report|
   FROM agreed_flags af
   LEFT JOIN disagreed_flags df
   ON df.user_id = af.user_id
+
+  UNION
+
+  SELECT
+  COALESCE(af.user_id, df.user_id) AS user_id,
+  COALESCE(af.flag_count, 0) + COALESCE(df.flag_count, 0) AS flag_count
+  FROM agreed_flags af
+  RIGHT JOIN disagreed_flags df
+  ON df.user_id = af.user_id
   ),
   revision_count AS (
   SELECT pr.user_id,
@@ -165,7 +174,7 @@ Report.add_report("moderators_activity") do |report|
   LEFT JOIN topic_count tc ON tc.user_id = m.user_id
   LEFT JOIN post_count pc ON pc.user_id = m.user_id
   LEFT JOIN pm_count pmc ON pmc.user_id = m.user_id
-  ORDER BY m.username
+  ORDER BY pc.post_count DESC
   SQL
 
   DB.query(query).each do |row|
