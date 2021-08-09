@@ -121,7 +121,7 @@ Report.add_report("flags_status") do |report|
   pa.disagreed_by_id,
   pa.deferred_by_id,
   COALESCE(pa.disagreed_at, pa.agreed_at, pa.deferred_at) AS responded_at
-  FROM period_actions1 pa, staff_data sd, flagger_data fd, poster_data pd
+  FROM period_actions pa, staff_data sd, flagger_data fd, poster_data pd
   WHERE sd.id = pa.id
   and fd.id = pa.id
   and pd.id = pa.id
