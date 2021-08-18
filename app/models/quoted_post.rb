@@ -8,6 +8,7 @@ class QuotedPost < ActiveRecord::Base
   #  however topic links exclude quotes and links within a topic
   #  we are double parsing this fragment, this may be worth optimising later
   def self.extract_from(post)
+    return
 
     doc = Nokogiri::HTML.fragment(post.cooked)
 
