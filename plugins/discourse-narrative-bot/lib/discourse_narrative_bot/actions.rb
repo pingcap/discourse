@@ -8,6 +8,10 @@ module DiscourseNarrativeBot
       @discobot ||= User.find(-2)
     end
 
+    def discobot_username
+      self.discobot_user.username_lower
+    end
+
     private
 
     def reply_to(post, raw, opts = {}, post_alert_options = {})
@@ -51,29 +55,29 @@ module DiscourseNarrativeBot
 
       key = "#{DiscourseNarrativeBot::PLUGIN_NAME}:reset-rate-limit:#{post.topic_id}:#{data['state']}"
 
-      if !(count = $redis.get(key))
+      if !(count = Discourse.redis.get(key))
         count = 0
-        $redis.setex(key, duration, count)
+        Discourse.redis.setex(key, duration, count)
       end
 
       if count.to_i < 2
         post.default_rate_limiter.rollback!
         post.limit_posts_per_day&.rollback!
-        $redis.incr(key)
+        Discourse.redis.incr(key)
       end
     end
 
     def fake_delay
-      sleep(rand(2..3)) if Rails.env.production?
+      sleep(rand(1.0..2.0)) if Rails.env.production?
     end
 
     def bot_mentioned?(post)
-      doc = Nokogiri::HTML.fragment(post.cooked)
+      doc = Nokogiri::HTML5.fragment(post.cooked)
 
       valid = false
 
       doc.css(".mention").each do |mention|
-        if User.normalize_username(mention.text) == "@#{self.discobot_user.username_lower}"
+        if User.normalize_username(mention.text) == "@#{self.discobot_username}"
           valid = true
           break
         end

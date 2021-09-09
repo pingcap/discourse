@@ -37,7 +37,7 @@ describe UsernameValidator do
                      error_message: I18n.t(:'user.username.short', min: 4))
     end
 
-    it 'is valid when the username has the minimum lenght' do
+    it 'is valid when the username has the minimum length' do
       SiteSetting.min_username_length = 4
 
       expect_valid('abcd')
@@ -50,7 +50,7 @@ describe UsernameValidator do
                      error_message: I18n.t(:'user.username.long', max: 8))
     end
 
-    it 'is valid when the username has the maximum lenght' do
+    it 'is valid when the username has the maximum length' do
       SiteSetting.max_username_length = 8
 
       expect_valid('abcdefgh')
@@ -122,7 +122,7 @@ describe UsernameValidator do
                        error_message: I18n.t(:'user.username.short', min: 3))
       end
 
-      it 'is valid when the username has the minimum lenght' do
+      it 'is valid when the username has the minimum length' do
         SiteSetting.min_username_length = 2
 
         expect_valid('পাখি', 'طائر')
@@ -135,7 +135,7 @@ describe UsernameValidator do
                        error_message: I18n.t(:'user.username.long', max: 8))
       end
 
-      it 'is valid when the username has the maximum lenght' do
+      it 'is valid when the username has the maximum length' do
         SiteSetting.max_username_length = 9
 
         expect_valid('Дровосек', 'چوب-لباسی', 'தமிழ்-தமிழ்')
@@ -178,27 +178,27 @@ describe UsernameValidator do
         expect_valid('தமிழ்')
       end
 
-      it 'allows all Unicode letters when the whitelist is empty' do
+      it 'allows all Unicode letters when the allowlist is empty' do
         expect_valid('鳥')
       end
 
-      context "with Unicode whitelist" do
-        before { SiteSetting.unicode_username_character_whitelist = "[äöüÄÖÜß]" }
+      context "with Unicode allowlist" do
+        before { SiteSetting.allowed_unicode_username_characters = "[äöüÄÖÜß]" }
 
-        it 'is invalid when username contains non-whitelisted letters' do
+        it 'is invalid when username contains non-allowlisted letters' do
           expect_invalid('鳥', 'francès', error_message: I18n.t(:'user.username.characters'))
         end
 
-        it 'is valid when username contains only whitelisted letters' do
+        it 'is valid when username contains only allowlisted letters' do
           expect_valid('Löwe', 'Ötzi')
         end
 
-        it 'is valid when username contains only ASCII letters and numbers regardless of whitelist' do
+        it 'is valid when username contains only ASCII letters and numbers regardless of allowlist' do
           expect_valid('a-z_A-Z.0-9')
         end
 
         it 'is valid after resetting the site setting' do
-          SiteSetting.unicode_username_character_whitelist = ""
+          SiteSetting.allowed_unicode_username_characters = ""
           expect_valid('鳥')
         end
       end

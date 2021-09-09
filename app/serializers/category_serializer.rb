@@ -12,6 +12,7 @@ class CategorySerializer < SiteCategorySerializer
              :email_in_allow_strangers,
              :mailinglist_mirror,
              :all_topics_wiki,
+             :allow_unlimited_owner_edits_on_first_post,
              :can_delete,
              :cannot_delete_reason,
              :is_special,
@@ -19,14 +20,15 @@ class CategorySerializer < SiteCategorySerializer
              :custom_fields,
              :topic_featured_link_allowed,
              :search_priority,
-             :reviewable_by_group_name
+             :reviewable_by_group_name,
+             :default_slow_mode_seconds
 
   def reviewable_by_group_name
     object.reviewable_by_group.name
   end
 
   def include_reviewable_by_group_name?
-    SiteSetting.enable_category_group_review? && object.reviewable_by_group_id.present?
+    SiteSetting.enable_category_group_moderation? && object.reviewable_by_group_id.present?
   end
 
   def group_permissions
@@ -42,6 +44,10 @@ class CategorySerializer < SiteCategorySerializer
       end
       perms
     end
+  end
+
+  def include_available_groups?
+    scope && scope.can_edit?(object)
   end
 
   def available_groups
@@ -81,10 +87,15 @@ class CategorySerializer < SiteCategorySerializer
     scope && scope.can_edit?(object)
   end
 
+  def include_notification_level?
+    scope && scope.user
+  end
+
   def notification_level
     user = scope && scope.user
-   object.notification_level ||
-     (user && CategoryUser.where(user: user, category: object).first.try(:notification_level))
+    object.notification_level ||
+     (user && CategoryUser.where(user: user, category: object).first.try(:notification_level)) ||
+     CategoryUser.default_notification_level
   end
 
   def custom_fields

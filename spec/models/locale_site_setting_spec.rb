@@ -30,8 +30,8 @@ describe LocaleSiteSetting do
 
     it 'returns native names' do
       expect(native_locale_name('de')).to eq('Deutsch')
-      expect(native_locale_name('zh_CN')).to eq('中文')
-      expect(native_locale_name('zh_TW')).to eq('中文 (TW)')
+      expect(native_locale_name('zh_CN')).to eq('简体中文')
+      expect(native_locale_name('zh_TW')).to eq('繁體中文')
     end
   end
 
@@ -90,15 +90,15 @@ describe LocaleSiteSetting do
         expect(LocaleSiteSetting.fallback_locale('foo')).to be_nil
       end
 
-      it 'returns English for English (United States)' do
-        expect(LocaleSiteSetting.fallback_locale('en_US')).to eq(:en)
+      it 'returns English for English (UK)' do
+        expect(LocaleSiteSetting.fallback_locale('en_GB')).to eq(:en)
       end
     end
   end
 
   describe '.fallback_locale' do
-    it 'returns English for English (United States)' do
-      expect(LocaleSiteSetting.fallback_locale('en_US')).to eq(:en)
+    it 'returns English for English (UK)' do
+      expect(LocaleSiteSetting.fallback_locale('en_GB')).to eq(:en)
     end
   end
 end

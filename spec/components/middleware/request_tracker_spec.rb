@@ -15,6 +15,36 @@ describe Middleware::RequestTracker do
     }.merge(opts)
   end
 
+  before do
+    ApplicationRequest.clear_cache!
+    ApplicationRequest.enable
+  end
+
+  after do
+    ApplicationRequest.disable
+    ApplicationRequest.clear_cache!
+  end
+
+  context "full request" do
+    before do
+      @orig = WebCrawlerRequest.autoflush
+      WebCrawlerRequest.autoflush = 1
+    end
+    after do
+      WebCrawlerRequest.autoflush = @orig
+    end
+
+    it "can handle rogue user agents" do
+      agent = (+"Evil Googlebot String \xc3\x28").force_encoding("Windows-1252")
+
+      middleware = Middleware::RequestTracker.new(->(env) { ["200", { "Content-Type" => "text/html" }, [""]] })
+      middleware.call(env("HTTP_USER_AGENT" => agent))
+
+      expect(WebCrawlerRequest.where(user_agent: agent.encode('utf-8')).count).to eq(1)
+    end
+
+  end
+
   context "log_request" do
     before do
       freeze_time Time.now
@@ -40,7 +70,6 @@ describe Middleware::RequestTracker do
     end
 
     it "can log requests correctly" do
-
       data = Middleware::RequestTracker.get_data(env(
         "HTTP_USER_AGENT" => "AdsBot-Google (+http://www.google.com/adsbot.html)"
       ), ["200", { "Content-Type" => 'text/html' }], 0.1)
@@ -59,10 +88,18 @@ describe Middleware::RequestTracker do
 
       Middleware::RequestTracker.log_request(data)
 
+      # /srv/status is never a tracked view because content-type is text/plain
+      data = Middleware::RequestTracker.get_data(env(
+        "HTTP_USER_AGENT" => "kube-probe/1.18",
+        "REQUEST_URI" => "/srv/status?shutdown_ok=1",
+      ), ["200", { "Content-Type" => 'text/plain' }], 0.1)
+
+      Middleware::RequestTracker.log_request(data)
+
       ApplicationRequest.write_cache!
 
-      expect(ApplicationRequest.http_total.first.count).to eq(3)
-      expect(ApplicationRequest.http_2xx.first.count).to eq(3)
+      expect(ApplicationRequest.http_total.first.count).to eq(4)
+      expect(ApplicationRequest.http_2xx.first.count).to eq(4)
 
       expect(ApplicationRequest.page_view_anon.first.count).to eq(2)
       expect(ApplicationRequest.page_view_crawler.first.count).to eq(1)
@@ -92,6 +129,53 @@ describe Middleware::RequestTracker do
       expect(ApplicationRequest.page_view_crawler.first.count).to eq(1)
       expect(ApplicationRequest.page_view_anon.first.count).to eq(1)
     end
+
+    context "ignore_anonymous_pageviews" do
+      let(:anon_data) do
+        Middleware::RequestTracker.get_data(env(
+          "HTTP_USER_AGENT" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.72 Safari/537.36"
+        ), ["200", { "Content-Type" => 'text/html' }], 0.1)
+      end
+
+      let(:logged_in_data) do
+        user = Fabricate(:user, active: true)
+        token = UserAuthToken.generate!(user_id: user.id)
+        Middleware::RequestTracker.get_data(env(
+          "HTTP_USER_AGENT" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.72 Safari/537.36",
+          "HTTP_COOKIE" => "_t=#{token.unhashed_auth_token};"
+        ), ["200", { "Content-Type" => 'text/html' }], 0.1)
+      end
+
+      it "does not ignore anonymous requests for public sites" do
+        SiteSetting.login_required = false
+
+        Middleware::RequestTracker.log_request(anon_data)
+        Middleware::RequestTracker.log_request(logged_in_data)
+
+        ApplicationRequest.write_cache!
+
+        expect(ApplicationRequest.http_total.first.count).to eq(2)
+        expect(ApplicationRequest.http_2xx.first.count).to eq(2)
+
+        expect(ApplicationRequest.page_view_logged_in.first.count).to eq(1)
+        expect(ApplicationRequest.page_view_anon.first.count).to eq(1)
+      end
+
+      it "ignores anonymous requests for private sites" do
+        SiteSetting.login_required = true
+
+        Middleware::RequestTracker.log_request(anon_data)
+        Middleware::RequestTracker.log_request(logged_in_data)
+
+        ApplicationRequest.write_cache!
+
+        expect(ApplicationRequest.http_total.first.count).to eq(2)
+        expect(ApplicationRequest.http_2xx.first.count).to eq(2)
+
+        expect(ApplicationRequest.page_view_logged_in.first.count).to eq(1)
+        expect(ApplicationRequest.page_view_anon.first).to eq(nil)
+      end
+    end
   end
 
   context "rate limiting" do
@@ -114,10 +198,13 @@ describe Middleware::RequestTracker do
 
       @old_logger = Rails.logger
       Rails.logger = TestLogger.new
+
+      # rate limiter tests depend on checks for retry-after
+      # they can be sensitive to clock skew during test runs
+      freeze_time DateTime.parse('2021-01-01 01:00')
     end
 
     after do
-      RateLimiter.disable
       Rails.logger = @old_logger
     end
 
@@ -144,13 +231,50 @@ describe Middleware::RequestTracker do
       global_setting :max_reqs_per_ip_mode, 'warn+block'
       global_setting :max_reqs_rate_limit_on_private, true
 
-      env1 = env("REMOTE_ADDR" => "127.0.0.2")
+      addresses = %w[127.1.2.3 127.0.0.2 192.168.1.2 10.0.1.2 172.16.9.8 172.19.1.2 172.20.9.8 172.29.1.2 172.30.9.8 172.31.1.2]
+      warn_count = 1
+      addresses.each do |addr|
+        env1 = env("REMOTE_ADDR" => addr)
 
+        status, _ = middleware.call(env1)
+        status, _ = middleware.call(env1)
+
+        expect(Rails.logger.warnings).to eq(warn_count)
+        expect(status).to eq(429)
+        warn_count += 1
+      end
+    end
+
+    it "blocks if the ip isn't static skipped" do
+      global_setting :max_reqs_per_ip_per_10_seconds, 1
+      global_setting :max_reqs_per_ip_mode, 'block'
+
+      env1 = env("REMOTE_ADDR" => "1.1.1.1")
       status, _ = middleware.call(env1)
       status, _ = middleware.call(env1)
-
-      expect(Rails.logger.warnings).to eq(1)
       expect(status).to eq(429)
+    end
+
+    it "doesn't block if rate limiter is enabled but IP is on the static exception list" do
+      stub_const(Middleware::RequestTracker, "STATIC_IP_SKIPPER", "177.33.14.73 191.209.88.192/30"&.split&.map { |ip| IPAddr.new(ip) }) do
+        global_setting :max_reqs_per_ip_per_10_seconds, 1
+        global_setting :max_reqs_per_ip_mode, 'block'
+
+        env1 = env("REMOTE_ADDR" => "177.33.14.73")
+        env2 = env("REMOTE_ADDR" => "191.209.88.194")
+
+        status, _ = middleware.call(env1)
+        expect(status).to eq(200)
+
+        status, _ = middleware.call(env1)
+        expect(status).to eq(200)
+
+        status, _ = middleware.call(env2)
+        expect(status).to eq(200)
+
+        status, _ = middleware.call(env2)
+        expect(status).to eq(200)
+      end
     end
 
     describe "register_ip_skipper" do
@@ -186,13 +310,16 @@ describe Middleware::RequestTracker do
       global_setting :max_reqs_per_ip_mode, 'warn+block'
       global_setting :max_reqs_rate_limit_on_private, false
 
-      env1 = env("REMOTE_ADDR" => "127.0.3.1")
+      addresses = %w[127.1.2.3 127.0.3.1 192.168.1.2 10.0.1.2 172.16.9.8 172.19.1.2 172.20.9.8 172.29.1.2 172.30.9.8 172.31.1.2]
+      addresses.each do |addr|
+        env1 = env("REMOTE_ADDR" => addr)
 
-      status, _ = middleware.call(env1)
-      status, _ = middleware.call(env1)
+        status, _ = middleware.call(env1)
+        status, _ = middleware.call(env1)
 
-      expect(Rails.logger.warnings).to eq(0)
-      expect(status).to eq(200)
+        expect(Rails.logger.warnings).to eq(0)
+        expect(status).to eq(200)
+      end
     end
 
     it "does warn if rate limiter is enabled via warn+block" do
@@ -200,10 +327,11 @@ describe Middleware::RequestTracker do
       global_setting :max_reqs_per_ip_mode, 'warn+block'
 
       status, _ = middleware.call(env)
-      status, _ = middleware.call(env)
+      status, headers = middleware.call(env)
 
       expect(Rails.logger.warnings).to eq(1)
       expect(status).to eq(429)
+      expect(headers["Retry-After"]).to eq("10")
     end
 
     it "does warn if rate limiter is enabled" do
@@ -230,13 +358,15 @@ describe Middleware::RequestTracker do
       expect(status).to eq(200)
       status, _ = middleware.call(env1)
       expect(status).to eq(200)
-      status, _ = middleware.call(env1)
+      status, headers = middleware.call(env1)
       expect(status).to eq(429)
+      expect(headers["Retry-After"]).to eq("10")
 
       env2 = env("REMOTE_ADDR" => "1.1.1.1")
 
-      status, _ = middleware.call(env2)
+      status, headers = middleware.call(env2)
       expect(status).to eq(429)
+      expect(headers["Retry-After"]).to eq("10")
     end
 
     it "does block if rate limiter is enabled" do
@@ -249,8 +379,9 @@ describe Middleware::RequestTracker do
       status, _ = middleware.call(env1)
       expect(status).to eq(200)
 
-      status, _ = middleware.call(env1)
+      status, headers = middleware.call(env1)
       expect(status).to eq(429)
+      expect(headers["Retry-After"]).to eq("10")
 
       status, _ = middleware.call(env2)
       expect(status).to eq(200)
@@ -264,7 +395,7 @@ describe Middleware::RequestTracker do
           User.where(id: -100).pluck(:id)
         end
         redis_calls.times do
-          $redis.get("x")
+          Discourse.redis.get("x")
         end
         result
       end
@@ -306,7 +437,7 @@ describe Middleware::RequestTracker do
       tracker.call(env("REQUEST_URI" => uri, "ANON_CACHE_DURATION" => 60))
       expect(@data[:cache]).to eq("true")
 
-      # not whitelisted
+      # not allowlisted
       request_params.delete("a")
 
       expect(@env["action_dispatch.request.parameters"]).to eq(request_params)

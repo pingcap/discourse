@@ -58,42 +58,42 @@ module DiscourseUpdates
 
     # last_installed_version is the installed version at the time of the last version check
     def last_installed_version
-      $redis.get last_installed_version_key
+      Discourse.redis.get last_installed_version_key
     end
 
     def latest_version
-      $redis.get latest_version_key
+      Discourse.redis.get latest_version_key
     end
 
     def missing_versions_count
-      $redis.get(missing_versions_count_key).try(:to_i)
+      Discourse.redis.get(missing_versions_count_key).try(:to_i)
     end
 
     def critical_updates_available?
-      ($redis.get(critical_updates_available_key) || false) == 'true'
+      (Discourse.redis.get(critical_updates_available_key) || false) == 'true'
     end
 
     def updated_at
-      t = $redis.get(updated_at_key)
+      t = Discourse.redis.get(updated_at_key)
       t ? Time.zone.parse(t) : nil
     end
 
     def updated_at=(time_with_zone)
-      $redis.set updated_at_key, time_with_zone.as_json
+      Discourse.redis.set updated_at_key, time_with_zone.as_json
     end
 
     ['last_installed_version', 'latest_version', 'missing_versions_count', 'critical_updates_available'].each do |name|
       eval "define_method :#{name}= do |arg|
-        $redis.set #{name}_key, arg
+        Discourse.redis.set #{name}_key, arg
       end"
     end
 
     def missing_versions=(versions)
       # delete previous list from redis
-      prev_keys = $redis.lrange(missing_versions_list_key, 0, 4)
+      prev_keys = Discourse.redis.lrange(missing_versions_list_key, 0, 4)
       if prev_keys
-        $redis.del prev_keys
-        $redis.del(missing_versions_list_key)
+        Discourse.redis.del prev_keys
+        Discourse.redis.del(missing_versions_list_key)
       end
 
       if versions.present?
@@ -101,18 +101,69 @@ module DiscourseUpdates
         version_keys = []
         versions[0, 5].each do |v|
           key = "#{missing_versions_key_prefix}:#{v['version']}"
-          $redis.mapped_hmset key, v
+          Discourse.redis.mapped_hmset key, v
           version_keys << key
         end
-        $redis.rpush missing_versions_list_key, version_keys
+        Discourse.redis.rpush missing_versions_list_key, version_keys
       end
 
       versions || []
     end
 
     def missing_versions
-      keys = $redis.lrange(missing_versions_list_key, 0, 4) # max of 5 versions
-      keys.present? ? keys.map { |k| $redis.hgetall(k) } : []
+      keys = Discourse.redis.lrange(missing_versions_list_key, 0, 4) # max of 5 versions
+      keys.present? ? keys.map { |k| Discourse.redis.hgetall(k) } : []
+    end
+
+    def current_version
+      last_installed_version || Discourse::VERSION::STRING
+    end
+
+    def new_features_payload
+      response = Excon.new(new_features_endpoint).request(expects: [200], method: :Get)
+      response.body
+    end
+
+    def update_new_features(payload = nil)
+      payload ||= new_features_payload
+      Discourse.redis.set(new_features_key, payload)
+    end
+
+    def new_features
+      entries = JSON.parse(Discourse.redis.get(new_features_key)) rescue nil
+      return nil if entries.nil?
+
+      entries.select! do |item|
+        item["discourse_version"].nil? || Discourse.has_needed_version?(current_version, item["discourse_version"]) rescue nil
+      end
+
+      entries.sort_by { |item| Time.zone.parse(item["created_at"]).to_i }.reverse
+    end
+
+    def has_unseen_features?(user_id)
+      entries = new_features
+      return false if entries.nil?
+
+      last_seen = new_features_last_seen(user_id)
+
+      if last_seen.present?
+        entries.select! { |item| Time.zone.parse(item["created_at"]) > last_seen }
+      end
+
+      entries.size > 0
+    end
+
+    def new_features_last_seen(user_id)
+      last_seen = Discourse.redis.get new_features_last_seen_key(user_id)
+      return nil if last_seen.blank?
+      Time.zone.parse(last_seen)
+    end
+
+    def mark_new_features_as_seen(user_id)
+      entries = JSON.parse(Discourse.redis.get(new_features_key)) rescue nil
+      return nil if entries.nil?
+      last_seen = entries.max_by { |x| x["created_at"] }
+      Discourse.redis.set(new_features_last_seen_key(user_id), last_seen["created_at"])
     end
 
     private
@@ -143,6 +194,18 @@ module DiscourseUpdates
 
     def missing_versions_key_prefix
       'missing_version'
+    end
+
+    def new_features_endpoint
+      'https://meta.discourse.org/new-features.json'
+    end
+
+    def new_features_key
+      'new_features'
+    end
+
+    def new_features_last_seen_key(user_id)
+      "new_features_last_seen_user_#{user_id}"
     end
   end
 end

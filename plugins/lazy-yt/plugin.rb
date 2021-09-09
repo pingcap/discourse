@@ -4,12 +4,12 @@
 # about: Uses the lazyYT plugin to lazy load Youtube videos
 # version: 1.0.1
 # authors: Arpit Jalan
-# url: https://github.com/discourse/discourse/tree/master/plugins/lazy-yt
+# url: https://github.com/discourse/discourse/tree/main/plugins/lazy-yt
+# transpile_js: true
 
 hide_plugin if self.respond_to?(:hide_plugin)
 
-# javascript
-register_asset "javascripts/lazyYT.js"
+require "onebox"
 
 # stylesheet
 register_asset "stylesheets/lazyYT.css"
@@ -22,12 +22,34 @@ class Onebox::Engine::YoutubeOnebox
 
   def to_html
     if video_id && !params['list']
-      video_width = (params['width'] && params['width'].to_i <= 695) ? params['width'] : 480 # embed width
-      video_height = (params['height'] && params['height'].to_i <= 500) ? params['height'] : 270 # embed height
+
+      size_restricted = [params['width'], params['height']].any?
+      video_width = (params['width'] && params['width'].to_i <= 695) ? params['width'] : 690 # embed width
+      video_height = (params['height'] && params['height'].to_i <= 500) ? params['height'] : 388 # embed height
+      size_tags = ["width=\"#{video_width}\"", "height=\"#{video_height}\""]
+
+      result = parse_embed_response
+      result ||= get_opengraph.data
+
+      thumbnail_url = result[:image] || "https://img.youtube.com/vi/#{video_id}/hqdefault.jpg"
 
       # Put in the LazyYT div instead of the iframe
       escaped_title = ERB::Util.html_escape(video_title)
-      "<div class=\"lazyYT\" data-youtube-id=\"#{video_id}\" data-youtube-title=\"#{escaped_title}\" data-width=\"#{video_width}\" data-height=\"#{video_height}\" data-parameters=\"#{embed_params}\"></div>"
+
+      <<~EOF
+      <div class="onebox lazyYT lazyYT-container"
+           data-youtube-id="#{video_id}"
+           data-youtube-title="#{escaped_title}"
+           #{size_restricted ? size_tags.map { |t| "data-#{t}" }.join(' ') : ""}
+           data-parameters="#{embed_params}">
+        <a href="https://www.youtube.com/watch?v=#{video_id}" target="_blank">
+          <img class="ytp-thumbnail-image"
+               src="#{thumbnail_url}"
+               #{size_restricted ? size_tags.join(' ') : ""}
+               title="#{escaped_title}">
+        </a>
+      </div>
+      EOF
     else
       yt_onebox_to_html
     end

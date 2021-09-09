@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class IgnoredUser < ActiveRecord::Base
+  validates :expiring_at, presence: true
+
   belongs_to :user
   belongs_to :ignored_user, class_name: "User"
 end
@@ -15,7 +17,7 @@ end
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
 #  summarized_at   :datetime
-#  expiring_at     :datetime
+#  expiring_at     :datetime         not null
 #
 # Indexes
 #

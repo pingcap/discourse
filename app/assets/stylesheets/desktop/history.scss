@@ -10,16 +10,17 @@
   #revision-controls {
     .btn[disabled] {
       cursor: not-allowed;
-      background-color: $primary-low;
+      background-color: var(--primary-low);
     }
     .btn-danger[disabled] {
-      background-color: $danger-medium;
+      background-color: var(--danger-medium);
     }
   }
 
   #revision {
     display: flex;
     justify-content: space-between;
+    padding-bottom: 0.5em;
   }
 
   #revisions {
@@ -28,6 +29,14 @@
       margin-top: 10px;
     }
   }
+  #display-modes {
+    .nav {
+      margin: 0;
+      padding: 0;
+      border: none;
+    }
+  }
+
   img {
     max-width: 670px;
     height: auto;

@@ -2,11 +2,22 @@
 
 if ENV['COVERAGE']
   require 'simplecov'
-  SimpleCov.start
+  SimpleCov.command_name "#{SimpleCov.command_name} #{ENV['TEST_ENV_NUMBER']}" if ENV['TEST_ENV_NUMBER']
+  SimpleCov.start 'rails' do
+    add_group 'Libraries', /^\/lib\/(?!tasks).*$/
+    add_group 'Scripts', 'script'
+    add_group 'Serializers', 'app/serializers'
+    add_group 'Services', 'app/services'
+    add_group 'Tasks', 'lib/tasks'
+  end
 end
 
 require 'rubygems'
 require 'rbtrace'
+
+require 'pry'
+require 'pry-byebug'
+require 'pry-rails'
 
 # Loading more in this block will cause your tests to run faster. However,
 # if you change any configuration or code from libraries loaded here, you'll
@@ -86,14 +97,14 @@ module TestSetup
   # This is run before each test and before each before_all block
   def self.test_setup(x = nil)
     # TODO not sure about this, we could use a mock redis implementation here:
-    #   this gives us really clean "flush" semantics, howere the side-effect is that
+    #   this gives us really clean "flush" semantics, however the side-effect is that
     #   we are no longer using a clean redis implementation, a preferable solution may
     #   be simply flushing before tests, trouble is that redis may be reused with dev
     #   so that would mean the dev would act weird
     #
     #   perf benefit seems low (shaves 20 secs off a 4 minute test suite)
     #
-    # $redis = DiscourseMockRedis.new
+    # Discourse.redis = DiscourseMockRedis.new
 
     RateLimiter.disable
     PostActionNotifier.disable
@@ -128,6 +139,12 @@ module TestSetup
     # code that runs inside jobs. run_later! means they are put on the redis
     # queue and never processed.
     Jobs.run_later!
+
+    # Don't track ApplicationRequests in test mode unless opted in
+    ApplicationRequest.disable
+
+    # Don't queue badge grant in test mode
+    BadgeGranter.disable_queue
   end
 end
 
@@ -160,7 +177,11 @@ RSpec.configure do |config|
   config.include MessageBus
   config.include RSpecHtmlMatchers
   config.include IntegrationHelpers, type: :request
+  config.include WebauthnIntegrationHelpers
   config.include SiteSettingsHelpers
+  config.include SidekiqHelpers
+  config.include UploadsHelpers
+  config.include OneboxHelpers
   config.mock_framework = :mocha
   config.order = 'random'
   config.infer_spec_type_from_file_location!
@@ -176,12 +197,18 @@ RSpec.configure do |config|
   config.infer_base_class_for_anonymous_controllers = true
 
   config.before(:suite) do
+    begin
+      ActiveRecord::Migration.check_pending!
+    rescue ActiveRecord::PendingMigrationError
+      raise "There are pending migrations, run RAILS_ENV=test bin/rake db:migrate"
+    end
+
     Sidekiq.error_handlers.clear
 
     # Ugly, but needed until we have a user creator
     User.skip_callback(:create, :after, :ensure_in_trust_level_group)
 
-    DiscoursePluginRegistry.clear if ENV['LOAD_PLUGINS'] != "1"
+    DiscoursePluginRegistry.reset! if ENV['LOAD_PLUGINS'] != "1"
     Discourse.current_user_provider = TestCurrentUserProvider
 
     SiteSetting.refresh!
@@ -196,9 +223,18 @@ RSpec.configure do |config|
       SiteSetting.defaults.set_regardless_of_locale(k, v) if SiteSetting.respond_to? k
     end
 
-    SiteSetting.provider = SiteSettings::LocalProcessProvider.new
+    SiteSetting.provider = TestLocalProcessProvider.new
 
     WebMock.disable_net_connect!
+  end
+
+  class TestLocalProcessProvider < SiteSettings::LocalProcessProvider
+    attr_accessor :current_site
+
+    def initialize
+      super
+      self.current_site = "test"
+    end
   end
 
   class DiscourseMockRedis < MockRedis
@@ -230,18 +266,38 @@ RSpec.configure do |config|
     end
   end
 
+  config.after(:suite) do
+    if SpecSecureRandom.value
+      FileUtils.remove_dir(file_from_fixtures_tmp_folder, true)
+    end
+  end
+
   config.before :each, &TestSetup.method(:test_setup)
 
+  config.around :each do |example|
+    before_event_count = DiscourseEvent.events.values.sum(&:count)
+    example.run
+    after_event_count = DiscourseEvent.events.values.sum(&:count)
+    expect(before_event_count).to eq(after_event_count), "DiscourseEvent registrations were not cleaned up"
+  end
+
+  config.before :each do
+    # This allows DB.transaction_open? to work in tests. See lib/mini_sql_multisite_connection.rb
+    DB.test_transaction = ActiveRecord::Base.connection.current_transaction
+  end
+
   config.before(:each, type: :multisite) do
-    Rails.configuration.multisite = true
+    Rails.configuration.multisite = true # rubocop:disable Discourse/NoDirectMultisiteManipulation
 
     RailsMultisite::ConnectionManagement.config_filename =
       "spec/fixtures/multisite/two_dbs.yml"
+
+    RailsMultisite::ConnectionManagement.establish_connection(db: 'default')
   end
 
   config.after(:each, type: :multisite) do
     ActiveRecord::Base.clear_all_connections!
-    Rails.configuration.multisite = false
+    Rails.configuration.multisite = false # rubocop:disable Discourse/NoDirectMultisiteManipulation
     RailsMultisite::ConnectionManagement.clear_settings!
     ActiveRecord::Base.establish_connection
   end
@@ -293,20 +349,6 @@ def global_setting(name, value)
   end
 end
 
-def set_env(var, value)
-  old = ENV.fetch var, :missing
-
-  ENV[var] = value
-
-  before_next_spec do
-    if old == :missing
-      ENV.delete var
-    else
-      ENV[var] = old
-    end
-  end
-end
-
 def set_cdn_url(cdn_url)
   global_setting :cdn_url, cdn_url
   Rails.configuration.action_controller.asset_host = cdn_url
@@ -346,6 +388,8 @@ def freeze_time(now = Time.now)
     ensure
       unfreeze_time
     end
+  else
+    time
   end
 end
 
@@ -357,9 +401,15 @@ def unfreeze_time
 end
 
 def file_from_fixtures(filename, directory = "images")
-  FileUtils.mkdir_p("#{Rails.root}/tmp/spec") unless Dir.exists?("#{Rails.root}/tmp/spec")
-  FileUtils.cp("#{Rails.root}/spec/fixtures/#{directory}/#{filename}", "#{Rails.root}/tmp/spec/#{filename}")
-  File.new("#{Rails.root}/tmp/spec/#{filename}")
+  SpecSecureRandom.value ||= SecureRandom.hex
+  FileUtils.mkdir_p(file_from_fixtures_tmp_folder) unless Dir.exists?(file_from_fixtures_tmp_folder)
+  tmp_file_path = File.join(file_from_fixtures_tmp_folder, SecureRandom.hex << filename)
+  FileUtils.cp("#{Rails.root}/spec/fixtures/#{directory}/#{filename}", tmp_file_path)
+  File.new(tmp_file_path)
+end
+
+def file_from_fixtures_tmp_folder
+  File.join(Dir.tmpdir, "rspec_#{Process.pid}_#{SpecSecureRandom.value}")
 end
 
 def has_trigger?(trigger_name)
@@ -375,4 +425,33 @@ def silence_stdout
   yield
 ensure
   STDOUT.unstub(:write)
+end
+
+class TrackingLogger < ::Logger
+  attr_reader :messages
+  def initialize(level: nil)
+    super(nil)
+    @messages = []
+    @level = level
+  end
+  def add(*args, &block)
+    if !level || args[0].to_i >= level
+      @messages << args
+    end
+  end
+end
+
+def track_log_messages(level: nil)
+  old_logger = Rails.logger
+  logger = Rails.logger = TrackingLogger.new(level: level)
+  yield logger.messages
+  logger.messages
+ensure
+  Rails.logger = old_logger
+end
+
+class SpecSecureRandom
+  class << self
+    attr_accessor :value
+  end
 end

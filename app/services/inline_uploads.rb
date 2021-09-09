@@ -16,7 +16,7 @@ class InlineUploads
       end
     end
 
-    cooked_fragment = Nokogiri::HTML::fragment(PrettyText.cook(markdown, disable_emojis: true))
+    cooked_fragment = Nokogiri::HTML5::fragment(PrettyText.cook(markdown, disable_emojis: true))
     link_occurences = []
 
     cooked_fragment.traverse do |node|
@@ -54,10 +54,8 @@ class InlineUploads
       raw_matches << [match, href, replacement, index]
     end
 
-    db = RailsMultisite::ConnectionManagement.current_db
-
     regexps = [
-      /(https?:\/\/[a-zA-Z0-9\.\/-]+\/uploads\/#{db}#{UPLOAD_REGEXP_PATTERN})/,
+      /(https?:\/\/[a-zA-Z0-9\.\/-]+\/#{Discourse.store.upload_path}#{UPLOAD_REGEXP_PATTERN})/,
     ]
 
     if Discourse.store.external?
@@ -150,7 +148,7 @@ class InlineUploads
   end
 
   def self.match_md_inline_img(markdown, external_src: false)
-    markdown.scan(/(!?\[([^\[\]]*)\]\(([a-zA-z0-9\.\/:-]+)([ ]*['"]{1}[^\)]*['"]{1}[ ]*)?\))/) do |match|
+    markdown.scan(/(!?\[([^\[\]]*)\]\(([^\s\)]+)([ ]*['"]{1}[^\)]*['"]{1}[ ]*)?\))/) do |match|
       if (matched_uploads(match[2]).present? || external_src) && block_given?
         yield(
           match[0],
@@ -185,7 +183,7 @@ class InlineUploads
 
   def self.match_anchor(markdown, external_href: false)
     markdown.scan(/((<a[^<]+>)([^<\a>]*?)<\/a>)/i) do |match|
-      node = Nokogiri::HTML::fragment(match[0]).children[0]
+      node = Nokogiri::HTML5::fragment(match[0]).children[0]
       href =  node.attributes["href"]&.value
 
       if href && (matched_uploads(href).present? || external_href)
@@ -199,19 +197,23 @@ class InlineUploads
     end
   end
 
-  def self.match_img(markdown, external_src: false)
+  def self.match_img(markdown, external_src: false, uploads: nil)
     markdown.scan(/(<(?!img)[^<>]+\/?>)?(\s*)(<img [^>\n]+>)/i) do |match|
-      node = Nokogiri::HTML::fragment(match[2].strip).children[0]
-      src =  node.attributes["src"]&.value
+      node = Nokogiri::HTML5::fragment(match[2].strip).children[0]
+      src = node&.attributes&.[]("src")&.value
 
       if src && (matched_uploads(src).present? || external_src)
-        text = node.attributes["alt"]&.value
-        width = node.attributes["width"]&.value.to_i
-        height = node.attributes["height"]&.value.to_i
+        upload = uploads&.[](src)
+
+        text = upload&.original_filename || node.attributes["alt"]&.value
+        width = (node.attributes["width"]&.value || upload&.width).to_i
+        height = (node.attributes["height"]&.value || upload&.height).to_i
         title = node.attributes["title"]&.value
         text = "#{text}|#{width}x#{height}" if width > 0 && height > 0
+        url = upload&.short_url || PLACEHOLDER
+
         spaces_before = match[1].present? ? match[1][/ +$/].size : 0
-        replacement = +"#{" " * spaces_before}![#{text}](#{PLACEHOLDER}#{title.present? ? " \"#{title}\"" : ""})"
+        replacement = +"#{" " * spaces_before}![#{text}](#{url}#{title.present? ? " \"#{title}\"" : ""})"
 
         yield(match[2], src, replacement, $~.offset(0)[0]) if block_given?
       end
@@ -219,28 +221,28 @@ class InlineUploads
   end
 
   def self.matched_uploads(node)
-    db = RailsMultisite::ConnectionManagement.current_db
+    upload_path = Discourse.store.upload_path
     base_url = Discourse.base_url.sub(/https?:\/\//, "(https?://)")
 
     regexps = [
       /(upload:\/\/([a-zA-Z0-9]+)[a-zA-Z0-9\.]*)/,
       /(\/uploads\/short-url\/([a-zA-Z0-9]+)[a-zA-Z0-9\.]*)/,
       /(#{base_url}\/uploads\/short-url\/([a-zA-Z0-9]+)[a-zA-Z0-9\.]*)/,
-      /(#{GlobalSetting.relative_url_root}\/uploads\/#{db}#{UPLOAD_REGEXP_PATTERN})/,
-      /(#{base_url}\/uploads\/#{db}#{UPLOAD_REGEXP_PATTERN})/,
+      /(#{GlobalSetting.relative_url_root}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/,
+      /(#{base_url}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/,
     ]
 
     if GlobalSetting.cdn_url && (cdn_url = GlobalSetting.cdn_url.sub(/https?:\/\//, "(https?://)"))
-      regexps << /(#{cdn_url}\/uploads\/#{db}#{UPLOAD_REGEXP_PATTERN})/
+      regexps << /(#{cdn_url}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/
       if GlobalSetting.relative_url_root.present?
-        regexps << /(#{cdn_url}#{GlobalSetting.relative_url_root}\/uploads\/#{db}#{UPLOAD_REGEXP_PATTERN})/
+        regexps << /(#{cdn_url}#{GlobalSetting.relative_url_root}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/
       end
     end
 
     if Discourse.store.external?
       if Rails.configuration.multisite
-        regexps << /((https?:)?#{SiteSetting.Upload.s3_base_url}\/uploads\/#{db}#{UPLOAD_REGEXP_PATTERN})/
-        regexps << /(#{SiteSetting.Upload.s3_cdn_url}\/uploads\/#{db}#{UPLOAD_REGEXP_PATTERN})/
+        regexps << /((https?:)?#{SiteSetting.Upload.s3_base_url}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/
+        regexps << /(#{SiteSetting.Upload.s3_cdn_url}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/
       else
         regexps << /((https?:)?#{SiteSetting.Upload.s3_base_url}#{UPLOAD_REGEXP_PATTERN})/
         regexps << /(#{SiteSetting.Upload.s3_cdn_url}#{UPLOAD_REGEXP_PATTERN})/

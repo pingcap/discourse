@@ -4,15 +4,20 @@ require 'excon'
 
 module Jobs
   class EmitWebHookEvent < ::Jobs::Base
-    PING_EVENT = 'ping'.freeze
-    MAX_RETRY_COUNT = 4.freeze
+    sidekiq_options queue: 'low'
+
+    PING_EVENT = 'ping'
+    MAX_RETRY_COUNT = 4
     RETRY_BACKOFF = 5
+    REQUEST_TIMEOUT = 20
 
     def execute(args)
       @arguments = args
       @retry_count = args[:retry_count] || 0
       @web_hook = WebHook.find_by(id: @arguments[:web_hook_id])
       validate_arguments!
+
+      return if @web_hook.blank? # Web Hook was deleted
 
       unless ping_event?(@arguments[:event_type])
         validate_argument!(:payload)
@@ -31,7 +36,6 @@ module Jobs
     def validate_arguments!
       validate_argument!(:web_hook_id)
       validate_argument!(:event_type)
-      raise Discourse::InvalidParameters.new(:web_hook_id) if @web_hook.blank?
     end
 
     def validate_argument!(key)
@@ -40,7 +44,14 @@ module Jobs
 
     def send_webhook!
       uri = URI(@web_hook.payload_url.strip)
-      conn = Excon.new(uri.to_s, ssl_verify_peer: @web_hook.verify_certificate, retry_limit: 0)
+      conn = Excon.new(
+        uri.to_s,
+        ssl_verify_peer: @web_hook.verify_certificate,
+        retry_limit: 0,
+        write_timeout: REQUEST_TIMEOUT,
+        read_timeout: REQUEST_TIMEOUT,
+        connect_timeout: REQUEST_TIMEOUT
+      )
 
       web_hook_body = build_webhook_body
       web_hook_event = create_webhook_event(web_hook_body)
@@ -93,6 +104,7 @@ module Jobs
         @retry_count += 1
         return if @retry_count > MAX_RETRY_COUNT
         delay = RETRY_BACKOFF**(@retry_count - 1)
+        @arguments[:retry_count] = @retry_count
         ::Jobs.enqueue_in(delay.minutes, :emit_web_hook_event, @arguments)
       end
     end
@@ -101,7 +113,7 @@ module Jobs
       MessageBus.publish("/web_hook_events/#{@web_hook.id}", {
         web_hook_event_id: web_hook_event.id,
         event_type: @arguments[:event_type]
-      }, user_ids: User.human_users.staff.pluck(:id))
+      }, group_ids: [Group::AUTO_GROUPS[:staff]])
     end
 
     def ping_event?(event_type)
@@ -113,8 +125,8 @@ module Jobs
     end
 
     def group_webhook_invalid?
-      @web_hook.group_ids.present? && (@arguments[:group_id].present? ||
-        !@web_hook.group_ids.include?(@arguments[:group_id]))
+      @web_hook.group_ids.present? && (@arguments[:group_ids].blank? ||
+        (@web_hook.group_ids & @arguments[:group_ids]).blank?)
     end
 
     def category_webhook_invalid?

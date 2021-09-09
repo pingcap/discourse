@@ -5,26 +5,30 @@ require 'rails_helper'
 describe Jobs::ExportCsvFile do
 
   context '#execute' do
-    fab!(:user) { Fabricate(:user, username: "john_doe") }
+    let(:other_user) { Fabricate(:user) }
+    let(:admin) { Fabricate(:admin) }
+    let(:action_log) { StaffActionLogger.new(admin).log_revoke_moderation(other_user) }
 
     it 'raises an error when the entity is missing' do
-      expect { Jobs::ExportCsvFile.new.execute(user_id: user.id) }.to raise_error(Discourse::InvalidParameters)
+      expect { Jobs::ExportCsvFile.new.execute(user_id: admin.id) }.to raise_error(Discourse::InvalidParameters)
     end
 
     it 'works' do
+      action_log
+
       begin
         expect do
           Jobs::ExportCsvFile.new.execute(
-            user_id: user.id,
-            entity: "user_archive"
+            user_id: admin.id,
+            entity: "staff_action"
           )
         end.to change { Upload.count }.by(1)
 
-        system_message = user.topics_allowed.last
+        system_message = admin.topics_allowed.last
 
         expect(system_message.title).to eq(I18n.t(
           "system_messages.csv_export_succeeded.subject_template",
-          export_title: "User Archive"
+          export_title: "Staff Action"
         ))
 
         upload = system_message.first_post.uploads.first
@@ -36,8 +40,15 @@ describe Jobs::ExportCsvFile do
 
         expect(system_message.id).to eq(UserExport.last.topic_id)
         expect(system_message.closed).to eq(true)
+
+        files = []
+        Zip::File.open(Discourse.store.path_for(upload)) do |zip_file|
+          zip_file.each { |entry| files << entry.name }
+        end
+
+        expect(files.size).to eq(1)
       ensure
-        user.uploads.each(&:destroy!)
+        admin.uploads.each(&:destroy!)
       end
     end
   end
@@ -48,17 +59,25 @@ describe Jobs::ExportCsvFile do
 
     let(:exporter) do
       exporter = Jobs::ExportCsvFile.new
-      exporter.instance_variable_set(:@entity, 'report')
-      exporter.instance_variable_set(:@extra, HashWithIndifferentAccess.new(start_date: '2010-01-01', end_date: '2011-01-01'))
-      exporter.instance_variable_set(:@current_user, User.find_by(id: user.id))
+      exporter.entity = 'report'
+      exporter.extra = HashWithIndifferentAccess.new(start_date: '2010-01-01', end_date: '2011-01-01')
+      exporter.current_user = User.find_by(id: user.id)
       exporter
+    end
+
+    it "does not throw an error when the dates are invalid" do
+      Jobs::ExportCsvFile.new.execute(
+        entity: 'report',
+        user_id: user.id,
+        args: { start_date: 'asdfasdf', end_date: 'not-a-date', name: 'dau_by_mau' }
+      )
     end
 
     it 'works with single-column reports' do
       user.user_visits.create!(visited_at: '2010-01-01', posts_read: 42)
       Fabricate(:user).user_visits.create!(visited_at: '2010-01-03', posts_read: 420)
 
-      exporter.instance_variable_get(:@extra)['name'] = 'dau_by_mau'
+      exporter.extra['name'] = 'dau_by_mau'
       report = exporter.report_export.to_a
 
       expect(report.first).to contain_exactly("Day", "Percent")
@@ -66,11 +85,28 @@ describe Jobs::ExportCsvFile do
       expect(report.third).to contain_exactly("2010-01-03", "50.0")
     end
 
+    it 'works with filters' do
+      user.user_visits.create!(visited_at: '2010-01-01', posts_read: 42)
+
+      group = Fabricate(:group)
+      user1 = Fabricate(:user)
+      group_user = Fabricate(:group_user, group: group, user: user1)
+      user1.user_visits.create!(visited_at: '2010-01-03', posts_read: 420)
+
+      exporter.extra['name'] = 'visits'
+      exporter.extra['group'] = group.id
+      report = exporter.report_export.to_a
+
+      expect(report.length).to eq(2)
+      expect(report.first).to contain_exactly("Day", "Count")
+      expect(report.second).to contain_exactly("2010-01-03", "1")
+    end
+
     it 'works with single-column reports with default label' do
       user.user_visits.create!(visited_at: '2010-01-01')
       Fabricate(:user).user_visits.create!(visited_at: '2010-01-03')
 
-      exporter.instance_variable_get(:@extra)['name'] = 'visits'
+      exporter.extra['name'] = 'visits'
       report = exporter.report_export.to_a
 
       expect(report.first).to contain_exactly("Day", "Count")
@@ -82,13 +118,68 @@ describe Jobs::ExportCsvFile do
       DiscourseIpInfo.stubs(:get).with("1.1.1.1").returns(location: "Earth")
       user.user_auth_token_logs.create!(action: "login", client_ip: "1.1.1.1", created_at: '2010-01-01')
 
-      exporter.instance_variable_get(:@extra)['name'] = 'staff_logins'
+      exporter.extra['name'] = 'staff_logins'
       report = exporter.report_export.to_a
 
       expect(report.first).to contain_exactly("User", "Location", "Login at")
       expect(report.second).to contain_exactly(user.username, "Earth", "2010-01-01 00:00:00 UTC")
     end
 
+    it 'works with topic reports' do
+      freeze_time DateTime.parse('2010-01-01 6:00')
+
+      exporter.extra['name'] = 'top_referred_topics'
+      post1 = Fabricate(:post)
+      post2 = Fabricate(:post)
+      IncomingLink.add(host: "a.com", referer: "http://twitter.com", post_id: post1.id, ip_address: '1.1.1.1')
+
+      report = exporter.report_export.to_a
+
+      expect(report.first).to contain_exactly("Topic", "Clicks")
+      expect(report.second).to contain_exactly(post1.topic.id.to_s, "1")
+    end
+
+    it 'works with stacked_chart reports' do
+      ApplicationRequest.create!(date: '2010-01-01', req_type: 'page_view_logged_in', count: 1)
+      ApplicationRequest.create!(date: '2010-01-02', req_type: 'page_view_logged_in', count: 2)
+      ApplicationRequest.create!(date: '2010-01-03', req_type: 'page_view_logged_in', count: 3)
+
+      ApplicationRequest.create!(date: '2010-01-01', req_type: 'page_view_anon', count: 4)
+      ApplicationRequest.create!(date: '2010-01-02', req_type: 'page_view_anon', count: 5)
+      ApplicationRequest.create!(date: '2010-01-03', req_type: 'page_view_anon', count: 6)
+
+      ApplicationRequest.create!(date: '2010-01-01', req_type: 'page_view_crawler', count: 7)
+      ApplicationRequest.create!(date: '2010-01-02', req_type: 'page_view_crawler', count: 8)
+      ApplicationRequest.create!(date: '2010-01-03', req_type: 'page_view_crawler', count: 9)
+
+      exporter.extra['name'] = 'consolidated_page_views'
+      report = exporter.report_export.to_a
+
+      expect(report[0]).to contain_exactly("Day", "Logged in users", "Anonymous users", "Crawlers")
+      expect(report[1]).to contain_exactly("2010-01-01", "1", "4", "7")
+      expect(report[2]).to contain_exactly("2010-01-02", "2", "5", "8")
+      expect(report[3]).to contain_exactly("2010-01-03", "3", "6", "9")
+    end
+
+    it 'works with posts reports and filters' do
+      category = Fabricate(:category)
+      subcategory = Fabricate(:category, parent_category: category)
+
+      Fabricate(:post, topic: Fabricate(:topic, category: category), created_at: '2010-01-01 12:00:00 UTC')
+      Fabricate(:post, topic: Fabricate(:topic, category: subcategory), created_at: '2010-01-01 12:00:00 UTC')
+
+      exporter.extra['name'] = 'posts'
+
+      exporter.extra['category'] = category.id
+      report = exporter.report_export.to_a
+      expect(report[0]).to contain_exactly("Count", "Day")
+      expect(report[1]).to contain_exactly("1", "2010-01-01")
+
+      exporter.extra['include_subcategories'] = true
+      report = exporter.report_export.to_a
+      expect(report[0]).to contain_exactly("Count", "Day")
+      expect(report[1]).to contain_exactly("2", "2010-01-01")
+    end
   end
 
   let(:user_list_header) {
@@ -119,8 +210,8 @@ describe Jobs::ExportCsvFile do
   end
 
   it 'exports sso data' do
-    SiteSetting.sso_url = "https://www.example.com/sso"
-    SiteSetting.enable_sso = true
+    SiteSetting.discourse_connect_url = "https://www.example.com/sso"
+    SiteSetting.enable_discourse_connect = true
     user = Fabricate(:user)
     user.user_profile.update_column(:location, "La,La Land")
     user.create_single_sign_on_record(external_id: "123", last_payload: "xxx", external_email: 'test@test.com')

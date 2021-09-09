@@ -6,7 +6,8 @@ class SiteCategorySerializer < BasicCategorySerializer
              :allowed_tag_groups,
              :allow_global_tags,
              :min_tags_from_required_group,
-             :required_tag_group_name
+             :required_tag_group_name,
+             :read_only_banner
 
   def include_allowed_tags?
     SiteSetting.tagging_enabled
@@ -31,5 +32,4 @@ class SiteCategorySerializer < BasicCategorySerializer
   def required_tag_group_name
     object.required_tag_group&.name
   end
-
 end

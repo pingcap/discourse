@@ -58,7 +58,6 @@ class ImportScripts::Base
       update_post_timings
       update_feature_topic_users
       update_category_featured_topics
-      update_topic_count_replies
       reset_topic_counters
     end
 
@@ -71,17 +70,22 @@ class ImportScripts::Base
 
   def get_site_settings_for_import
     {
-      email_domains_blacklist: '',
+      blocked_email_domains: '',
       min_topic_title_length: 1,
       min_post_length: 1,
       min_first_post_length: 1,
       min_personal_message_post_length: 1,
       min_personal_message_title_length: 1,
       allow_duplicate_topic_titles: true,
+      allow_duplicate_topic_titles_category: false,
       disable_emails: 'yes',
       max_attachment_size_kb: 102400,
       max_image_size_kb: 102400,
-      authorized_extensions: '*'
+      authorized_extensions: '*',
+      clean_up_inactive_users_after_days: 0,
+      clean_up_unused_staged_users_after_days: 0,
+      clean_up_uploads: false,
+      clean_orphan_uploads_grace_period_hours: 1800
     }
   end
 
@@ -100,7 +104,9 @@ class ImportScripts::Base
     end
 
     # Some changes that should not be rolled back after the script is done
-    SiteSetting.purge_unactivated_users_grace_period_days = 60
+    if SiteSetting.purge_unactivated_users_grace_period_days > 0
+      SiteSetting.purge_unactivated_users_grace_period_days = 60
+    end
     SiteSetting.purge_deleted_uploads_grace_period_days = 90
 
     RateLimiter.disable
@@ -125,14 +131,21 @@ class ImportScripts::Base
     raise NotImplementedError
   end
 
-  %i{ post_id_from_imported_post_id
-      topic_lookup_from_imported_post_id
-      group_id_from_imported_group_id
-      find_group_by_import_id
-      user_id_from_imported_user_id
-      find_user_by_import_id
-      category_id_from_imported_category_id
-      add_group add_user add_category add_topic add_post
+  %i{
+    add_category
+    add_group
+    add_post
+    add_topic
+    add_user
+    category_id_from_imported_category_id
+    find_group_by_import_id
+    find_user_by_import_id
+    group_id_from_imported_group_id
+    post_already_imported?
+    post_id_from_imported_post_id
+    topic_lookup_from_imported_post_id
+    user_already_imported?
+    user_id_from_imported_user_id
   }.each do |method_name|
     delegate method_name, to: :@lookup
   end
@@ -208,24 +221,28 @@ class ImportScripts::Base
   def all_records_exist?(type, import_ids)
     return false if import_ids.empty?
 
-    connection = ActiveRecord::Base.connection.raw_connection
-    connection.exec('CREATE TEMP TABLE import_ids(val text PRIMARY KEY)')
+    ActiveRecord::Base.transaction do
+      begin
+        connection = ActiveRecord::Base.connection.raw_connection
+        connection.exec('CREATE TEMP TABLE import_ids(val text PRIMARY KEY)')
 
-    import_id_clause = import_ids.map { |id| "('#{PG::Connection.escape_string(id.to_s)}')" }.join(",")
+        import_id_clause = import_ids.map { |id| "('#{PG::Connection.escape_string(id.to_s)}')" }.join(",")
 
-    connection.exec("INSERT INTO import_ids VALUES #{import_id_clause}")
+        connection.exec("INSERT INTO import_ids VALUES #{import_id_clause}")
 
-    existing = "#{type.to_s.classify}CustomField".constantize
-    existing = existing.where(name: 'import_id')
-      .joins('JOIN import_ids ON val = value')
-      .count
+        existing = "#{type.to_s.classify}CustomField".constantize
+        existing = existing.where(name: 'import_id')
+          .joins('JOIN import_ids ON val = value')
+          .count
 
-    if existing == import_ids.length
-      puts "Skipping #{import_ids.length} already imported #{type}"
-      return true
+        if existing == import_ids.length
+          puts "Skipping #{import_ids.length} already imported #{type}"
+          true
+        end
+      ensure
+        connection.exec('DROP TABLE import_ids') unless connection.nil?
+      end
     end
-  ensure
-    connection.exec('DROP TABLE import_ids') unless connection.nil?
   end
 
   def created_user(user)
@@ -358,8 +375,6 @@ class ImportScripts::Base
     if u.custom_fields['import_email']
       u.suspended_at = Time.zone.at(Time.now)
       u.suspended_till = 200.years.from_now
-      ban_reason = 'Invalid email address on import'
-      u.active = false
       u.save!
 
       user_option = u.user_option
@@ -368,7 +383,7 @@ class ImportScripts::Base
       user_option.email_messages_level = UserOption.email_level_types[:never]
       user_option.save!
       if u.save
-        StaffActionLogger.new(Discourse.system_user).log_user_suspend(u, ban_reason)
+        StaffActionLogger.new(Discourse.system_user).log_user_suspend(u, 'Invalid email address on import')
       else
         Rails.logger.error("Failed to suspend user #{u.username}. #{u.errors.try(:full_messages).try(:inspect)}")
       end
@@ -415,7 +430,7 @@ class ImportScripts::Base
         # make sure categories don't go more than 2 levels deep
         if params[:parent_category_id]
           top = Category.find_by_id(params[:parent_category_id])
-          top = top.parent_category while top && !top.parent_category.nil?
+          top = top.parent_category while (top&.height_of_ancestors || -1) + 1 >= SiteSetting.max_category_nesting
           params[:parent_category_id] = top.id if top
         end
 
@@ -432,8 +447,13 @@ class ImportScripts::Base
   end
 
   def create_category(opts, import_id)
-    existing = Category.where("LOWER(name) = ?", opts[:name].downcase).first
-    return existing if existing && existing.parent_category.try(:id) == opts[:parent_category_id]
+    existing =
+      Category
+        .where(parent_category_id: opts[:parent_category_id])
+        .where("LOWER(name) = ?", opts[:name].downcase.strip)
+        .first
+
+    return existing if existing
 
     post_create_action = opts.delete(:post_create_action)
 
@@ -588,9 +608,15 @@ class ImportScripts::Base
           skipped += 1
           puts "Skipping bookmark for user id #{params[:user_id]} and post id #{params[:post_id]}"
         else
-          result = PostActionCreator.create(user, post, :bookmark)
-          created += 1 if result.success?
-          skipped += 1 if result.failed?
+          begin
+            manager = BookmarkManager.new(user)
+            bookmark = manager.create(post_id: post.id)
+
+            created += 1 if manager.errors.none?
+            skipped += 1 if manager.errors.any?
+          rescue
+            skipped += 1
+          end
         end
       end
 
@@ -666,24 +692,11 @@ class ImportScripts::Base
       FROM users u1
       JOIN lpa ON lpa.user_id = u1.id
       WHERE u1.id = users.id
-        AND users.last_posted_at <> lpa.last_posted_at
+        AND users.last_posted_at IS DISTINCT FROM lpa.last_posted_at
     SQL
   end
 
   def update_user_stats
-    puts "", "Updating topic reply counts..."
-
-    count = 0
-    total = User.real.count
-
-    User.real.find_each do |u|
-      u.create_user_stat if u.user_stat.nil?
-      us = u.user_stat
-      us.update_topic_reply_count
-      us.save
-      print_status(count += 1, total, get_start_time("user_stats"))
-    end
-
     puts "", "Updating first_post_created_at..."
 
     DB.exec <<~SQL
@@ -697,7 +710,7 @@ class ImportScripts::Base
       FROM user_stats u1
       JOIN sub ON sub.user_id = u1.user_id
       WHERE u1.user_id = user_stats.user_id
-        AND user_stats.first_post_created_at <> sub.first_post_created_at
+        AND user_stats.first_post_created_at IS DISTINCT FROM sub.first_post_created_at
     SQL
 
     puts "", "Updating user post_count..."
@@ -731,6 +744,10 @@ class ImportScripts::Base
       WHERE u1.user_id = user_stats.user_id
         AND user_stats.topic_count <> sub.topic_count
     SQL
+
+    puts "", "Updating user digest_attempted_at..."
+
+    DB.exec("UPDATE user_stats SET digest_attempted_at = now() - random() * interval '1 week' WHERE digest_attempted_at IS NULL")
   end
 
   # scripts that are able to import last_seen_at from the source data should override this method
@@ -745,8 +762,8 @@ class ImportScripts::Base
     puts "", "Updating topic users"
 
     DB.exec <<~SQL
-      INSERT INTO topic_users (user_id, topic_id, posted, last_read_post_number, highest_seen_post_number, first_visited_at, last_visited_at, total_msecs_viewed)
-           SELECT user_id, topic_id, 't' , MAX(post_number), MAX(post_number), MIN(created_at), MAX(created_at), COUNT(id) * 5000
+      INSERT INTO topic_users (user_id, topic_id, posted, last_read_post_number, first_visited_at, last_visited_at, total_msecs_viewed)
+           SELECT user_id, topic_id, 't' , MAX(post_number), MIN(created_at), MAX(created_at), COUNT(id) * 5000
              FROM posts
             WHERE user_id > 0
          GROUP BY user_id, topic_id
@@ -785,19 +802,6 @@ class ImportScripts::Base
     Category.find_each do |category|
       CategoryFeaturedTopic.feature_topics_for(category)
       print_status(count += 1, total, get_start_time("category_featured_topics"))
-    end
-  end
-
-  def update_topic_count_replies
-    puts "", "Updating user topic reply counts"
-
-    count = 0
-    total = User.real.count
-
-    User.real.find_each do |u|
-      u.user_stat.update_topic_reply_count
-      u.user_stat.save!
-      print_status(count += 1, total, get_start_time("topic_count_replies"))
     end
   end
 

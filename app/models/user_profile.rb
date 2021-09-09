@@ -1,15 +1,11 @@
 # frozen_string_literal: true
 
 class UserProfile < ActiveRecord::Base
-  self.ignored_columns = %w{
-    card_background
-    profile_background
-  }
-
   belongs_to :user, inverse_of: :user_profile
   belongs_to :card_background_upload, class_name: "Upload"
   belongs_to :profile_background_upload, class_name: "Upload"
   belongs_to :granted_title_badge, class_name: "Badge"
+  belongs_to :featured_topic, class_name: 'Topic'
 
   validates :bio_raw, length: { maximum: 3000 }
   validates :website, url: true, allow_blank: true, if: Proc.new { |c| c.new_record? || c.website_changed? }
@@ -78,6 +74,10 @@ class UserProfile < ActiveRecord::Base
   end
 
   def self.import_url_for_user(background_url, user, options = nil)
+    if SiteSetting.verbose_upload_logging
+      Rails.logger.warn("Verbose Upload Logging: Downloading profile background from #{background_url}")
+    end
+
     tempfile = FileHelper.download(
       background_url,
       max_file_size: SiteSetting.max_image_size_kb.kilobytes,
@@ -135,7 +135,7 @@ class UserProfile < ActiveRecord::Base
   end
 
   def website_domain_validator
-    allowed_domains = SiteSetting.user_website_domains_whitelist
+    allowed_domains = SiteSetting.allowed_user_website_domains
     return if (allowed_domains.blank? || self.website.blank?)
 
     domain = begin
@@ -145,6 +145,9 @@ class UserProfile < ActiveRecord::Base
     self.errors.add :base, (I18n.t('user.website.domain_not_allowed', domains: allowed_domains.split('|').join(", "))) unless allowed_domains.split('|').include?(domain)
   end
 
+  def self.remove_featured_topic_from_all_profiles(topic)
+    where(featured_topic_id: topic.id).update_all(featured_topic_id: nil)
+  end
 end
 
 # == Schema Information
@@ -163,13 +166,14 @@ end
 #  profile_background_upload_id :integer
 #  card_background_upload_id    :integer
 #  granted_title_badge_id       :bigint
+#  featured_topic_id            :integer
 #
 # Indexes
 #
-#  index_user_profiles_on_bio_cooked_version      (bio_cooked_version)
-#  index_user_profiles_on_card_background         (card_background)
-#  index_user_profiles_on_granted_title_badge_id  (granted_title_badge_id)
-#  index_user_profiles_on_profile_background      (profile_background)
+#  index_user_profiles_on_bio_cooked_version            (bio_cooked_version)
+#  index_user_profiles_on_card_background_upload_id     (card_background_upload_id)
+#  index_user_profiles_on_granted_title_badge_id        (granted_title_badge_id)
+#  index_user_profiles_on_profile_background_upload_id  (profile_background_upload_id)
 #
 # Foreign Keys
 #

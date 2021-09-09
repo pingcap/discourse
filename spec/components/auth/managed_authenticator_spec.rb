@@ -12,7 +12,7 @@ describe Auth::ManagedAuthenticator do
   }
 
   let(:hash) {
-    {
+    OmniAuth::AuthHash.new(
       provider: "myauth",
       uid: "1234",
       info: {
@@ -28,14 +28,14 @@ describe Auth::ManagedAuthenticator do
           randominfo: "some info"
         }
       }
-    }
+    )
   }
 
   let(:create_hash) {
-    {
+    OmniAuth::AuthHash.new(
       provider: "myauth",
       uid: "1234"
-    }
+    )
   }
 
   describe 'after_authenticate' do
@@ -51,6 +51,18 @@ describe Auth::ManagedAuthenticator do
       expect(associated.info["email"]).to eq("awesome@example.com")
       expect(associated.credentials["token"]).to eq("supersecrettoken")
       expect(associated.extra["raw_info"]["randominfo"]).to eq("some info")
+    end
+
+    it 'only sets email valid for present strings' do
+      # (Twitter sometimes sends empty email strings)
+      result = authenticator.after_authenticate(create_hash.merge(info: { email: "email@example.com" }))
+      expect(result.email_valid).to eq(true)
+
+      result = authenticator.after_authenticate(create_hash.merge(info: { email: "" }))
+      expect(result.email_valid).to be_falsey
+
+      result = authenticator.after_authenticate(create_hash.merge(info: { email: nil }))
+      expect(result.email_valid).to be_falsey
     end
 
     describe 'connecting to another user account' do
@@ -150,6 +162,12 @@ describe Auth::ManagedAuthenticator do
         }.to change { UserAssociatedAccount.count }.by(1)
         expect(UserAssociatedAccount.last.user).to eq(nil)
         expect(UserAssociatedAccount.last.info["nickname"]).to eq("IAmGroot")
+      end
+
+      it 'will ignore name when equal to email' do
+        result = authenticator.after_authenticate(hash.deep_merge(info: { name: hash.info.email }))
+        expect(result.email).to eq(hash.info.email)
+        expect(result.name).to eq(nil)
       end
     end
 

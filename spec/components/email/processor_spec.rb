@@ -5,7 +5,7 @@ require "email/processor"
 
 describe Email::Processor do
   after do
-    $redis.flushall
+    Discourse.redis.flushdb
   end
 
   let(:from) { "foo@bar.com" }
@@ -59,13 +59,15 @@ describe Email::Processor do
     end
 
     it "enqueues a background job by default" do
-      Jobs.expects(:enqueue).with(:process_email, mail: mail)
-      Email::Processor.process!(mail)
+      expect_enqueued_with(job: :process_email, args: { mail: mail }) do
+        Email::Processor.process!(mail, retry_on_rate_limit: true)
+      end
     end
 
     it "doesn't enqueue a background job when retry is disabled" do
-      Jobs.expects(:enqueue).with(:process_email, mail: mail).never
-      expect { Email::Processor.process!(mail, false) }.to raise_error(limit_exceeded)
+      expect_not_enqueued_with(job: :process_email, args: { mail: mail }) do
+        expect { Email::Processor.process!(mail, retry_on_rate_limit: false) }.to raise_error(limit_exceeded)
+      end
     end
 
   end
@@ -78,7 +80,7 @@ describe Email::Processor do
 
     it "only sends one rejection email per day" do
       key = "rejection_email:#{[from]}:email_reject_empty:#{Date.today}"
-      $redis.expire(key, 0)
+      Discourse.redis.expire(key, 0)
 
       expect {
         Email::Processor.process!(mail)
@@ -91,7 +93,7 @@ describe Email::Processor do
       freeze_time(Date.today + 1)
 
       key = "rejection_email:#{[from]}:email_reject_empty:#{Date.today}"
-      $redis.expire(key, 0)
+      Discourse.redis.expire(key, 0)
 
       expect {
         Email::Processor.process!(mail3)
@@ -131,7 +133,7 @@ describe Email::Processor do
     it "sends more than one rejection email per day" do
       Email::Receiver.any_instance.stubs(:process_internal).raises("boom")
       key = "rejection_email:#{[from]}:email_reject_unrecognized_error:#{Date.today}"
-      $redis.expire(key, 0)
+      Discourse.redis.expire(key, 0)
 
       expect {
         Email::Processor.process!(mail)

@@ -7,7 +7,7 @@
   display: grid;
   grid-template-columns: 1fr 5fr;
   grid-template-rows: auto auto 1fr auto;
-  grid-row-gap: s(5);
+  grid-row-gap: 20px;
   .user-primary-navigation {
     grid-column-start: 1;
     grid-column-end: 3;
@@ -31,6 +31,7 @@
   .user-content {
     min-width: 100%;
   }
+
   .user-additional-controls + .user-content,
   .user-secondary-navigation + .user-content {
     grid-column-start: 2;
@@ -43,45 +44,13 @@
   }
 }
 
-.user-content-wrapper {
-  // IE11 Support
-  display: -ms-grid;
-  -ms-grid-columns: 1fr 5fr;
-  -ms-grid-rows: auto auto 1fr auto;
-  .user-primary-navigation {
-    -ms-grid-row: 1;
-    -ms-grid-column: 1;
-    -ms-grid-column-span: 2;
-  }
-  .user-secondary-navigation {
-    -ms-grid-row: 2;
-    -ms-grid-column: 1;
-  }
-  .solo-preference,
-  .user-content,
-  .spinner {
-    -ms-grid-row: 2;
-    -ms-grid-column: 2;
-    -ms-grid-column-span: 2;
-  }
-  .user-secondary-navigation + .user-content {
-    -ms-grid-column: 2;
-    -ms-grid-column-span: 1;
-  }
-  .user-additional-controls {
-    -ms-grid-row: 3;
-    -ms-grid-column-align: start;
-    -ms-grid-row-align: start;
-  }
-}
-
 .user-content {
   .list-actions {
     display: flex;
-    margin-bottom: s(3);
+    margin-bottom: 12px;
 
     .btn {
-      margin-right: s(3);
+      margin-right: 12px;
     }
   }
 
@@ -94,7 +63,13 @@
   }
 
   .d-icon-heart {
-    color: $love;
+    color: var(--love);
+  }
+
+  .user-notifications-filter-select-kit {
+    display: block;
+    width: 100%;
+    border-bottom: 0.5px solid var(--primary-low);
   }
 }
 
@@ -117,7 +92,7 @@
     .secondary {
       display: inline-block;
       width: 100%;
-      border-top: 1px solid $primary-low;
+      border-top: 1px solid var(--primary-low);
 
       .btn {
         padding: 4px 12px;
@@ -143,7 +118,7 @@
       dd {
         padding: 0;
         margin: 0 15px 0 0;
-        color: $primary;
+        color: var(--primary);
 
         &.groups {
           span:not(:last-of-type) {
@@ -159,15 +134,15 @@
       }
 
       dt {
-        color: $secondary-medium;
+        color: var(--secondary-medium);
         margin-right: 5px;
         display: inline-block;
       }
     }
 
     .details {
-      background: rgba($secondary, 0.8);
-      border-bottom: 1px solid $primary-low;
+      background: rgba(var(--secondary-rgb), 0.8);
+      border-bottom: 1px solid var(--primary-low);
 
       h1 {
         font-size: $font-up-5;
@@ -201,7 +176,7 @@
       }
 
       .suspended {
-        color: $danger;
+        color: var(--danger);
       }
 
       .primary {
@@ -239,18 +214,18 @@
     .controls {
       ul {
         list-style-type: none;
+        margin-top: 0;
       }
 
       .btn {
         margin-bottom: 10px;
-        line-height: $line-height-medium;
       }
     }
 
     &.collapsed-info {
       .details {
         margin-top: 0;
-        background: rgba($secondary, 0.8);
+        background: rgba(var(--secondary-rgb), 0.8);
 
         .bio {
           display: none;
@@ -292,18 +267,18 @@
   }
 
   .staff-counters {
-    background: $primary;
-    color: $secondary;
+    background: var(--primary);
+    color: var(--secondary);
     display: flex;
     padding: 10px;
-    margin-bottom: s(4);
+    margin-bottom: 16px;
     > div,
     > div a {
       display: flex;
       align-items: baseline;
       flex: 0 1 auto;
       margin: 0 10px 0 0;
-      color: $secondary;
+      color: var(--secondary);
 
       span {
         padding: 0 7px 1px;
@@ -318,7 +293,7 @@
   }
 
   .helpful-flags {
-    background-color: $success;
+    background-color: var(--success);
   }
 
   .flagged-posts {
@@ -326,15 +301,15 @@
   }
 
   .warnings-received {
-    background-color: $danger-medium;
+    background-color: var(--danger-medium);
   }
 
   .deleted-posts {
-    background-color: $danger-medium;
+    background-color: var(--danger-medium);
   }
 
   .suspensions {
-    background-color: $danger;
+    background-color: var(--danger);
   }
 
   .user-field {
@@ -348,7 +323,7 @@
       }
 
       .instructions {
-        color: $primary-medium;
+        color: var(--primary-medium);
         margin-top: 5px;
         margin-bottom: 10px;
         font-size: $font-down-1;
@@ -365,10 +340,12 @@
   }
 }
 
-.user-field {
+.login-form,
+.user-field,
+.invites-show {
   .required {
     vertical-align: top;
-    color: $danger;
+    color: var(--danger);
     font-weight: bold;
     margin-left: 0.25em;
   }
@@ -384,6 +361,13 @@
 
   .collapsed-info & {
     display: none;
+  }
+
+  .user-field-value-list-item:not(:last-of-type) {
+    &:after {
+      // create comma separated list
+      content: ",";
+    }
   }
 }
 
@@ -419,34 +403,11 @@
     }
   }
   .error {
-    color: $danger;
+    color: var(--danger);
     margin: 0;
     max-width: calc(#{$label-max-width} - 20px);
     grid-column-start: 2;
     grid-column-end: 3;
-  }
-
-  // IE11 Support
-  .avatar-choice {
-    display: -ms-grid;
-    -ms-grid-columns: 2em 1fr auto;
-    -ms-grid-rows: auto auto;
-    input[type="radio"] {
-      -ms-grid-row: 1;
-      -ms-grid-column: 1;
-    }
-    label.radio {
-      -ms-grid-row: 1;
-      -ms-grid-column: 2;
-    }
-    span.avatar-uploader {
-      -ms-grid-row: 1;
-      -ms-grid-column: 3;
-    }
-    .error {
-      -ms-grid-row: 2;
-      -ms-grid-column-span: 3;
-    }
   }
 }
 
@@ -465,6 +426,10 @@
     display: flex;
     flex-wrap: wrap;
   }
+}
+
+.user-badges {
+  margin-bottom: 2em;
 }
 
 .stats-title {
@@ -491,7 +456,7 @@
         width: 100%;
         height: 100%;
         display: block;
-        color: $primary;
+        color: var(--primary);
       }
     }
   }
@@ -502,7 +467,7 @@
   }
 
   .label {
-    color: $primary-medium;
+    color: var(--primary-medium);
   }
 }
 
@@ -514,13 +479,13 @@
   }
 
   li {
-    border-left: $primary-low solid 2px;
+    border-left: var(--primary-low) solid 2px;
     padding: 5px 8px;
     margin: 10px 0;
   }
 
   .topic-info {
-    color: $primary-medium;
+    color: var(--primary-medium);
   }
 
   @media all and (max-width: 600px) {
@@ -540,7 +505,7 @@
 .links-section {
   .domain {
     font-size: $font-down-1;
-    color: $primary-medium;
+    color: var(--primary-medium);
   }
 }
 
@@ -569,7 +534,7 @@
 
 .groups {
   .group-link {
-    color: $tertiary;
+    color: var(--tertiary);
   }
 }
 
@@ -597,18 +562,18 @@
   }
 
   .static {
-    color: $primary;
+    color: var(--primary);
     display: inline-block;
   }
 
   .instructions {
-    color: $primary-medium;
+    color: var(--primary-medium);
     margin-bottom: 10px;
     font-size: $font-down-1;
     line-height: $line-height-large;
 
     a[href] {
-      color: $tertiary;
+      color: var(--tertiary);
     }
   }
 
@@ -617,9 +582,9 @@
   }
 
   .warning {
-    background-color: $danger-medium;
+    background-color: var(--danger-medium);
     padding: 5px 8px;
-    color: $secondary;
+    color: var(--secondary);
     width: 520px;
   }
 
@@ -639,8 +604,13 @@
       margin-right: 10px;
     }
 
-    .form-horizontal .instructions {
-      margin-left: 0;
+    .form-horizontal {
+      .instructions {
+        margin-left: 0;
+      }
+      .actions {
+        margin-top: 5px;
+      }
     }
 
     .backup-codes {
@@ -649,9 +619,9 @@
       .wrapper {
         display: inline-block;
         position: relative;
-        padding: 10px;
         border-radius: 3px;
-        border: 1px solid $primary-low;
+        border: 1px solid var(--primary-low);
+        width: 100%;
       }
 
       .backup-codes-area {
@@ -659,17 +629,16 @@
         padding: 0;
         height: auto;
         text-align: center;
-        width: 250px;
-        background: white;
+        width: 100%;
+        background: var(--secondary);
         border: 0;
         cursor: auto;
-        overflow: hidden;
         outline: none;
         font-family: monospace;
 
         &:focus {
           box-shadow: none;
-          border-color: $primary-low;
+          border-color: var(--primary-low);
         }
       }
 
@@ -694,6 +663,53 @@
       padding: 8px;
     }
   }
+  .featured-topic-link {
+    padding: 5px 0;
+    font-weight: bold;
+  }
+  .save-theme-alert {
+    font-size: $font-down-1;
+  }
+
+  .control-subgroup {
+    float: left;
+    + .controls {
+      clear: both;
+      padding-top: 1em;
+    }
+  }
+
+  .light-color-scheme {
+    margin-right: 1em;
+  }
+
+  .instructions {
+    clear: both;
+    display: inline-block;
+    margin-top: 4px;
+  }
+
+  @mixin inactiveMode() {
+    color: var(--primary-medium);
+    .select-kit.combo-box .select-kit-header {
+      border-color: var(--primary-medium);
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .light-color-scheme {
+      @include inactiveMode;
+    }
+  }
+  @media (prefers-color-scheme: light) {
+    .dark-color-scheme {
+      @include inactiveMode;
+    }
+  }
+
+  .undo-preview {
+    margin-bottom: 1em;
+  }
 }
 
 .paginated-topics-list {
@@ -701,6 +717,10 @@
     width: 100%;
     margin-top: 0;
   }
+}
+
+.large-notifications {
+  margin: 0;
 }
 
 .large-notification {
@@ -716,7 +736,7 @@
     }
 
     span:first-child {
-      color: $primary;
+      color: var(--primary);
     }
 
     // Can remove this once other languages have removed html from i18n values
@@ -741,7 +761,7 @@
 
 .second-factor {
   &.instructions {
-    color: $primary-medium;
+    color: var(--primary-medium);
     margin-top: 5px;
     margin-bottom: 10px;
     font-size: $font-down-1;
@@ -755,7 +775,7 @@
 }
 
 .primary-textual .staged,
-#user-card .staged {
+.user-card .staged {
   font-style: italic;
 }
 
@@ -771,7 +791,60 @@
       width: 60px;
       height: 60px;
       &:hover {
-        box-shadow: 0 0 10px $primary;
+        box-shadow: 0 0 10px var(--primary);
+      }
+    }
+  }
+}
+
+.timezone-input {
+  margin-bottom: 0.5em;
+}
+
+.user-invites-page {
+  .user-invite-search {
+    clear: both;
+    margin: 15px 0px -15px 0px;
+  }
+
+  .invite-error {
+    grid-column: 1 / span 2;
+  }
+
+  table.user-invite-list {
+    .invite-type {
+      .d-icon {
+        color: var(--primary-medium);
+      }
+    }
+
+    .invite-extra {
+      font-size: $font-down-1;
+      margin: 0.25em 0;
+
+      a {
+        color: var(--primary-medium);
+      }
+    }
+  }
+}
+
+.notification-schedule {
+  .instruction {
+    margin-top: 12px;
+    margin-bottom: 10px;
+  }
+
+  .notification-schedule-table {
+    .notification-schedule-tbody {
+      border-top-width: 1px;
+      .day {
+        .day-label {
+          padding: 1em 1em 1em 0;
+        }
+        .to {
+          padding: 0 0.5em;
+        }
       }
     }
   }

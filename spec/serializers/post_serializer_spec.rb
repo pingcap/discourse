@@ -106,14 +106,8 @@ describe PostSerializer do
   end
 
   context "a hidden post with add_raw enabled" do
-    let(:user) { Fabricate.build(:user, id: 101) }
+    let(:user) { Fabricate.build(:user, id: -99999) }
     let(:raw)  { "Raw contents of the post." }
-
-    def serialized_post_for_user(u)
-      s = PostSerializer.new(post, scope: Guardian.new(u), root: false)
-      s.add_raw = true
-      s.as_json
-    end
 
     context "a public post" do
       let(:post) { Fabricate.build(:post, raw: raw, user: user) }
@@ -207,8 +201,7 @@ describe PostSerializer do
 
     let(:post) {
       post = Fabricate(:post, user: user)
-      post.custom_fields[Post::NOTICE_TYPE] = Post.notices[:returning_user]
-      post.custom_fields[Post::NOTICE_ARGS] = 1.day.ago
+      post.custom_fields[Post::NOTICE] = { type: Post.notices[:returning_user], last_posted_at: 1.day.ago }
       post.save_custom_fields
       post
     }
@@ -218,17 +211,73 @@ describe PostSerializer do
     end
 
     it "is visible for TL2+ users (except poster)" do
-      expect(json_for_user(nil)[:notice_type]).to eq(nil)
-      expect(json_for_user(user)[:notice_type]).to eq(nil)
+      expect(json_for_user(nil)[:notice]).to eq(nil)
+      expect(json_for_user(user)[:notice]).to eq(nil)
 
       SiteSetting.returning_user_notice_tl = 2
-      expect(json_for_user(user_tl1)[:notice_type]).to eq(nil)
-      expect(json_for_user(user_tl2)[:notice_type]).to eq(Post.notices[:returning_user])
+      expect(json_for_user(user_tl1)[:notice]).to eq(nil)
+      expect(json_for_user(user_tl2)[:notice][:type]).to eq(Post.notices[:returning_user])
 
       SiteSetting.returning_user_notice_tl = 1
-      expect(json_for_user(user_tl1)[:notice_type]).to eq(Post.notices[:returning_user])
-      expect(json_for_user(user_tl2)[:notice_type]).to eq(Post.notices[:returning_user])
+      expect(json_for_user(user_tl1)[:notice][:type]).to eq(Post.notices[:returning_user])
+      expect(json_for_user(user_tl2)[:notice][:type]).to eq(Post.notices[:returning_user])
     end
   end
 
+  context "post with bookmarks" do
+    let(:current_user) { Fabricate(:user) }
+    let(:topic_view) { TopicView.new(post.topic, current_user) }
+    let(:serialized) do
+      s = serialized_post(current_user)
+      s.post_actions = PostAction.counts_for([post], current_user)[post.id]
+      s.topic_view = topic_view
+      s
+    end
+
+    context "when a Bookmark record exists for the user on the post" do
+      let!(:bookmark) { Fabricate(:bookmark_next_business_day_reminder, user: current_user, post: post) }
+
+      context "bookmarks with reminders" do
+        it "returns true" do
+          expect(serialized.as_json[:bookmarked]).to eq(true)
+        end
+
+        it "returns the reminder_at for the bookmark" do
+          expect(serialized.as_json[:bookmark_reminder_at]).to eq(bookmark.reminder_at.iso8601)
+        end
+      end
+    end
+  end
+
+  context "posts when group moderation is enabled" do
+    fab!(:topic) { Fabricate(:topic) }
+    fab!(:group_user) { Fabricate(:group_user) }
+    fab!(:post) { Fabricate(:post, topic: topic) }
+
+    before do
+      SiteSetting.enable_category_group_moderation = true
+      topic.category.update!(reviewable_by_group_id: group_user.group.id)
+    end
+
+    it "does nothing for regular users" do
+      expect(serialized_post_for_user(nil)[:group_moderator]).to eq(nil)
+    end
+
+    it "returns a group_moderator attribute for category group moderators" do
+      post.update!(user: group_user.user)
+      expect(serialized_post_for_user(nil)[:group_moderator]).to eq(true)
+    end
+
+  end
+
+  def serialized_post(u)
+    s = PostSerializer.new(post, scope: Guardian.new(u), root: false)
+    s.add_raw = true
+    s
+  end
+
+  def serialized_post_for_user(u)
+    s = serialized_post(u)
+    s.as_json
+  end
 end

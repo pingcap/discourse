@@ -3,8 +3,9 @@
 # Ensure that scheduled jobs are loaded before mini_scheduler is configured.
 if Rails.env == "development"
   require "jobs/base"
+
   Dir.glob("#{Rails.root}/app/jobs/scheduled/*.rb") do |f|
-    load(f)
+    require(f)
   end
 end
 
@@ -24,7 +25,7 @@ end
 
 MiniScheduler.configure do |config|
 
-  config.redis = $redis
+  config.redis = Discourse.redis
 
   config.job_exception_handler do |ex, context|
     Discourse.handle_job_exception(ex, context)
@@ -59,18 +60,23 @@ if Sidekiq.server?
   # defer queue should simply run in sidekiq
   Scheduler::Defer.async = false
 
-  # warm up AR
-  RailsMultisite::ConnectionManagement.safe_each_connection do
-    (ActiveRecord::Base.connection.tables - %w[schema_migrations versions]).each do |table|
-      table.classify.constantize.first rescue nil
-    end
-  end
-
   Rails.application.config.after_initialize do
+    # warm up AR
+    RailsMultisite::ConnectionManagement.safe_each_connection do
+      (ActiveRecord::Base.connection.tables - %w[schema_migrations versions]).each do |table|
+        table.classify.constantize.first rescue nil
+      end
+    end
+
     scheduler_hostname = ENV["UNICORN_SCHEDULER_HOSTNAME"]
 
-    if !scheduler_hostname || scheduler_hostname.split(',').include?(`hostname`.strip)
-      MiniScheduler.start(workers: GlobalSetting.mini_scheduler_workers)
+    if !scheduler_hostname || scheduler_hostname.split(',').include?(Discourse.os_hostname)
+      begin
+        MiniScheduler.start(workers: GlobalSetting.mini_scheduler_workers)
+      rescue MiniScheduler::DistributedMutex::Timeout
+        sleep 5
+        retry
+      end
     end
   end
 end
@@ -105,5 +111,8 @@ class SidekiqLogsterReporter < Sidekiq::ExceptionHandler::Logger
   end
 end
 
-Sidekiq.error_handlers.clear
+unless Rails.env.development?
+  Sidekiq.error_handlers.clear
+end
+
 Sidekiq.error_handlers << SidekiqLogsterReporter.new

@@ -49,7 +49,7 @@ describe Admin::UserFieldsController do
       it "returns a list of user fields" do
         get "/admin/customize/user_fields.json"
         expect(response.status).to eq(200)
-        json = ::JSON.parse(response.body)
+        json = response.parsed_body
         expect(json['user_fields']).to be_present
       end
     end
@@ -123,6 +123,21 @@ describe Admin::UserFieldsController do
         expect(response.status).to eq(200)
         user_field.reload
         expect(user_field.user_field_options.size).to eq(2)
+      end
+
+      it "removes directory column record if not public" do
+        next_position = DirectoryColumn.maximum("position") + 1
+        DirectoryColumn.create(
+          user_field_id: user_field.id,
+          enabled: false,
+          type: DirectoryColumn.types[:user_field],
+          position: next_position
+        )
+        expect {
+          put "/admin/customize/user_fields/#{user_field.id}.json", params: {
+            user_field: { show_on_profile: false, show_on_user_card: false, searchable: true }
+          }
+        }.to change { DirectoryColumn.count }.by(-1)
       end
     end
   end

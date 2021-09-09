@@ -3,13 +3,13 @@
 module Jobs
 
   class PendingUsersReminder < ::Jobs::Scheduled
-    every 1.hour
+    every 5.minutes
 
     def execute(args)
-      if SiteSetting.must_approve_users && SiteSetting.pending_users_reminder_delay >= 0
+      if SiteSetting.must_approve_users && SiteSetting.pending_users_reminder_delay_minutes >= 0
         query = AdminUserIndexQuery.new(query: 'pending', stats: false).find_users_query # default order is: users.created_at DESC
-        if SiteSetting.pending_users_reminder_delay > 0
-          query = query.where('users.created_at < ?', SiteSetting.pending_users_reminder_delay.hours.ago)
+        if SiteSetting.pending_users_reminder_delay_minutes > 0
+          query = query.where('users.created_at < ?', SiteSetting.pending_users_reminder_delay_minutes.minutes.ago)
         end
 
         newest_username = query.limit(1).select(:username).first&.username
@@ -50,15 +50,15 @@ module Jobs
     end
 
     def previous_newest_username
-      $redis.get previous_newest_username_cache_key
+      Discourse.redis.get previous_newest_username_cache_key
     end
 
     def previous_newest_username=(username)
-      $redis.setex previous_newest_username_cache_key, 7.days, username
+      Discourse.redis.setex previous_newest_username_cache_key, 7.days, username
     end
 
     def previous_newest_username_cache_key
-      "pending-users-reminder:newest-username".freeze
+      "pending-users-reminder:newest-username"
     end
 
   end

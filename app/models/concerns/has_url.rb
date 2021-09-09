@@ -22,7 +22,7 @@ module HasUrl
       return if url.blank?
 
       uri = begin
-        URI(URI.unescape(url))
+        URI(UrlHelper.unencode(url))
       rescue URI::Error
       end
 
@@ -43,6 +43,30 @@ module HasUrl
       end
 
       result || self.find_by("url LIKE ?", "%#{data[1]}")
+    end
+
+    def get_from_urls(upload_urls)
+      urls = []
+      sha1s = []
+
+      upload_urls.each do |url|
+        next if url.blank?
+
+        uri = begin
+          URI(UrlHelper.unencode(url))
+        rescue URI::Error
+        end
+
+        next if uri&.path.blank?
+        urls << uri.path
+
+        if data = extract_url(uri.path).presence
+          urls << data[1]
+          sha1s << data[2] if self.name == "Upload"
+        end
+      end
+
+      self.where(url: urls).or(self.where(sha1: sha1s))
     end
   end
 end

@@ -14,6 +14,21 @@ class ReviewableScore < ActiveRecord::Base
     )
   end
 
+  # When extending post action flags, we need to call this method in order to
+  # get the latests flags.
+  def self.reload_types
+    @types = nil
+    types
+  end
+
+  def self.add_new_types(type_names)
+    next_id = types.values.max + 1
+
+    type_names.each_with_index do |name, idx|
+      @types[name] = next_id + idx
+    end
+  end
+
   def self.statuses
     @statuses ||= Enum.new(
       pending: 0,
@@ -62,7 +77,7 @@ class ReviewableScore < ActiveRecord::Base
   #   if > 5 flags => (agreed flags / total flags) * 5.0
   def self.user_accuracy_bonus(user)
     user_stat = user&.user_stat
-    return 0.0 if user_stat.blank?
+    return 0.0 if user_stat.blank? || user.bot?
 
     calc_user_accuracy_bonus(user_stat.flags_agreed, user_stat.flags_disagreed)
   end

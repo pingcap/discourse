@@ -11,11 +11,13 @@ class Admin::ReportsController < Admin::AdminController
     reports = reports_methods.map do |name|
       type = name.to_s.gsub('report_', '')
       description = I18n.t("reports.#{type}.description", default: '')
+      description_link = I18n.t("reports.#{type}.description_link", default: '')
 
       {
         type: type,
         title: I18n.t("reports.#{type}.title"),
         description: description.presence ? description : nil,
+        description_link: description_link.presence ? description_link : nil
       }
     end
 
@@ -40,7 +42,7 @@ class Admin::ReportsController < Admin::AdminController
           report = Report.find(report_type, args)
 
           if (report_params[:cache]) && report
-            Report.cache(report, 35.minutes)
+            Report.cache(report)
           end
 
           if report.blank?
@@ -78,7 +80,7 @@ class Admin::ReportsController < Admin::AdminController
       raise Discourse::NotFound if report.blank?
 
       if (params[:cache])
-        Report.cache(report, 35.minutes)
+        Report.cache(report)
       end
 
       render_json_dump(report: report)
@@ -88,8 +90,12 @@ class Admin::ReportsController < Admin::AdminController
   private
 
   def parse_params(report_params)
-    start_date = (report_params[:start_date].present? ? Time.parse(report_params[:start_date]).to_date : 1.days.ago).beginning_of_day
-    end_date = (report_params[:end_date].present? ? Time.parse(report_params[:end_date]).to_date : start_date + 30.days).end_of_day
+    begin
+      start_date = (report_params[:start_date].present? ? Time.parse(report_params[:start_date]).to_date : 1.days.ago).beginning_of_day
+      end_date = (report_params[:end_date].present? ? Time.parse(report_params[:end_date]).to_date : start_date + 30.days).end_of_day
+    rescue ArgumentError => e
+      raise Discourse::InvalidParameters.new(e.message)
+    end
 
     facets = nil
     if Array === report_params[:facets]

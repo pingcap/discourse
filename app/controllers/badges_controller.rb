@@ -2,6 +2,7 @@
 
 class BadgesController < ApplicationController
   skip_before_action :check_xhr, only: [:index, :show]
+  after_action :add_noindex_header
 
   def index
     raise Discourse::NotFound unless SiteSetting.enable_badges
@@ -16,7 +17,7 @@ class BadgesController < ApplicationController
     if (params[:only_listable] == "true") || !request.xhr?
       # NOTE: this is sorted client side if needed
       badges = badges.includes(:badge_grouping)
-        .includes(:badge_type)
+        .includes(:badge_type, :image_upload)
         .where(enabled: true, listable: true)
     end
 

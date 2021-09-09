@@ -13,6 +13,28 @@ module ApplicationHelper
     @extra_body_classes ||= Set.new
   end
 
+  def discourse_config_environment
+    # TODO: Can this come from Ember CLI somehow?
+    { modulePrefix: "discourse",
+      environment: Rails.env,
+      rootURL: Discourse.base_path,
+      locationType: "auto",
+      historySupportMiddleware: false,
+      EmberENV: {
+        FEATURES: {},
+        EXTEND_PROTOTYPES: { "Date": false },
+        _APPLICATION_TEMPLATE_WRAPPER: false,
+        _DEFAULT_ASYNC_OBSERVERS: true,
+        _JQUERY_INTEGRATION: true
+      },
+      APP: {
+        name: "discourse",
+        version: "#{Discourse::VERSION::STRING} #{Discourse.git_version}",
+        exportApplicationGlobal: true
+      }
+    }.to_json
+  end
+
   def google_universal_analytics_json(ua_domain_name = nil)
     result = {}
     if ua_domain_name
@@ -35,13 +57,17 @@ module ApplicationHelper
     google_universal_analytics_json
   end
 
+  def self.google_tag_manager_nonce
+    @gtm_nonce ||= SecureRandom.hex
+  end
+
   def shared_session_key
-    if SiteSetting.long_polling_base_url != '/'.freeze && current_user
+    if SiteSetting.long_polling_base_url != '/' && current_user
       sk = "shared_session_key"
       return request.env[sk] if request.env[sk]
 
       request.env[sk] = key = (session[sk] ||= SecureRandom.hex)
-      $redis.setex "#{sk}_#{key}", 7.days, current_user.id.to_s
+      Discourse.redis.setex "#{sk}_#{key}", 7.days, current_user.id.to_s
       key
     end
   end
@@ -55,7 +81,7 @@ module ApplicationHelper
   end
 
   def script_asset_path(script)
-    path = asset_path("#{script}.js")
+    path = ActionController::Base.helpers.asset_path("#{script}.js")
 
     if GlobalSetting.use_s3? && GlobalSetting.s3_cdn_url
       if GlobalSetting.cdn_url
@@ -71,13 +97,20 @@ module ApplicationHelper
         path = "#{GlobalSetting.s3_cdn_url}#{path}"
       end
 
-      if is_brotli_req?
-        path = path.gsub(/\.([^.]+)$/, '.br.\1')
-      elsif is_gzip_req?
-        path = path.gsub(/\.([^.]+)$/, '.gz.\1')
+      # assets needed for theme testing are not compressed because they take a fair
+      # amount of time to compress (+30 seconds) during rebuilds/deploys when the
+      # vast majority of sites will never need them, so it makes more sense to serve
+      # them uncompressed instead of making everyone's rebuild/deploy take +30 more
+      # seconds.
+      if !script.start_with?("discourse/tests/")
+        if is_brotli_req?
+          path = path.gsub(/\.([^.]+)$/, '.br.\1')
+        elsif is_gzip_req?
+          path = path.gsub(/\.([^.]+)$/, '.gz.\1')
+        end
       end
 
-    elsif GlobalSetting.cdn_url&.start_with?("https") && is_brotli_req?
+    elsif GlobalSetting.cdn_url&.start_with?("https") && is_brotli_req? && Rails.env != "development"
       path = path.gsub("#{GlobalSetting.cdn_url}/assets/", "#{GlobalSetting.cdn_url}/brotli_asset/")
     end
 
@@ -207,7 +240,7 @@ module ApplicationHelper
   end
 
   def html_lang
-    SiteSetting.default_locale.sub("_", "-")
+    (request ? I18n.locale.to_s : SiteSetting.default_locale).sub("_", "-")
   end
 
   # Creates open graph and twitter card meta data
@@ -233,6 +266,7 @@ module ApplicationHelper
     # Add opengraph & twitter tags
     result = []
     result << tag(:meta, property: 'og:site_name', content: SiteSetting.title)
+    result << tag(:meta, property: 'og:type', content: 'website')
 
     if opts[:twitter_summary_large_image].present?
       result << tag(:meta, name: 'twitter:card', content: "summary_large_image")
@@ -282,7 +316,7 @@ module ApplicationHelper
         'query-input' => 'required name=search_term_string',
       }
     }
-    content_tag(:script, MultiJson.dump(json).html_safe, type: 'application/ld+json'.freeze)
+    content_tag(:script, MultiJson.dump(json).html_safe, type: 'application/ld+json')
   end
 
   def gsub_emoji_to_unicode(str)
@@ -291,16 +325,24 @@ module ApplicationHelper
 
   def application_logo_url
     @application_logo_url ||= begin
-      if mobile_view? && SiteSetting.site_mobile_logo_url.present?
-        SiteSetting.site_mobile_logo_url
+      if mobile_view?
+        if dark_color_scheme? && SiteSetting.site_mobile_logo_dark_url.present?
+          SiteSetting.site_mobile_logo_dark_url
+        elsif SiteSetting.site_mobile_logo_url.present?
+          SiteSetting.site_mobile_logo_url
+        end
       else
-        SiteSetting.site_logo_url
+        if dark_color_scheme? && SiteSetting.site_logo_dark_url.present?
+          SiteSetting.site_logo_dark_url
+        else
+          SiteSetting.site_logo_url
+        end
       end
     end
   end
 
   def login_path
-    "#{Discourse::base_uri}/login"
+    "#{Discourse.base_path}/login"
   end
 
   def mobile_view?
@@ -356,6 +398,9 @@ module ApplicationHelper
   end
 
   def loading_admin?
+    return false unless defined?(controller)
+    return false if controller.class.name.blank?
+
     controller.class.name.split("::").first == "Admin"
   end
 
@@ -383,8 +428,7 @@ module ApplicationHelper
 
   def topic_featured_link_domain(link)
     begin
-      uri = URI.encode(link)
-      uri = URI.parse(uri)
+      uri = UrlHelper.encode_and_parse(link)
       uri = URI.parse("http://#{uri}") if uri.scheme.nil?
       host = uri.host.downcase
       host.start_with?('www.') ? host[4..-1] : host
@@ -393,20 +437,34 @@ module ApplicationHelper
     end
   end
 
-  def theme_ids
+  def theme_id
     if customization_disabled?
-      [nil]
+      nil
     else
-      request.env[:resolved_theme_ids]
+      request.env[:resolved_theme_id]
     end
   end
 
+  def stylesheet_manager
+    return @stylesheet_manager if defined?(@stylesheet_manager)
+    @stylesheet_manager = Stylesheet::Manager.new(theme_id: theme_id)
+  end
+
   def scheme_id
-    return if theme_ids.blank?
-    Theme
-      .where(id: theme_ids.first)
-      .pluck(:color_scheme_id)
-      .first
+    return @scheme_id if defined?(@scheme_id)
+
+    custom_user_scheme_id = cookies[:color_scheme_id] || current_user&.user_option&.color_scheme_id
+    if custom_user_scheme_id && ColorScheme.find_by_id(custom_user_scheme_id)
+      return custom_user_scheme_id
+    end
+
+    return if theme_id.blank?
+
+    @scheme_id = Theme.where(id: theme_id).pluck_first(:color_scheme_id)
+  end
+
+  def dark_scheme_id
+    cookies[:dark_scheme_id] || current_user&.user_option&.dark_scheme_id || SiteSetting.default_dark_mode_color_scheme_id
   end
 
   def current_homepage
@@ -429,25 +487,59 @@ module ApplicationHelper
   end
 
   def theme_lookup(name)
-    Theme.lookup_field(theme_ids, mobile_view? ? :mobile : :desktop, name)
+    Theme.lookup_field(
+      theme_id,
+      mobile_view? ? :mobile : :desktop,
+      name,
+      skip_transformation: request.env[:skip_theme_ids_transformation].present?
+    )
   end
 
   def theme_translations_lookup
-    Theme.lookup_field(theme_ids, :translations, I18n.locale)
+    Theme.lookup_field(
+      theme_id,
+      :translations,
+      I18n.locale,
+      skip_transformation: request.env[:skip_theme_ids_transformation].present?
+    )
   end
 
   def theme_js_lookup
-    Theme.lookup_field(theme_ids, :extra_js, nil)
+    Theme.lookup_field(
+      theme_id,
+      :extra_js,
+      nil,
+      skip_transformation: request.env[:skip_theme_ids_transformation].present?
+    )
   end
 
   def discourse_stylesheet_link_tag(name, opts = {})
-    if opts.key?(:theme_ids)
-      ids = opts[:theme_ids] unless customization_disabled?
-    else
-      ids = theme_ids
+    manager =
+      if opts.key?(:theme_id)
+        Stylesheet::Manager.new(
+          theme_id: customization_disabled? ? nil : opts[:theme_id]
+        )
+      else
+        stylesheet_manager
+      end
+
+    manager.stylesheet_link_tag(name, 'all')
+  end
+
+  def discourse_color_scheme_stylesheets
+    result = +""
+    result << stylesheet_manager.color_scheme_stylesheet_link_tag(scheme_id, 'all')
+
+    if dark_scheme_id != -1
+      result << stylesheet_manager.color_scheme_stylesheet_link_tag(dark_scheme_id, '(prefers-color-scheme: dark)')
     end
 
-    Stylesheet::Manager.stylesheet_link_tag(name, 'all', ids)
+    result.html_safe
+  end
+
+  def dark_color_scheme?
+    return false if scheme_id.blank?
+    ColorScheme.find_by_id(scheme_id)&.is_dark?
   end
 
   def preloaded_json
@@ -456,26 +548,32 @@ module ApplicationHelper
   end
 
   def client_side_setup_data
-    service_worker_url = Rails.env.development? ? 'service-worker.js' : Rails.application.assets_manifest.assets['service-worker.js']
-
     setup_data = {
       cdn: Rails.configuration.action_controller.asset_host,
       base_url: Discourse.base_url,
-      base_uri: Discourse::base_uri,
+      base_uri: Discourse.base_path,
       environment: Rails.env,
       letter_avatar_version: LetterAvatar.version,
       markdown_it_url: script_asset_path('markdown-it-bundle'),
-      service_worker_url: service_worker_url,
+      service_worker_url: 'service-worker.js',
       default_locale: SiteSetting.default_locale,
       asset_version: Discourse.assets_digest,
       disable_custom_css: loading_admin?,
       highlight_js_path: HighlightJs.path,
-      svg_sprite_path: SvgSprite.path(theme_ids),
+      svg_sprite_path: SvgSprite.path(theme_id),
       enable_js_error_reporting: GlobalSetting.enable_js_error_reporting,
+      color_scheme_is_dark: dark_color_scheme?,
+      user_color_scheme_id: scheme_id,
+      user_dark_scheme_id: dark_scheme_id
     }
 
     if Rails.env.development?
-      setup_data[:svg_icon_list] = SvgSprite.all_icons(theme_ids)
+      setup_data[:svg_icon_list] = SvgSprite.all_icons(theme_id)
+
+      if ENV['DEBUG_PRELOADED_APP_DATA']
+        setup_data[:debug_preloaded_app_data] = true
+      end
+      setup_data[:mb_last_file_change_id] = MessageBus.last_id('/file-change')
     end
 
     if guardian.can_enable_safe_mode? && params["safe_mode"]
@@ -492,12 +590,10 @@ module ApplicationHelper
 
   def get_absolute_image_url(link)
     absolute_url = link
-    if link.start_with?("//")
+    if link.start_with?('//')
       uri = URI(Discourse.base_url)
       absolute_url = "#{uri.scheme}:#{link}"
-    elsif link.start_with?("/uploads/")
-      absolute_url = "#{Discourse.base_url}#{link}"
-    elsif link.start_with?("/images/")
+    elsif link.start_with?('/uploads/', '/images/', '/user_avatar/')
       absolute_url = "#{Discourse.base_url}#{link}"
     elsif GlobalSetting.relative_url_root && link.start_with?(GlobalSetting.relative_url_root)
       absolute_url = "#{Discourse.base_url_no_prefix}#{link}"
@@ -508,6 +604,34 @@ module ApplicationHelper
   def can_sign_up?
     SiteSetting.allow_new_registrations &&
     !SiteSetting.invite_only &&
-    !SiteSetting.enable_sso
+    !SiteSetting.enable_discourse_connect
+  end
+
+  def rss_creator(user)
+    if user
+      if SiteSetting.prioritize_username_in_ux
+        "#{user.username}"
+      else
+        "#{user.name.presence || user.username }"
+      end
+    end
+  end
+
+  def authentication_data
+    return @authentication_data if defined?(@authentication_data)
+
+    @authentication_data = begin
+      value = cookies[:authentication_data]
+      if value
+        cookies.delete(:authentication_data, path: Discourse.base_path("/"))
+      end
+      current_user ? nil : value
+    end
+  end
+
+  def hijack_if_ember_cli!
+    if request.headers["HTTP_X_DISCOURSE_EMBER_CLI"] == "true"
+      raise ApplicationController::EmberCLIHijacked.new
+    end
   end
 end

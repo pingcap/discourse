@@ -25,35 +25,40 @@ div.poll {
   .poll-container {
     display: table-cell;
     width: 100%;
-    border-right: 1px solid $primary-low;
+    border-right: 1px solid var(--primary-low);
+  }
+
+  .poll-title {
+    border-bottom: 1px solid var(--primary-low);
+    margin-bottom: 0.5em;
+    padding: 0.5em 0;
   }
 
   .poll-buttons {
-    border-top: 1px solid $primary-low;
+    border-top: 1px solid var(--primary-low);
     padding: 1em;
+    display: flex;
+    flex-direction: row;
 
     .info-text {
       line-height: 2em;
     }
 
-    :not(:first-child):not(:last-child) {
-      margin-left: 1em;
+    button:not(:first-child) {
+      margin-left: 0.5em;
     }
 
-    .toggle-status {
-      float: right;
+    .btn-danger.toggle-status {
+      margin-left: auto;
     }
   }
 }
 
 div.poll.pie {
   .poll-container {
-    width: calc(100% - 181px);
-
-    .poll-grouped-pie-container {
-      width: 50%;
-    }
+    width: calc(100% - 190px);
   }
+
   .poll-info {
     display: inline-block;
     width: 150px;
@@ -71,7 +76,7 @@ div.poll.pie {
     li[data-poll-option-id]:before {
       position: relative;
       vertical-align: baseline;
-      border: 2px solid $primary;
+      border: 2px solid var(--primary);
       border-radius: 50%;
       display: inline-block;
       margin-right: 0.5em;

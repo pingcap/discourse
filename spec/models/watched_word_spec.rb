@@ -71,7 +71,7 @@ describe WatchedWord do
       expect {
         w = described_class.create_or_update_word(word: existing.word, action_key: :flag)
         expect(w.id).to eq(existing.id)
-        expect(w.updated_at).to eq(w.updated_at)
+        expect(w.updated_at).to eq_time(w.updated_at)
       }.to_not change { described_class.count }
     end
 
@@ -89,6 +89,17 @@ describe WatchedWord do
         expect(w.reload.action).to eq(described_class.actions[:block])
         expect(w.id).to eq(existing.id)
       }.to_not change { described_class.count }
+    end
+
+    it "replaces link with absolute URL" do
+      word = Fabricate(:watched_word, action: described_class.actions[:link], word: "meta1")
+      expect(word.replacement).to eq("http://test.localhost/")
+
+      word = Fabricate(:watched_word, action: described_class.actions[:link], word: "meta2", replacement: "test")
+      expect(word.replacement).to eq("http://test.localhost/test")
+
+      word = Fabricate(:watched_word, action: described_class.actions[:link], word: "meta3", replacement: "/test")
+      expect(word.replacement).to eq("http://test.localhost/test")
     end
   end
 end

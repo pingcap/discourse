@@ -1,6 +1,6 @@
 .search-container {
   flex-direction: column;
-  margin-top: 0.5em;
+  margin: 0;
 
   .search-advanced {
     order: 1;
@@ -34,12 +34,15 @@
     width: 100%;
     margin: 0;
 
-    .tag-chooser {
+    .tag-chooser,
+    .user-chooser {
       width: 100%;
     }
   }
 }
 
-.fps-topic {
-  max-width: 75%;
+.fps-result {
+  input[type="checkbox"] {
+    vertical-align: baseline;
+  }
 }

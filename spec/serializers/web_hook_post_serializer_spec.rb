@@ -11,20 +11,55 @@ RSpec.describe WebHookPostSerializer do
   end
 
   it 'should only include the required keys' do
-    count = serialized_for_user(admin).keys.count
-    difference = count - 38
+    expect(serialized_for_user(admin).keys).to contain_exactly(
+      :id,
+      :name,
+      :username,
+      :avatar_template,
+      :created_at,
+      :cooked,
+      :post_number,
+      :post_type,
+      :updated_at,
+      :reply_count,
+      :reply_to_post_number,
+      :quote_count,
+      :incoming_link_count,
+      :reads,
+      :score,
+      :topic_id,
+      :topic_slug,
+      :topic_title,
+      :category_id,
+      :display_username,
+      :primary_group_name,
+      :flair_name,
+      :version,
+      :user_title,
+      :bookmarked,
+      :raw,
+      :moderator,
+      :admin,
+      :staff,
+      :user_id,
+      :hidden,
+      :trust_level,
+      :deleted_at,
+      :user_deleted,
+      :edit_reason,
+      :wiki,
+      :reviewable_id,
+      :reviewable_score_count,
+      :reviewable_score_pending_count,
+      :topic_posts_count,
+      :topic_filtered_posts_count,
+      :topic_archetype,
+      :category_slug
+    )
+  end
 
-    expect(difference).to eq(0), lambda {
-      message = +""
-
-      if difference < 0
-        message << "#{difference * -1} key(s) have been removed from this serializer."
-      else
-        message << "#{difference} key(s) have been added to this serializer."
-      end
-
-      message << "\nPlease verify if those key(s) are required as part of the web hook's payload."
-    }
+  it "includes category_id" do
+    expect(serialized_for_user(admin)[:category_id]).to eq(post.topic.category_id)
   end
 
   it 'should only include deleted topic title for staffs' do

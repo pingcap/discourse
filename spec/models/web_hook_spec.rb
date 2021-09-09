@@ -40,8 +40,24 @@ describe WebHook do
     fab!(:post_hook) { Fabricate(:web_hook, payload_url: " https://example.com ") }
     fab!(:topic_hook) { Fabricate(:topic_web_hook) }
 
-    it "removes whitspace from payload_url before saving" do
+    it "removes whitespace from payload_url before saving" do
       expect(post_hook.payload_url).to eq("https://example.com")
+    end
+
+    it "excludes disabled plugin web_hooks" do
+      web_hook_event_types = WebHookEventType.active.find_by(name: 'solved')
+      expect(web_hook_event_types).to eq(nil)
+    end
+
+    it "includes non-plugin web_hooks" do
+      web_hook_event_types = WebHookEventType.active.where(name: 'topic')
+      expect(web_hook_event_types.count).to eq(1)
+    end
+
+    it "includes enabled plugin web_hooks" do
+      SiteSetting.stubs(:solved_enabled).returns(true)
+      web_hook_event_types = WebHookEventType.active.where(name: 'solved')
+      expect(web_hook_event_types.count).to eq(1)
     end
 
     describe '#active_web_hooks' do
@@ -181,7 +197,8 @@ describe WebHook do
       expect do
         PostRevisor.new(post, post.topic).revise!(
           post.user,
-          category_id: category.id,
+          { category_id: category.id },
+          { skip_validations: true },
         )
       end.to change { Jobs::EmitWebHookEvent.jobs.length }.by(1)
 
@@ -308,12 +325,19 @@ describe WebHook do
       Fabricate(:user_web_hook, active: true)
 
       user
-      user.activate
       Jobs::CreateUserReviewable.new.execute(user_id: user.id)
 
       job_args = Jobs::EmitWebHookEvent.jobs.last["args"].first
 
       expect(job_args["event_name"]).to eq("user_created")
+      payload = JSON.parse(job_args["payload"])
+      expect(payload["id"]).to eq(user.id)
+
+      email_token = user.email_tokens.create(email: user.email)
+      EmailToken.confirm(email_token.token)
+      job_args = Jobs::EmitWebHookEvent.jobs.last["args"].first
+
+      expect(job_args["event_name"]).to eq("user_confirmed_email")
       payload = JSON.parse(job_args["payload"])
       expect(payload["id"]).to eq(user.id)
 
@@ -361,6 +385,14 @@ describe WebHook do
       payload = JSON.parse(job_args["payload"])
       expect(payload["id"]).to eq(user.id)
       expect(payload["email"]).to eq(email)
+
+      # Reflects runtime change to user field
+      user_field = Fabricate(:user_field, show_on_profile: true)
+      user.logged_in
+      job_args = Jobs::EmitWebHookEvent.jobs.last["args"].first
+      expect(job_args["event_name"]).to eq("user_logged_in")
+      payload = JSON.parse(job_args["payload"])
+      expect(payload["user_fields"].size).to eq(1)
     end
 
     it 'should enqueue the right hooks for category events' do
@@ -463,12 +495,103 @@ describe WebHook do
       payload = JSON.parse(job_args["payload"])
       expect(payload["id"]).to eq(reviewable.id)
 
-      reviewable.perform(Discourse.system_user, :reject_user_delete)
+      reviewable.add_score(
+        Discourse.system_user,
+        ReviewableScore.types[:off_topic],
+        reason: "test"
+      )
+      job_args = Jobs::EmitWebHookEvent.jobs.last["args"].first
+
+      expect(job_args["event_name"]).to eq("reviewable_score_updated")
+      payload = JSON.parse(job_args["payload"])
+      expect(payload["id"]).to eq(reviewable.id)
+
+      reviewable.perform(Discourse.system_user, :delete_user)
       job_args = Jobs::EmitWebHookEvent.jobs.last["args"].first
 
       expect(job_args["event_name"]).to eq("reviewable_transitioned_to")
       payload = JSON.parse(job_args["payload"])
       expect(payload["id"]).to eq(reviewable.id)
+    end
+
+    it 'should enqueue the right hooks for badge grants' do
+      Fabricate(:user_badge_web_hook)
+      badge = Fabricate(:badge)
+      badge.multiple_grant = true
+      badge.show_posts = true
+      badge.save
+
+      now = Time.now
+      freeze_time now
+
+      BadgeGranter.grant(badge, user, granted_by: admin, post_id: post.id)
+
+      job_args = Jobs::EmitWebHookEvent.jobs.last["args"].first
+      expect(job_args["event_name"]).to eq("user_badge_granted")
+      payload = JSON.parse(job_args["payload"])
+      expect(payload["badge_id"]).to eq(badge.id)
+      expect(payload["user_id"]).to eq(user.id)
+      expect(payload["granted_by_id"]).to eq(admin.id)
+      # be_within required because rounding occurs
+      expect(Time.zone.parse(payload["granted_at"]).to_f).to be_within(0.001).of(now.to_f)
+      expect(payload["post_id"]).to eq(post.id)
+
+      # Future work: revoke badge hook
+    end
+
+    it 'should enqueue the right hooks for group user addition' do
+      Fabricate(:group_user_web_hook)
+      group = Fabricate(:group)
+
+      now = Time.now
+      freeze_time now
+
+      group.add(user)
+
+      job_args = Jobs::EmitWebHookEvent.jobs.last["args"].first
+      expect(job_args["event_name"]).to eq("user_added_to_group")
+      payload = JSON.parse(job_args["payload"])
+      expect(payload["group_id"]).to eq(group.id)
+      expect(payload["user_id"]).to eq(user.id)
+      expect(payload["notification_level"]).to eq(group.default_notification_level)
+      expect(Time.zone.parse(payload["created_at"]).to_f).to be_within(0.001).of(now.to_f)
+    end
+
+    it 'should enqueue the right hooks for group user deletion' do
+      Fabricate(:group_user_web_hook)
+      group = Fabricate(:group)
+      group_user = Fabricate(:group_user, group: group, user: user)
+
+      now = Time.now
+      freeze_time now
+
+      group.remove(user)
+
+      job_args = Jobs::EmitWebHookEvent.jobs.last["args"].first
+      expect(job_args["event_name"]).to eq("user_removed_from_group")
+      payload = JSON.parse(job_args["payload"])
+      expect(payload["group_id"]).to eq(group.id)
+      expect(payload["user_id"]).to eq(user.id)
+    end
+
+    it 'should enqueue hooks for user likes in a group' do
+      group = Fabricate(:group)
+      Fabricate(:like_web_hook, groups: [group])
+      group_user = Fabricate(:group_user, group: group, user: user)
+      poster = Fabricate(:user)
+      post = Fabricate(:post, user: poster)
+      like = Fabricate(:post_action, post: post, user: user, post_action_type_id: PostActionType.types[:like])
+      now = Time.now
+      freeze_time now
+
+      DiscourseEvent.trigger(:like_created, like)
+
+      job_args = Jobs::EmitWebHookEvent.jobs.last["args"].first
+      expect(job_args["event_name"]).to eq("post_liked")
+      expect(job_args["group_ids"]).to eq([group.id])
+      payload = JSON.parse(job_args["payload"])
+      expect(payload["post"]["id"]).to eq(post.id)
+      expect(payload["user"]["id"]).to eq(user.id)
     end
   end
 end

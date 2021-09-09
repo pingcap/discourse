@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_helper'
+require_relative '../components/imap/imap_helper'
 
 describe Group do
   let(:admin) { Fabricate(:admin) }
@@ -232,8 +233,7 @@ describe Group do
 
       expect(GroupUser.where(user_id: staged.id).count).to eq(0)
 
-      staged.unstage
-      staged.save!
+      staged.unstage!
 
       expect(GroupUser.where(user_id: staged.id).count).to eq(2)
     end
@@ -315,7 +315,7 @@ describe Group do
   end
 
   it "Correctly handles removal of primary group" do
-    group = Fabricate(:group)
+    group = Fabricate(:group, flair_icon: "icon")
     user = Fabricate(:user)
     group.add(user)
     group.save
@@ -330,6 +330,7 @@ describe Group do
 
     user.reload
     expect(user.primary_group).to eq nil
+    expect(user.flair_group_id).to eq nil
   end
 
   it "Can update moderator/staff/admin groups correctly" do
@@ -367,7 +368,7 @@ describe Group do
     expect(real_admins).to be_empty
     expect(real_staff).to eq []
 
-    # we need some ninja work to set min username to 6
+    # we need some work to set min username to 6
 
     User.where('length(username) < 6').each do |u|
       u.username = u.username + "ZZZZZZ"
@@ -503,6 +504,14 @@ describe Group do
       expect(user.title).to eq('Different')
       expect(user.primary_group).to eq(primary_group)
     end
+
+    it "doesn't fail when the user gets destroyed" do
+      group.update(title: 'Awesome')
+      group.add(user)
+      user.reload
+
+      UserDestroyer.new(Discourse.system_user).destroy(user)
+    end
   end
 
   it "has custom fields" do
@@ -536,6 +545,22 @@ describe Group do
     Group.user_trust_level_change!(user.id, 0)
     user.reload
     expect(user.groups.map(&:name).sort).to eq ["trust_level_0"]
+  end
+
+  it "generates an event when applying group from trust level change" do
+    called = nil
+    block = Proc.new { |user, group| called = { user_id: user.id, group_id: group.id } }
+
+    begin
+      DiscourseEvent.on(:user_added_to_group, &block)
+
+      user = Fabricate(:user, trust_level: 2)
+      Group.user_trust_level_change!(user.id, 2)
+
+      expect(called).to eq(user_id: user.id, group_id: Group.find_by(name: 'trust_level_2').id)
+    ensure
+      DiscourseEvent.off(:user_added_to_group, &block)
+    end
   end
 
   context "group management" do
@@ -690,7 +715,7 @@ describe Group do
 
       expect(can_view?(admin, group)).to eq(true)
       expect(can_view?(owner, group)).to eq(true)
-      expect(can_view?(moderator, group)).to eq(false)
+      expect(can_view?(moderator, group)).to eq(true)
       expect(can_view?(member, group)).to eq(true)
       expect(can_view?(logged_on_user, group)).to eq(false)
       expect(can_view?(nil, group)).to eq(false)
@@ -755,7 +780,7 @@ describe Group do
 
       expect(can_view?(admin, group)).to eq(true)
       expect(can_view?(owner, group)).to eq(true)
-      expect(can_view?(moderator, group)).to eq(false)
+      expect(can_view?(moderator, group)).to eq(true)
       expect(can_view?(member, group)).to eq(true)
       expect(can_view?(logged_on_user, group)).to eq(false)
       expect(can_view?(nil, group)).to eq(false)
@@ -845,21 +870,22 @@ describe Group do
     end
 
     it 'triggers a user_added_to_group event' do
-      begin
-        automatic = nil
-        called = false
+      automatic = nil
+      called = false
 
-        DiscourseEvent.on(:user_added_to_group) do |_u, _g, options|
-          automatic = options[:automatic]
-          called = true
-        end
+      block = Proc.new do |_u, _g, options|
+        automatic = options[:automatic]
+        called = true
+      end
+      begin
+        DiscourseEvent.on(:user_added_to_group, &block)
 
         group.add(user)
 
         expect(automatic).to eql(false)
         expect(called).to eq(true)
       ensure
-        DiscourseEvent.off(:user_added_to_group)
+        DiscourseEvent.off(:user_added_to_group, &block)
       end
     end
 
@@ -894,6 +920,7 @@ describe Group do
 
   describe '.search_groups' do
     fab!(:group) { Fabricate(:group, name: 'tEsT_more_things', full_name: 'Abc something awesome') }
+    let(:messageable_group) { Fabricate(:group, name: "MessageableGroup", messageable_level: Group::ALIAS_LEVELS[:everyone]) }
 
     it 'should return the right groups' do
       group
@@ -943,46 +970,103 @@ describe Group do
   end
 
   describe '#automatic_group_membership' do
-    describe 'for a automatic_membership_retroactive group' do
-      let(:group) { Fabricate(:group, automatic_membership_retroactive: true) }
+    let(:group) { Fabricate(:group, automatic_membership_email_domains: "example.com") }
 
-      it "should be triggered on create and update" do
-        expect { group }
-          .to change { Jobs::AutomaticGroupMembership.jobs.size }.by(1)
+    it "should be triggered on create and update" do
+      expect { group }
+        .to change { Jobs::AutomaticGroupMembership.jobs.size }.by(1)
 
-        job = Jobs::AutomaticGroupMembership.jobs.last
+      job = Jobs::AutomaticGroupMembership.jobs.last
 
-        expect(job["args"].first["group_id"]).to eq(group.id)
+      expect(job["args"].first["group_id"]).to eq(group.id)
 
-        Jobs::AutomaticGroupMembership.jobs.clear
+      Jobs::AutomaticGroupMembership.jobs.clear
 
-        expect do
-          group.update!(name: 'asdiaksjdias')
-        end.to change { Jobs::AutomaticGroupMembership.jobs.size }.by(1)
+      expect do
+        group.update!(name: 'asdiaksjdias')
+      end.to change { Jobs::AutomaticGroupMembership.jobs.size }.by(1)
 
-        job = Jobs::AutomaticGroupMembership.jobs.last
+      job = Jobs::AutomaticGroupMembership.jobs.last
 
-        expect(job["args"].first["group_id"]).to eq(group.id)
-      end
+      expect(job["args"].first["group_id"]).to eq(group.id)
     end
   end
 
-  it "allows Font Awesome 4.7 syntax as group avatar flair" do
-    group = Fabricate(:group)
-    group.flair_url = "fa-air-freshener"
-    group.save
+  describe "IMAP" do
+    let(:group) { Fabricate(:group) }
 
-    group = Group.find(group.id)
-    expect(group.flair_url).to eq("fa-air-freshener")
-  end
+    def mock_imap
+      @mocked_imap_provider = MockedImapProvider.new(
+        group.imap_server,
+        port: group.imap_port,
+        ssl: group.imap_ssl,
+        username: group.email_username,
+        password: group.email_password
+      )
+      Imap::Providers::Detector.stubs(:init_with_detected_provider).returns(
+        @mocked_imap_provider
+      )
+    end
 
-  it "allows Font Awesome 5 syntax as group avatar flair" do
-    group = Fabricate(:group)
-    group.flair_url = "fab fa-bandcamp"
-    group.save
+    def configure_imap
+      group.update(
+        imap_server: "imap.gmail.com",
+        imap_port: 993,
+        imap_ssl: true,
+        imap_enabled: true,
+        email_username: "test@gmail.com",
+        email_password: "testPassword1!"
+      )
+    end
 
-    group = Group.find(group.id)
-    expect(group.flair_url).to eq("fab fa-bandcamp")
+    def enable_imap
+      SiteSetting.enable_imap = true
+      @mocked_imap_provider.stubs(:connect!)
+      @mocked_imap_provider.stubs(:list_mailboxes_with_attributes).returns([stub(attr: [], name: "Inbox")])
+      @mocked_imap_provider.stubs(:list_mailboxes).returns(["Inbox"])
+      @mocked_imap_provider.stubs(:disconnect!)
+    end
+
+    before do
+      Discourse.redis.del("group_imap_mailboxes_#{group.id}")
+    end
+
+    describe "#imap_mailboxes" do
+      it "returns an empty array if group imap is not configured" do
+        expect(group.imap_mailboxes).to eq([])
+      end
+
+      it "returns an empty array and does not contact IMAP server if group imap is configured but the setting is disabled" do
+        configure_imap
+        Imap::Providers::Detector.expects(:init_with_detected_provider).never
+        expect(group.imap_mailboxes).to eq([])
+      end
+
+      it "logs the imap error if one occurs" do
+        configure_imap
+        mock_imap
+        SiteSetting.enable_imap = true
+        @mocked_imap_provider.stubs(:connect!).raises(Net::IMAP::NoResponseError)
+        group.imap_mailboxes
+        expect(group.reload.imap_last_error).not_to eq(nil)
+      end
+
+      it "returns a list of mailboxes from the IMAP provider" do
+        configure_imap
+        mock_imap
+        enable_imap
+        expect(group.imap_mailboxes).to eq(["Inbox"])
+      end
+
+      it "caches the login and mailbox fetch" do
+        configure_imap
+        mock_imap
+        enable_imap
+        group.imap_mailboxes
+        Imap::Providers::Detector.expects(:init_with_detected_provider).never
+        group.imap_mailboxes
+      end
+    end
   end
 
   context "Unicode usernames and group names" do
@@ -991,6 +1075,238 @@ describe Group do
     it "should normalize the name" do
       group = Fabricate(:group, name: "Bücherwurm") # NFD
       expect(group.name).to eq("Bücherwurm") # NFC
+    end
+  end
+
+  describe "default notifications" do
+    let(:category1) { Fabricate(:category) }
+    let(:category2) { Fabricate(:category) }
+    let(:category3) { Fabricate(:category) }
+    let(:category4) { Fabricate(:category) }
+    let(:tag1) { Fabricate(:tag) }
+    let(:tag2) { Fabricate(:tag) }
+    let(:tag3) { Fabricate(:tag) }
+    let(:tag4) { Fabricate(:tag) }
+    let(:synonym1) { Fabricate(:tag, target_tag: tag1) }
+    let(:synonym2) { Fabricate(:tag, target_tag: tag2) }
+
+    it "can set category notifications" do
+      group.watching_category_ids = [category1.id, category2.id]
+      group.tracking_category_ids = [category3.id]
+      group.regular_category_ids = [category4.id]
+      group.save!
+      expect(GroupCategoryNotificationDefault.lookup(group, :watching).pluck(:category_id)).to contain_exactly(category1.id, category2.id)
+      expect(GroupCategoryNotificationDefault.lookup(group, :tracking).pluck(:category_id)).to eq([category3.id])
+      expect(GroupCategoryNotificationDefault.lookup(group, :regular).pluck(:category_id)).to eq([category4.id])
+
+      new_group = Fabricate.build(:group)
+      new_group.watching_category_ids = [category1.id, category2.id]
+      new_group.save!
+      expect(GroupCategoryNotificationDefault.lookup(new_group, :watching).pluck(:category_id)).to contain_exactly(category1.id, category2.id)
+    end
+
+    it "can remove categories" do
+      [category1, category2].each do |category|
+        GroupCategoryNotificationDefault.create!(
+          group: group,
+          category: category,
+          notification_level: GroupCategoryNotificationDefault.notification_levels[:watching]
+        )
+      end
+
+      group.watching_category_ids = [category2.id]
+      group.save!
+      expect(GroupCategoryNotificationDefault.lookup(group, :watching).pluck(:category_id)).to eq([category2.id])
+
+      group.watching_category_ids = []
+      group.save!
+      expect(GroupCategoryNotificationDefault.lookup(group, :watching).pluck(:category_id)).to be_empty
+    end
+
+    it "can set tag notifications" do
+      group.regular_tags = [tag4.name]
+      group.watching_tags = [tag1.name, tag2.name]
+      group.tracking_tags = [tag3.name]
+      group.save!
+      expect(GroupTagNotificationDefault.lookup(group, :regular).pluck(:tag_id)).to eq([tag4.id])
+      expect(GroupTagNotificationDefault.lookup(group, :watching).pluck(:tag_id)).to contain_exactly(tag1.id, tag2.id)
+      expect(GroupTagNotificationDefault.lookup(group, :tracking).pluck(:tag_id)).to eq([tag3.id])
+
+      new_group = Fabricate.build(:group)
+      new_group.watching_first_post_tags = [tag1.name, tag3.name]
+      new_group.save!
+      expect(GroupTagNotificationDefault.lookup(new_group, :watching_first_post).pluck(:tag_id)).to contain_exactly(tag1.id, tag3.id)
+    end
+
+    it "can take tag synonyms" do
+      group.tracking_tags = [synonym1.name, synonym2.name, tag3.name]
+      group.save!
+      expect(GroupTagNotificationDefault.lookup(group, :tracking).pluck(:tag_id)).to contain_exactly(tag1.id, tag2.id, tag3.id)
+
+      group.tracking_tags = [synonym1.name, synonym2.name, tag1.name, tag2.name, tag3.name]
+      group.save!
+      expect(GroupTagNotificationDefault.lookup(group, :tracking).pluck(:tag_id)).to contain_exactly(tag1.id, tag2.id, tag3.id)
+    end
+
+    it "can remove tags" do
+      [tag1, tag2].each do |tag|
+        GroupTagNotificationDefault.create!(
+          group: group,
+          tag: tag,
+          notification_level: GroupTagNotificationDefault.notification_levels[:watching]
+        )
+      end
+
+      group.watching_tags = [tag2.name]
+      group.save!
+      expect(GroupTagNotificationDefault.lookup(group, :watching).pluck(:tag_id)).to eq([tag2.id])
+
+      group.watching_tags = []
+      group.save!
+      expect(GroupTagNotificationDefault.lookup(group, :watching)).to be_empty
+    end
+
+    it "can apply default notifications for admins group" do
+      group = Group.find(Group::AUTO_GROUPS[:admins])
+      group.tracking_category_ids = [category1.id]
+      group.tracking_tags = [tag1.name]
+      group.save!
+      user.grant_admin!
+      expect(CategoryUser.lookup(user, :tracking).pluck(:category_id)).to eq([category1.id])
+      expect(TagUser.lookup(user, :tracking).pluck(:tag_id)).to eq([tag1.id])
+    end
+
+    it "can apply default notifications for staff group" do
+      group = Group.find(Group::AUTO_GROUPS[:staff])
+      group.tracking_category_ids = [category1.id]
+      group.tracking_tags = [tag1.name]
+      group.save!
+      user.grant_admin!
+      expect(CategoryUser.lookup(user, :tracking).pluck(:category_id)).to eq([category1.id])
+      expect(TagUser.lookup(user, :tracking).pluck(:tag_id)).to eq([tag1.id])
+    end
+
+    it "can apply default notifications from two automatic groups" do
+      staff = Group.find(Group::AUTO_GROUPS[:staff])
+      staff.tracking_category_ids = [category1.id]
+      staff.tracking_tags = [tag1.name]
+      staff.save!
+      admins = Group.find(Group::AUTO_GROUPS[:admins])
+      admins.tracking_category_ids = [category2.id]
+      admins.tracking_tags = [tag2.name]
+      admins.save!
+      user.grant_admin!
+      expect(CategoryUser.lookup(user, :tracking).pluck(:category_id)).to contain_exactly(category1.id, category2.id)
+      expect(TagUser.lookup(user, :tracking).pluck(:tag_id)).to contain_exactly(tag1.id, tag2.id)
+    end
+  end
+
+  describe "email setting changes" do
+    it "enables smtp and records the change" do
+      group.update(
+        smtp_port: 587,
+        smtp_ssl: true,
+        smtp_server: "smtp.gmail.com",
+        email_username: "test@gmail.com",
+        email_password: "password",
+      )
+
+      group.record_email_setting_changes!(user)
+      group.reload
+
+      expect(group.smtp_enabled).to eq(true)
+      expect(group.smtp_updated_at).not_to eq(nil)
+      expect(group.smtp_updated_by).to eq(user)
+    end
+
+    it "enables imap and records the change" do
+      group.update(
+        imap_port: 587,
+        imap_ssl: true,
+        imap_server: "imap.gmail.com",
+        email_username: "test@gmail.com",
+        email_password: "password",
+      )
+
+      group.record_email_setting_changes!(user)
+      group.reload
+
+      expect(group.imap_enabled).to eq(true)
+      expect(group.imap_updated_at).not_to eq(nil)
+      expect(group.imap_updated_by).to eq(user)
+    end
+
+    it "disables smtp and records the change" do
+      group.update(
+        smtp_port: 587,
+        smtp_ssl: true,
+        smtp_server: "smtp.gmail.com",
+        email_username: "test@gmail.com",
+        email_password: "password",
+        smtp_updated_by: user
+      )
+
+      group.record_email_setting_changes!(user)
+      group.reload
+
+      group.update(
+        smtp_port: nil,
+        smtp_ssl: false,
+        smtp_server: nil,
+        email_username: nil,
+        email_password: nil,
+      )
+
+      group.record_email_setting_changes!(user)
+      group.reload
+
+      expect(group.smtp_enabled).to eq(false)
+      expect(group.smtp_updated_at).not_to eq(nil)
+      expect(group.smtp_updated_by).to eq(user)
+    end
+
+    it "disables imap and records the change" do
+      group.update(
+        imap_port: 587,
+        imap_ssl: true,
+        imap_server: "imap.gmail.com",
+        email_username: "test@gmail.com",
+        email_password: "password",
+      )
+
+      group.record_email_setting_changes!(user)
+      group.reload
+
+      group.update(
+        imap_port: nil,
+        imap_ssl: false,
+        imap_server: nil,
+        email_username: nil,
+        email_password: nil
+      )
+
+      group.record_email_setting_changes!(user)
+      group.reload
+
+      expect(group.imap_enabled).to eq(false)
+      expect(group.imap_updated_at).not_to eq(nil)
+      expect(group.imap_updated_by).to eq(user)
+    end
+  end
+
+  describe "#find_by_email" do
+    it "finds the group by any of its incoming emails" do
+      group.update!(incoming_email: "abc@test.com|support@test.com")
+      expect(Group.find_by_email("abc@test.com")).to eq(group)
+      expect(Group.find_by_email("support@test.com")).to eq(group)
+      expect(Group.find_by_email("nope@test.com")).to eq(nil)
+    end
+
+    it "finds the group by its email_username" do
+      group.update!(email_username: "abc@test.com", incoming_email: "support@test.com")
+      expect(Group.find_by_email("abc@test.com")).to eq(group)
+      expect(Group.find_by_email("support@test.com")).to eq(group)
+      expect(Group.find_by_email("nope@test.com")).to eq(nil)
     end
   end
 end

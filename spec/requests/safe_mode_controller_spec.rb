@@ -3,6 +3,28 @@
 require 'rails_helper'
 
 RSpec.describe SafeModeController do
+  describe 'index' do
+    it 'never includes customizations' do
+      theme = Fabricate(:theme)
+      theme.set_field(target: :common, name: "header", value: "My Custom Header")
+      theme.save!
+      theme.set_default!
+
+      Fabricate(:admin) # Avoid wizard page
+
+      get '/'
+
+      expect(response.status).to eq(200)
+      expect(response.body).to include("data-theme-id=\"#{theme.id}\"")
+
+      get '/safe-mode'
+
+      expect(response.status).to eq(200)
+      expect(response.body).not_to include("My Custom Header")
+      expect(response.body).not_to include("data-theme-id=\"#{theme.id}\"")
+    end
+  end
+
   describe 'enter' do
     context 'when no params are given' do
       it 'should redirect back to safe mode page' do

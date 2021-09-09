@@ -1,14 +1,13 @@
-# encoding: utf-8
-#
-# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+# WARNING: Never edit this file.
+# It will be overwritten when translations are pulled from Crowdin.
 #
 # To work with us on translations, join this project:
-# https://www.transifex.com/projects/p/discourse-org/
+# https://translate.discourse.org/
 
 ja:
   js:
     details:
       title: 詳細を隠す
     composer:
-      details_title: サマリー
-      details_text: "こちらの文字は表示させません。"
+      details_title: 要約
+      details_text: "このテキストは表示されません"

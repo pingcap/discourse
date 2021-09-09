@@ -6,31 +6,29 @@ describe OptimizedImage do
   let(:upload) { build(:upload) }
   before { upload.id = 42 }
 
-  unless ENV["TRAVIS"]
-    describe '.crop' do
-      it 'should produce cropped images (requires ImageMagick 7)' do
-        tmp_path = "/tmp/cropped.png"
+  describe '.crop' do
+    it 'should produce cropped images (requires ImageMagick 7)' do
+      tmp_path = "/tmp/cropped.png"
 
-        begin
-          OptimizedImage.crop(
-            "#{Rails.root}/spec/fixtures/images/logo.png",
-            tmp_path,
-            5,
-            5
-          )
+      begin
+        OptimizedImage.crop(
+          "#{Rails.root}/spec/fixtures/images/logo.png",
+          tmp_path,
+          5,
+          5
+        )
 
-          # we don't want to deal with something new here every time image magick
-          # is upgraded or pngquant is upgraded, lets just test the basics ...
-          # cropped image should be less than 120 bytes
+        # we don't want to deal with something new here every time image magick
+        # is upgraded or pngquant is upgraded, lets just test the basics ...
+        # cropped image should be less than 120 bytes
 
-          cropped_size = File.size(tmp_path)
+        cropped_size = File.size(tmp_path)
 
-          expect(cropped_size).to be < 120
-          expect(cropped_size).to be > 50
+        expect(cropped_size).to be < 120
+        expect(cropped_size).to be > 50
 
-        ensure
-          File.delete(tmp_path) if File.exists?(tmp_path)
-        end
+      ensure
+        File.delete(tmp_path) if File.exists?(tmp_path)
       end
     end
 
@@ -292,66 +290,54 @@ describe OptimizedImage do
     end
 
     describe "external store" do
-      let(:s3_upload) { Fabricate(:upload_s3) }
-
       before do
-        SiteSetting.enable_s3_uploads = true
-        SiteSetting.s3_upload_bucket = "s3-upload-bucket"
-        SiteSetting.s3_access_key_id = "some key"
-        SiteSetting.s3_secret_access_key = "some secret key"
-
-        tempfile = Tempfile.new(["discourse-external", ".png"])
-
-        %i{head get}.each do |method|
-          stub_request(method, "http://#{s3_upload.url}")
-            .to_return(
-              status: 200,
-              body: tempfile.read
-            )
-        end
+        setup_s3
       end
 
-      context "when an error happened while generatign the thumbnail" do
+      context "when we have a bad file returned" do
         it "returns nil" do
-          OptimizedImage.expects(:resize).returns(false)
+          s3_upload = Fabricate(:upload_s3)
+          stub_request(:head, "http://#{s3_upload.url}").to_return(status: 200)
+          stub_request(:get, "http://#{s3_upload.url}").to_return(status: 200)
+
           expect(OptimizedImage.create_for(s3_upload, 100, 200)).to eq(nil)
         end
       end
 
       context "when the thumbnail is properly generated" do
-        before do
-          OptimizedImage.expects(:resize).returns(true)
+        context "secure media disabled" do
+          let(:s3_upload) { Fabricate(:upload_s3) }
+          let(:optimized_path) { "/optimized/1X/#{s3_upload.sha1}_2_100x200.png" }
+
+          before do
+            stub_request(:head, "http://#{s3_upload.url}").to_return(status: 200)
+            stub_request(:get, "http://#{s3_upload.url}").to_return(status: 200, body: file_from_fixtures("logo.png"))
+            stub_request(:put, "https://#{SiteSetting.s3_upload_bucket}.s3.#{SiteSetting.s3_region}.amazonaws.com#{optimized_path}")
+              .to_return(status: 200, headers: { "ETag" => "someetag" })
+          end
+
+          it "downloads a copy of the original image" do
+            oi = OptimizedImage.create_for(s3_upload, 100, 200)
+
+            expect(oi.sha1).to_not be_nil
+            expect(oi.extension).to eq(".png")
+            expect(oi.width).to eq(100)
+            expect(oi.height).to eq(200)
+            expect(oi.url).to eq("//#{SiteSetting.s3_upload_bucket}.s3.dualstack.us-west-1.amazonaws.com#{optimized_path}")
+            expect(oi.filesize).to be > 0
+
+            oi.filesize = nil
+
+            stub_request(
+              :get,
+              "http://#{SiteSetting.s3_upload_bucket}.s3.dualstack.us-west-1.amazonaws.com#{optimized_path}"
+            ).to_return(status: 200, body: file_from_fixtures("resized.png"))
+
+            expect(oi.filesize).to be > 0
+          end
         end
-
-        it "downloads a copy of the original image" do
-          optimized_path = "/optimized/1X/#{s3_upload.sha1}_2_100x200.png"
-
-          stub_request(
-            :head,
-            "https://#{SiteSetting.s3_upload_bucket}.s3.amazonaws.com/"
-          )
-
-          stub_request(
-            :put,
-            "https://#{SiteSetting.s3_upload_bucket}.s3.amazonaws.com#{optimized_path}"
-          ).to_return(
-            status: 200,
-            headers: { "ETag" => "someetag" }
-          )
-
-          oi = OptimizedImage.create_for(s3_upload, 100, 200)
-
-          expect(oi.sha1).to eq("da39a3ee5e6b4b0d3255bfef95601890afd80709")
-          expect(oi.extension).to eq(".png")
-          expect(oi.width).to eq(100)
-          expect(oi.height).to eq(200)
-          expect(oi.url).to eq("//#{SiteSetting.s3_upload_bucket}.s3.dualstack.us-east-1.amazonaws.com#{optimized_path}")
-        end
-
       end
-
     end
-
   end
 
   describe '#destroy' do
@@ -378,7 +364,7 @@ class FakeInternalStore
     upload.url
   end
 
-  def store_optimized_image(file, optimized_image)
+  def store_optimized_image(file, optimized_image, content_type = nil, secure: false)
     "/internally/stored/optimized/image#{optimized_image.extension}"
   end
 

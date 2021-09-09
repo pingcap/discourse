@@ -16,7 +16,8 @@ module Jobs
     def make_anonymous
       anonymize_ips(@anonymize_ip) if @anonymize_ip
 
-      Invite.with_deleted.where(user_id: @user_id).destroy_all
+      Invite.where(email: @prev_email).destroy_all
+      InvitedUser.where(user_id: @user_id).destroy_all
       EmailToken.where(user_id: @user_id).destroy_all
       EmailLog.where(user_id: @user_id).delete_all
       IncomingEmail.where("user_id = ? OR from_address = ?", @user_id, @prev_email).delete_all

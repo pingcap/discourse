@@ -1,20 +1,3 @@
-# encoding: utf-8
-# This file contains content for the client portion of the poll plugin, sent out
-# to the Javascript app.
-#
-# To work with us on translations, see:
-# https://www.transifex.com/projects/p/discourse-org/
-#
-# This is a "source" file, which is used by Transifex to get translations for other languages.
-# After this file is changed, it needs to be pushed by a maintainer to Transifex:
-#
-#   tx push -s
-#
-# Read more here: https://meta.discourse.org/t/contribute-a-translation-to-discourse/14882
-#
-# To validate this YAML file after you change it, please paste it into
-# http://yamllint.com/
-
 en:
   js:
     poll:
@@ -31,6 +14,8 @@ en:
         title: "Votes are <strong>public</strong>."
 
       results:
+        groups:
+          title: "You need to be a member of %{groups} to vote in this poll."
         vote:
           title: "Results will be shown on <strong>vote</strong>."
         closed:
@@ -41,15 +26,15 @@ en:
       multiple:
         help:
           at_least_min_options:
-            one: "Choose at least <strong>%{count}</strong> option"
-            other: "Choose at least <strong>%{count}</strong> options"
+            one: "Choose at least <strong>%{count}</strong> option."
+            other: "Choose at least <strong>%{count}</strong> options."
           up_to_max_options:
-            one: "Choose up to <strong>%{count}</strong> option"
-            other: "Choose up to <strong>%{count}</strong> options"
+            one: "Choose up to <strong>%{count}</strong> option."
+            other: "Choose up to <strong>%{count}</strong> options."
           x_options:
-            one: "Choose <strong>%{count}</strong> option"
-            other: "Choose <strong>%{count}</strong> options"
-          between_min_and_max_options: "Choose between <strong>%{min}</strong> and <strong>%{max}</strong> options"
+            one: "Choose <strong>%{count}</strong> option."
+            other: "Choose <strong>%{count}</strong> options."
+          between_min_and_max_options: "Choose between <strong>%{min}</strong> and <strong>%{max}</strong> options."
 
       cast-votes:
         title: "Cast your votes"
@@ -66,10 +51,6 @@ en:
       group-results:
         title: "Group votes by user field"
         label: "Show breakdown"
-
-      ungroup-results:
-        title: "Combine all votes"
-        label: "Hide breakdown"
 
       export-results:
         title: "Export the poll results"
@@ -89,6 +70,13 @@ en:
         closes_in: "Closes in <strong>%{timeLeft}</strong>."
         age: "Closed <strong>%{age}</strong>"
 
+      breakdown:
+        title: "Poll results"
+        votes: "%{count} votes"
+        breakdown: "Breakdown"
+        percentage: "Percentage"
+        count: "Count"
+
       error_while_toggling_status: "Sorry, there was an error toggling the status of this poll."
       error_while_casting_votes: "Sorry, there was an error casting your votes."
       error_while_fetching_voters: "Sorry, there was an error displaying the voters."
@@ -98,7 +86,10 @@ en:
         title: Build Poll
         insert: Insert Poll
         help:
-          options_count: Enter at least 2 options
+          options_min_count: Enter at least 1 option.
+          options_max_count: Enter at most %{count} options.
+          invalid_min_value: Minimum value must be at least 1.
+          invalid_max_value: Maximum value must be at least 1, but less than or equal with the number of options.
           invalid_values: Minimum value must be smaller than the maximum value.
           min_step_value: The minimum step value is 1
         poll_type:
@@ -107,20 +98,29 @@ en:
           multiple: Multiple Choice
           number: Number Rating
         poll_result:
-          label: Results
+          label: Show Results...
           always: Always visible
-          vote: On vote
-          closed: When closed
+          vote: Only after voting
+          closed: When the poll is closed
           staff: Staff only
+        poll_groups:
+          label: Limit voting to these groups
         poll_chart_type:
-          label: Chart type
+          label: Result chart
+          bar: Bar
+          pie: Pie
         poll_config:
-          max: Max
-          min: Min
+          max: Max Choices
+          min: Min Choices
           step: Step
         poll_public:
           label: Show who voted
+        poll_title:
+          label: Title (optional)
         poll_options:
-          label: Enter one poll option per line
+          label: Options (one per line)
+          add: Add option
         automatic_close:
           label: Automatically close poll
+        show_advanced: "Show Advanced Options"
+        hide_advanced: "Hide Advanced Options"

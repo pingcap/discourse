@@ -3,7 +3,7 @@
 # Modified version of: https://github.com/steventen/base62-rb
 
 module Base62
-  KEYS ||= "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".freeze
+  KEYS ||= "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
   KEYS_HASH ||= KEYS.each_char.with_index.to_h
   BASE ||= KEYS.length
 
@@ -14,7 +14,7 @@ module Base62
 
     str = ""
     while num > 0
-      # prepend base62 charaters
+      # prepend base62 characters
       str = KEYS[num % BASE] + str
       num = num / BASE
     end

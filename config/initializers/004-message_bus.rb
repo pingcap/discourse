@@ -30,7 +30,7 @@ def setup_message_bus_env(env)
     extra_headers = {
       "Access-Control-Allow-Origin" => Discourse.base_url_no_prefix,
       "Access-Control-Allow-Methods" => "GET, POST",
-      "Access-Control-Allow-Headers" => "X-SILENCE-LOGGER, X-Shared-Session-Key, Dont-Chunk, Discourse-Visible"
+      "Access-Control-Allow-Headers" => "X-SILENCE-LOGGER, X-Shared-Session-Key, Dont-Chunk, Discourse-Present"
     }
 
     user = nil
@@ -42,8 +42,9 @@ def setup_message_bus_env(env)
         extra_headers['Set-Cookie'] = '_t=del; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
       end
     rescue => e
-      Discourse.warn_exception(e, message: "Unexpected error in Message Bus")
+      Discourse.warn_exception(e, message: "Unexpected error in Message Bus", env: env)
     end
+
     user_id = user && user.id
 
     raise Discourse::InvalidAccess if !user_id && SiteSetting.login_required
@@ -98,7 +99,7 @@ MessageBus.on_middleware_error do |env, e|
   if Discourse::InvalidAccess === e
     [403, {}, ["Invalid Access"]]
   elsif RateLimiter::LimitExceeded === e
-    [429, { 'Retry-After' => e.available_in }, [e.description]]
+    [429, { 'Retry-After' => e.available_in.to_s }, [e.description]]
   end
 end
 

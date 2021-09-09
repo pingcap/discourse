@@ -33,7 +33,7 @@ describe RetrieveTitle do
       expect(title).to eq("Good Title")
     end
 
-    it "will prefer the title from an opengraph tag" do
+    it "will prefer the title over the opengraph tag" do
       title = RetrieveTitle.extract_title(<<~HTML
         <html>
           <title>Good Title</title>
@@ -67,6 +67,58 @@ describe RetrieveTitle do
 
       expect(RetrieveTitle.crawl("https://brelksdjflaskfj.com/amazing")).to eq("very amazing")
     end
+
+    it "detects and uses encoding from Content-Type header" do
+      stub_request(:get, "https://brelksdjflaskfj.com/amazing")
+        .to_return(
+          status: 200,
+          body: "<html><title>fancy apostrophes ’’’</title>".dup.force_encoding('ASCII-8BIT'),
+          headers: { 'Content-Type' => 'text/html; charset="utf-8"' }
+        )
+
+      IPSocket.stubs(:getaddress).returns('100.2.3.4')
+      expect(RetrieveTitle.crawl("https://brelksdjflaskfj.com/amazing")).to eq("fancy apostrophes ’’’")
+
+      stub_request(:get, "https://brelksdjflaskfj.com/amazing")
+        .to_return(
+          status: 200,
+          body: "<html><title>japanese こんにちは website</title>".encode('EUC-JP').force_encoding('ASCII-8BIT'),
+          headers: { 'Content-Type' => 'text/html;charset=euc-jp' }
+        )
+
+      IPSocket.stubs(:getaddress).returns('100.2.3.4')
+      expect(RetrieveTitle.crawl("https://brelksdjflaskfj.com/amazing")).to eq("japanese こんにちは website")
+    end
+
+    it "can follow redirect" do
+      stub_request(:get, "http://foobar.com/amazing").
+        to_return(status: 301, body: "", headers: { "location" => "https://wikipedia.com/amazing" })
+
+      stub_request(:get, "https://wikipedia.com/amazing").
+        to_return(status: 200, body: "<html><title>very amazing</title>", headers: {})
+
+      IPSocket.stubs(:getaddress).returns('100.2.3.4')
+      expect(RetrieveTitle.crawl("http://foobar.com/amazing")).to eq("very amazing")
+    end
   end
 
+  context 'fetch_title' do
+    it "does not parse broken title tag" do
+      # webmock does not do chunks
+      stub_request(:get, "https://en.wikipedia.org/wiki/Internet").
+        to_return(status: 200, body: "<html><head><title>Internet - Wikipedia</ti" , headers: {})
+
+      title = RetrieveTitle.fetch_title("https://en.wikipedia.org/wiki/Internet")
+      expect(title).to eq(nil)
+    end
+
+    it "can parse correct title tag" do
+      # webmock does not do chunks
+      stub_request(:get, "https://en.wikipedia.org/wiki/Internet").
+        to_return(status: 200, body: "<html><head><title>Internet - Wikipedia</title>" , headers: {})
+
+      title = RetrieveTitle.fetch_title("https://en.wikipedia.org/wiki/Internet")
+      expect(title).to eq("Internet - Wikipedia")
+    end
+  end
 end

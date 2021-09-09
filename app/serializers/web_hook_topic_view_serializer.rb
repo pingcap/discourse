@@ -18,9 +18,11 @@ class WebHookTopicViewSerializer < TopicViewSerializer
     current_post_number
     chunk_size
     topic_timer
-    private_topic_timer
     details
     image_url
+    slow_mode_seconds
+    slow_mode_enabled_until
+    bookmarked_posts
   }.each do |attr|
     define_method("include_#{attr}?") do
       false

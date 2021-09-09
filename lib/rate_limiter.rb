@@ -24,12 +24,12 @@ class RateLimiter
 
   # Only used in test, only clears current namespace, does not clear globals
   def self.clear_all!
-    $redis.delete_prefixed(RateLimiter.key_prefix)
+    Discourse.redis.delete_prefixed(RateLimiter.key_prefix)
   end
 
   def self.clear_all_global!
-    $redis.without_namespace.keys("GLOBAL::#{key_prefix}*").each do |k|
-      $redis.without_namespace.del k
+    Discourse.redis.without_namespace.keys("GLOBAL::#{key_prefix}*").each do |k|
+      Discourse.redis.without_namespace.del k
     end
   end
 
@@ -37,13 +37,14 @@ class RateLimiter
     "#{RateLimiter.key_prefix}:#{@user && @user.id}:#{type}"
   end
 
-  def initialize(user, type, max, secs, global: false)
+  def initialize(user, type, max, secs, global: false, aggressive: false)
     @user = user
     @type = type
     @key = build_key(type)
     @max = max
     @secs = secs
     @global = global
+    @aggressive = aggressive
   end
 
   def clear!
@@ -52,6 +53,10 @@ class RateLimiter
 
   def can_perform?
     rate_unlimited? || is_under_limit?
+  end
+
+  def seconds_to_wait(now)
+    @secs - age_of_oldest(now)
   end
 
   # reloader friendly
@@ -65,7 +70,7 @@ class RateLimiter
 
 
       if ((tonumber(redis.call("LLEN", key)) < max) or
-          (now - tonumber(redis.call("LRANGE", key, -1, -1)[1])) > secs) then
+          (now - tonumber(redis.call("LRANGE", key, -1, -1)[1])) >= secs) then
         redis.call("LPUSH", key, now)
         redis.call("LTRIM", key, 0, max - 1)
         redis.call("EXPIRE", key, secs * 2)
@@ -79,14 +84,39 @@ class RateLimiter
     PERFORM_LUA_SHA = Digest::SHA1.hexdigest(PERFORM_LUA)
   end
 
+  unless defined? PERFORM_LUA_AGGRESSIVE
+    PERFORM_LUA_AGGRESSIVE = <<~LUA
+      local now = tonumber(ARGV[1])
+      local secs = tonumber(ARGV[2])
+      local max = tonumber(ARGV[3])
+
+      local key = KEYS[1]
+
+      local return_val = 0
+
+      if ((tonumber(redis.call("LLEN", key)) < max) or
+          (now - tonumber(redis.call("LRANGE", key, -1, -1)[1])) >= secs) then
+        return_val = 1
+      else
+        return_val = 0
+      end
+
+      redis.call("LPUSH", key, now)
+      redis.call("LTRIM", key, 0, max - 1)
+      redis.call("EXPIRE", key, secs * 2)
+
+      return return_val
+    LUA
+
+    PERFORM_LUA_AGGRESSIVE_SHA = Digest::SHA1.hexdigest(PERFORM_LUA_AGGRESSIVE)
+  end
+
   def performed!(raise_error: true)
     return true if rate_unlimited?
     now = Time.now.to_i
 
-    if ((max || 0) <= 0) ||
-       (eval_lua(PERFORM_LUA, PERFORM_LUA_SHA, [prefixed_key], [now, @secs, @max]) == 0)
-
-      raise RateLimiter::LimitExceeded.new(seconds_to_wait, @type) if raise_error
+    if ((max || 0) <= 0) || rate_limiter_allowed?(now)
+      raise RateLimiter::LimitExceeded.new(seconds_to_wait(now), @type) if raise_error
       false
     else
       true
@@ -102,6 +132,12 @@ class RateLimiter
   def rollback!
     return if RateLimiter.disabled?
     redis.lpop(prefixed_key)
+  rescue Redis::CommandError => e
+    if e.message =~ /READONLY/
+      # TODO,switch to in-memory rate limiter
+    else
+      raise
+    end
   end
 
   def remaining
@@ -115,32 +151,44 @@ class RateLimiter
 
   private
 
+  def rate_limiter_allowed?(now)
+
+    lua, lua_sha = nil
+    if @aggressive
+      lua = PERFORM_LUA_AGGRESSIVE
+      lua_sha = PERFORM_LUA_AGGRESSIVE_SHA
+    else
+      lua = PERFORM_LUA
+      lua_sha = PERFORM_LUA_SHA
+    end
+
+    eval_lua(lua, lua_sha, [prefixed_key], [now, @secs, @max]) == 0
+  end
+
   def prefixed_key
     if @global
       "GLOBAL::#{key}"
     else
-      $redis.namespace_key(key)
+      Discourse.redis.namespace_key(key)
     end
   end
 
   def redis
-    $redis.without_namespace
+    Discourse.redis.without_namespace
   end
 
-  def seconds_to_wait
-    @secs - age_of_oldest
-  end
-
-  def age_of_oldest
+  def age_of_oldest(now)
     # age of oldest event in buffer, in seconds
-    Time.now.to_i - redis.lrange(prefixed_key, -1, -1).first.to_i
+    now - redis.lrange(prefixed_key, -1, -1).first.to_i
   end
 
   def is_under_limit?
+    now = Time.now.to_i
+
     # number of events in buffer less than max allowed? OR
     (redis.llen(prefixed_key) < @max) ||
-    # age bigger than silding window size?
-    (age_of_oldest > @secs)
+    # age bigger than sliding window size?
+    (age_of_oldest(now) >= @secs)
   end
 
   def rate_unlimited?

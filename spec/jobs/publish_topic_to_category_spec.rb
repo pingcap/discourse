@@ -12,7 +12,9 @@ RSpec.describe Jobs::PublishTopicToCategory do
     Fabricate(:topic_timer,
       status_type: TopicTimer.types[:publish_to_category],
       category_id: another_category.id,
-      topic: topic
+      topic: topic,
+      execute_at: 1.minute.ago,
+      created_at: 5.minutes.ago
     )
 
     Fabricate(:post, topic: topic)
@@ -22,7 +24,7 @@ RSpec.describe Jobs::PublishTopicToCategory do
 
   describe 'when topic has been deleted' do
     it 'should not publish the topic to the new category' do
-      freeze_time 1.hour.ago
+      created_at = freeze_time 1.hour.ago
       topic
 
       freeze_time 1.hour.from_now
@@ -32,7 +34,7 @@ RSpec.describe Jobs::PublishTopicToCategory do
 
       topic.reload
       expect(topic.category).to eq(category)
-      expect(topic.created_at).to be_within(1.second).of(Time.zone.now - 1.hour)
+      expect(topic.created_at).to eq_time(created_at)
     end
   end
 
@@ -40,6 +42,8 @@ RSpec.describe Jobs::PublishTopicToCategory do
     freeze_time 1.hour.ago do
       topic.update!(visible: false)
     end
+
+    now = freeze_time
 
     message = MessageBus.track_publish do
       described_class.new.execute(topic_timer_id: topic.public_topic_timer.id)
@@ -54,19 +58,21 @@ RSpec.describe Jobs::PublishTopicToCategory do
     expect(message.channel).to eq("/topic/#{topic.id}")
 
     %w{created_at bumped_at updated_at last_posted_at}.each do |attribute|
-      expect(topic.public_send(attribute)).to be_within(1.second).of(Time.zone.now)
+      expect(topic.public_send(attribute)).to eq_time(now)
     end
   end
 
   describe 'when topic is a private message' do
-    before do
+    it 'should publish the topic to the new category' do
       freeze_time 1.hour.ago do
         expect { topic.convert_to_private_message(Discourse.system_user) }
           .to change { topic.private_message? }.to(true)
       end
-    end
 
-    it 'should publish the topic to the new category' do
+      topic.allowed_users << topic.public_topic_timer.user
+
+      now = freeze_time
+
       message = MessageBus.track_publish do
         described_class.new.execute(topic_timer_id: topic.public_topic_timer.id)
       end.last
@@ -77,11 +83,57 @@ RSpec.describe Jobs::PublishTopicToCategory do
       expect(topic.private_message?).to eq(false)
 
       %w{created_at bumped_at updated_at last_posted_at}.each do |attribute|
-        expect(topic.public_send(attribute)).to be_within(1.second).of(Time.zone.now)
+        expect(topic.public_send(attribute)).to eq_time(now)
       end
 
       expect(message.data[:reload_topic]).to be_present
       expect(message.data[:refresh_stream]).to be_present
+    end
+
+    it "does nothing if the user can't see the PM" do
+      non_participant_TL4_user = Fabricate(:trust_level_4)
+      topic.convert_to_private_message(Discourse.system_user)
+      timer = topic.public_topic_timer
+      timer.update!(user: non_participant_TL4_user)
+
+      described_class.new.execute(topic_timer_id: topic.public_topic_timer.id)
+
+      topic.reload
+      expect(topic.private_message?).to eq(true)
+      expect(topic.category).not_to eq(another_category)
+    end
+
+    it "works if the user can see the PM" do
+      tl4_user = Fabricate(:trust_level_4)
+      topic.convert_to_private_message(Discourse.system_user)
+
+      topic.allowed_users << tl4_user
+
+      timer = topic.public_topic_timer
+      timer.update!(user: tl4_user)
+
+      described_class.new.execute(topic_timer_id: topic.public_topic_timer.id)
+
+      topic.reload
+      expect(topic.private_message?).to eq(false)
+      expect(topic.category).to eq(another_category)
+    end
+  end
+
+  describe 'when new category has a default auto-close' do
+    it 'should apply the auto-close timer upon publishing' do
+      freeze_time
+
+      another_category.update!(auto_close_hours: 5)
+      topic
+
+      described_class.new.execute(topic_timer_id: topic.public_topic_timer.id)
+
+      topic.reload
+      topic_timer = topic.public_topic_timer
+      expect(topic.category).to eq(another_category)
+      expect(topic_timer.status_type).to eq(TopicTimer.types[:close])
+      expect(topic_timer.execute_at).to be_within_one_second_of(5.hours.from_now)
     end
   end
 end

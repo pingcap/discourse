@@ -359,7 +359,7 @@ class BulkImport::VBulletin < BulkImport::Base
         reply_to_post_number: reply_to_post_number,
         user_id: user_id_from_imported_id(row[3]),
         created_at: Time.zone.at(row[4]),
-        hidden: row[5] == 0,
+        hidden: row[5] != 1,
         raw: normalize_text(row[6]),
       }
 
@@ -608,7 +608,7 @@ class BulkImport::VBulletin < BulkImport::Base
       count = 0
 
       Dir.foreach(AVATAR_DIR) do |item|
-        print "\r%7d - %6d/sec".freeze % [count, count.to_f / (Time.now - start)]
+        print "\r%7d - %6d/sec" % [count, count.to_f / (Time.now - start)]
 
         next if item == ('.') || item == ('..') || item == ('.DS_Store')
         next unless item =~ /avatar(\d+)_(\d).gif/

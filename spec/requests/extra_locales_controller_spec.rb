@@ -52,12 +52,12 @@ describe ExtraLocalesController do
         before do
           JsLocaleHelper.clear_cache!
           JsLocaleHelper.expects(:plugin_translations)
-            .with(any_of("en", "en_US"))
+            .with(any_of("en", "en_GB"))
             .returns("admin_js" => {
               "admin" => {
                 "site_settings" => {
                   "categories" => {
-                    "github_badges" => "Github Badges"
+                    "github_badges" => "GitHub Badges"
                   }
                 }
               }

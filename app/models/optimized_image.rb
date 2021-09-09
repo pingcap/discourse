@@ -9,7 +9,7 @@ class OptimizedImage < ActiveRecord::Base
   URL_REGEX ||= /(\/optimized\/\dX[\/\.\w]*\/([a-zA-Z0-9]+)[\.\w]*)/
 
   def self.lock(upload_id, width, height)
-    @hostname ||= `hostname`.strip rescue "unknown"
+    @hostname ||= Discourse.os_hostname
     # note, the extra lock here ensures we only optimize one image per machine on webs
     # this can very easily lead to runaway CPU so slowing it down is beneficial and it is hijacked
     #
@@ -56,19 +56,21 @@ class OptimizedImage < ActiveRecord::Base
 
     return thumbnail if thumbnail
 
+    # create the thumbnail otherwise
+    original_path = Discourse.store.path_for(upload)
+
+    if original_path.blank?
+      # download is protected with a DistributedMutex
+      external_copy = Discourse.store.download(upload) rescue nil
+      original_path = external_copy.try(:path)
+    end
+
     lock(upload.id, width, height) do
       # may have been generated since we got the lock
       thumbnail = find_by(upload_id: upload.id, width: width, height: height)
 
       # return the previous thumbnail if any
       return thumbnail if thumbnail
-
-      # create the thumbnail otherwise
-      original_path = Discourse.store.path_for(upload)
-      if original_path.blank?
-        external_copy = Discourse.store.download(upload) rescue nil
-        original_path = external_copy.try(:path)
-      end
 
       if original_path.blank?
         Rails.logger.error("Could not find file in the store located at url: #{upload.url}")
@@ -82,6 +84,9 @@ class OptimizedImage < ActiveRecord::Base
 
         temp_file = Tempfile.new(["discourse-thumbnail", extension])
         temp_path = temp_file.path
+
+        target_quality = upload.target_image_quality(original_path, SiteSetting.image_preview_jpg_quality)
+        opts = opts.merge(quality: target_quality) if target_quality
 
         if upload.extension == "svg"
           FileUtils.cp(original_path, temp_path)
@@ -106,10 +111,12 @@ class OptimizedImage < ActiveRecord::Base
 
           # store the optimized image and update its url
           File.open(temp_path) do |file|
-            url = Discourse.store.store_optimized_image(file, thumbnail)
+            url = Discourse.store.store_optimized_image(file, thumbnail, nil, secure: upload.secure?)
             if url.present?
               thumbnail.url = url
               thumbnail.save
+            else
+              Rails.logger.error("Failed to store optimized image of size #{width}x#{height} from url: #{upload.url}\nTemp image path: #{temp_path}")
             end
           end
         end
@@ -152,9 +159,7 @@ class OptimizedImage < ActiveRecord::Base
     if size = read_attribute(:filesize)
       size
     else
-      # we may have a bad optimized image so just skip for now
-      # and do not break here
-      size = calculate_filesize rescue nil
+      size = calculate_filesize
 
       write_attribute(:filesize, size)
       if !new_record?
@@ -178,7 +183,7 @@ class OptimizedImage < ActiveRecord::Base
     end
   end
 
-  IM_DECODERS ||= /\A(jpe?g|png|ico|gif)\z/i
+  IM_DECODERS ||= /\A(jpe?g|png|ico|gif|webp)\z/i
 
   def self.prepend_decoder!(path, ext_path = nil, opts = nil)
     opts ||= {}
@@ -216,6 +221,10 @@ class OptimizedImage < ActiveRecord::Base
       instructions << "-colors" << opts[:colors].to_s
     end
 
+    if opts[:quality]
+      instructions << "-quality" << opts[:quality].to_s
+    end
+
     # NOTE: ORDER is important!
     instructions.concat(%W{
       -auto-orient
@@ -226,23 +235,9 @@ class OptimizedImage < ActiveRecord::Base
       -interpolate catrom
       -unsharp 2x0.5+0.7+0
       -interlace none
-      -quality 98
       -profile #{File.join(Rails.root, 'vendor', 'data', 'RT_sRGB.icm')}
       #{to}
     })
-  end
-
-  def self.resize_instructions_animated(from, to, dimensions, opts = {})
-    ensure_safe_paths!(from, to)
-
-    %W{
-      gifsicle
-      --colors=#{opts[:colors] || 256}
-      --resize-fit #{dimensions}
-      --optimize=3
-      --output #{to}
-      #{from}
-    }
   end
 
   def self.crop_instructions(from, to, dimensions, opts = {})
@@ -251,7 +246,7 @@ class OptimizedImage < ActiveRecord::Base
     from = prepend_decoder!(from, to, opts)
     to = prepend_decoder!(to, to, opts)
 
-    %W{
+    instructions = %W{
       convert
       #{from}[0]
       -auto-orient
@@ -261,23 +256,14 @@ class OptimizedImage < ActiveRecord::Base
       -crop #{dimensions}+0+0
       -unsharp 2x0.5+0.7+0
       -interlace none
-      -quality 98
       -profile #{File.join(Rails.root, 'vendor', 'data', 'RT_sRGB.icm')}
-      #{to}
     }
-  end
 
-  def self.crop_instructions_animated(from, to, dimensions, opts = {})
-    ensure_safe_paths!(from, to)
+    if opts[:quality]
+      instructions << "-quality" << opts[:quality].to_s
+    end
 
-    %W{
-      gifsicle
-      --crop 0,0+#{dimensions}
-      --colors=#{opts[:colors] || 256}
-      --optimize=3
-      --output #{to}
-      #{from}
-    }
+    instructions << to
   end
 
   def self.downsize_instructions(from, to, dimensions, opts = {})
@@ -299,10 +285,6 @@ class OptimizedImage < ActiveRecord::Base
     }
   end
 
-  def self.downsize_instructions_animated(from, to, dimensions, opts = {})
-    resize_instructions_animated(from, to, dimensions, opts)
-  end
-
   def self.resize(from, to, width, height, opts = {})
     optimize("resize", from, to, "#{width}x#{height}", opts)
   end
@@ -319,18 +301,15 @@ class OptimizedImage < ActiveRecord::Base
   def self.optimize(operation, from, to, dimensions, opts = {})
     method_name = "#{operation}_instructions"
 
-    if !!opts[:allow_animation] && (from =~ /\.GIF$/i)
-      method_name += "_animated"
-    end
-
     instructions = self.public_send(method_name.to_sym, from, to, dimensions, opts)
     convert_with(instructions, to, opts)
   end
 
   MAX_PNGQUANT_SIZE = 500_000
+  MAX_CONVERT_SECONDS = 20
 
   def self.convert_with(instructions, to, opts = {})
-    Discourse::Utils.execute_command("nice", "-n", "10", *instructions)
+    Discourse::Utils.execute_command("nice", "-n", "10", *instructions, timeout: MAX_CONVERT_SECONDS)
 
     allow_pngquant = to.downcase.ends_with?(".png") && File.size(to) < MAX_PNGQUANT_SIZE
     FileHelper.optimize_image!(to, allow_pngquant: allow_pngquant)
@@ -347,7 +326,7 @@ class OptimizedImage < ActiveRecord::Base
         error << " unknown reason"
       end
 
-      Discourse.warn(error, location: to, error_message: e.message)
+      Discourse.warn(error, location: to, error_message: e.message, instructions: instructions)
       false
     end
   end
@@ -357,16 +336,18 @@ end
 #
 # Table name: optimized_images
 #
-#  id        :integer          not null, primary key
-#  sha1      :string(40)       not null
-#  extension :string(10)       not null
-#  width     :integer          not null
-#  height    :integer          not null
-#  upload_id :integer          not null
-#  url       :string           not null
-#  filesize  :integer
-#  etag      :string
-#  version   :integer
+#  id         :integer          not null, primary key
+#  sha1       :string(40)       not null
+#  extension  :string(10)       not null
+#  width      :integer          not null
+#  height     :integer          not null
+#  upload_id  :integer          not null
+#  url        :string           not null
+#  filesize   :integer
+#  etag       :string
+#  version    :integer
+#  created_at :datetime         not null
+#  updated_at :datetime         not null
 #
 # Indexes
 #

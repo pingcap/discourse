@@ -8,6 +8,11 @@ describe TopicRetriever do
   let(:author_username) { "eviltrout" }
   let(:topic_retriever) { TopicRetriever.new(embed_url, author_username: author_username) }
 
+  it "can initialize without optional parameters" do
+    t = TopicRetriever.new(embed_url)
+    expect(t).to be_present
+  end
+
   describe "#retrieve" do
     context "when host is invalid" do
       before do
@@ -20,7 +25,7 @@ describe TopicRetriever do
       end
     end
 
-    context "when topics have been retrieived recently" do
+    context "when topics have been retrieved recently" do
       before do
         topic_retriever.stubs(:retrieved_recently?).returns(true)
       end
@@ -31,12 +36,12 @@ describe TopicRetriever do
       end
     end
 
-    context "when host is not invalid" do
+    context "when host is valid" do
       before do
-        topic_retriever.stubs(:invalid_url?).returns(false)
+        Fabricate(:embeddable_host, host: 'http://eviltrout.com/')
       end
 
-      context "when topics have been retrieived recently" do
+      context "when topics have been retrieved recently" do
         before do
           topic_retriever.stubs(:retrieved_recently?).returns(true)
         end
@@ -47,7 +52,7 @@ describe TopicRetriever do
         end
       end
 
-      context "when topics have not been retrieived recently" do
+      context "when topics have not been retrieved recently" do
         before do
           topic_retriever.stubs(:retrieved_recently?).returns(false)
         end
@@ -57,6 +62,22 @@ describe TopicRetriever do
           topic_retriever.retrieve
         end
       end
+    end
+
+    context "when host is invalid" do
+      before do
+        Fabricate(:embeddable_host, host: 'http://not-eviltrout.com/')
+      end
+
+      it "does not perform_retrieve" do
+        topic_retriever.expects(:perform_retrieve).never
+        topic_retriever.retrieve
+      end
+    end
+
+    it "works with URLs with whitespaces" do
+      expect { TopicRetriever.new(" https://example.com ").retrieve }
+        .not_to raise_error
     end
   end
 

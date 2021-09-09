@@ -3,52 +3,73 @@
 class Jobs::NotifyReviewable < ::Jobs::Base
 
   def execute(args)
-    reviewable = Reviewable.find_by(id: args[:reviewable_id])
-    return unless reviewable.present?
+    return unless reviewable = Reviewable.find_by(id: args[:reviewable_id])
 
     @contacted = Set.new
 
-    notify_admins
-    notify_moderators if reviewable.reviewable_by_moderator?
-    if SiteSetting.enable_category_group_review? && reviewable.reviewable_by_group.present?
-      notify_group(reviewable.reviewable_by_group)
+    counts = Hash.new(0)
+
+    Reviewable.default_visible.pending.each do |r|
+      counts[:admins] += 1
+      counts[:moderators] += 1 if r.reviewable_by_moderator?
+      counts[r.reviewable_by_group_id] += 1 if r.reviewable_by_group_id
+    end
+
+    all_updates = Hash.new { |h, k| h[k] = {} }
+
+    if args[:updated_reviewable_ids].present?
+      Reviewable.where(id: args[:updated_reviewable_ids]).each do |r|
+        payload = {
+          last_performing_username: args[:performing_username],
+          status: r.status
+        }
+
+        all_updates[:admins][r.id] = payload
+        all_updates[:moderators][r.id] = payload if r.reviewable_by_moderator?
+        all_updates[r.reviewable_by_group_id][r.id] = payload if r.reviewable_by_group_id
+      end
+    end
+
+    # admins
+    notify(
+      User.real.admins.pluck(:id),
+      count: counts[:admins],
+      updates: all_updates[:admins],
+    )
+
+    # moderators
+    if reviewable.reviewable_by_moderator?
+      notify(
+        User.real.moderators.where("id NOT IN (?)", @contacted).pluck(:id),
+        count: counts[:moderators],
+        updates: all_updates[:moderators],
+      )
+    end
+
+    # category moderators
+    if SiteSetting.enable_category_group_moderation? && (group = reviewable.reviewable_by_group)
+      group.users.includes(:group_users).where("users.id NOT IN (?)", @contacted).find_each do |user|
+        count = 0
+        updates = {}
+
+        user.group_users.each do |gu|
+          count += counts[gu.group_id] || 0
+          updates.merge!(all_updates[gu.group_id] || {})
+        end
+
+        notify([user.id], count: count, updates: updates)
+      end
     end
   end
 
-protected
+  protected
 
-  def users
-    return User if @contacted.blank?
-    User.where("id NOT IN (?)", @contacted)
-  end
+  def notify(user_ids, count:, updates:)
+    return if user_ids.blank?
 
-  def pending
-    Reviewable.default_visible.pending
-  end
-
-  def notify_admins
-    notify(pending.count, users.admins.pluck(:id))
-  end
-
-  def notify_moderators
-    user_ids = users.moderators.pluck(:id)
-    notify(pending.where(reviewable_by_moderator: true).count, user_ids)
-  end
-
-  def notify_group(group)
-    @group_counts = {}
-    group.users.includes(:group_users).where("users.id NOT IN (?)", @contacted).each do |u|
-      reviewable_count = u.group_users.map { |gu| count_for_group(gu.group_id) }.sum
-      MessageBus.publish("/reviewable_counts", { reviewable_count: reviewable_count }, user_ids: [u.id])
-    end
-  end
-
-  def count_for_group(group_id)
-    @group_counts[group_id] ||= pending.where(reviewable_by_group_id: group_id).count
-  end
-
-  def notify(count, user_ids)
     data = { reviewable_count: count }
+    data[:updates] = updates if updates.present?
+
     MessageBus.publish("/reviewable_counts", data, user_ids: user_ids)
     @contacted += user_ids
   end

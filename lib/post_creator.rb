@@ -32,10 +32,11 @@ class PostCreator
   #   skip_jobs               - Don't enqueue jobs when creation succeeds. This is needed if you
   #                             wrap `PostCreator` in a transaction, as the sidekiq jobs could
   #                             dequeue before the commit finishes. If you do this, be sure to
-  #                             call `enqueue_jobs` after the transaction is comitted.
+  #                             call `enqueue_jobs` after the transaction is committed.
   #   hidden_reason_id        - Reason for hiding the post (optional)
   #   skip_validations        - Do not validate any of the content in the post
   #   draft_key               - the key of the draft we are creating (will be deleted on success)
+  #   silent                  - Do not update topic stats and fields like last_post_user_id
   #
   #   When replying to a topic:
   #     topic_id              - topic we're replying to
@@ -59,21 +60,20 @@ class PostCreator
     # TODO: we should reload user in case it is tainted, should take in a user_id as opposed to user
     # If we don't do this we introduce a rather risky dependency
     @user = user
-    @opts = opts || {}
-    opts[:title] = pg_clean_up(opts[:title]) if opts[:title] && opts[:title].include?("\u0000")
-    opts[:raw] = pg_clean_up(opts[:raw]) if opts[:raw] && opts[:raw].include?("\u0000")
-    opts.delete(:reply_to_post_number) unless opts[:topic_id]
-    opts[:visible] = false if opts[:visible].nil? && opts[:hidden_reason_id].present?
-    @guardian = opts[:guardian] if opts[:guardian]
-
     @spam = false
+    @opts = opts || {}
+
+    opts[:title] = pg_clean_up(opts[:title]) if opts[:title]&.include?("\u0000")
+    opts[:raw] = pg_clean_up(opts[:raw]) if opts[:raw]&.include?("\u0000")
+    opts[:visible] = false if opts[:visible].nil? && opts[:hidden_reason_id].present?
+
+    opts.delete(:reply_to_post_number) unless opts[:topic_id]
   end
 
   def pg_clean_up(str)
     str.gsub("\u0000", "")
   end
 
-  # True if the post was considered spam
   def spam?
     @spam
   end
@@ -83,7 +83,7 @@ class PostCreator
   end
 
   def guardian
-    @guardian ||= Guardian.new(@user)
+    @guardian ||= @opts[:guardian] || Guardian.new(@user)
   end
 
   def valid?
@@ -96,7 +96,7 @@ class PostCreator
     end
 
     if @opts[:target_usernames].present? && !skip_validations? && !@user.staff?
-      names = @opts[:target_usernames].split(',')
+      names = @opts[:target_usernames].split(',').flatten.map(&:downcase)
 
       # Make sure max_allowed_message_recipients setting is respected
       max_allowed_message_recipients = SiteSetting.max_allowed_message_recipients
@@ -104,14 +104,14 @@ class PostCreator
       if names.length > max_allowed_message_recipients
         errors.add(
           :base,
-          I18n.t(:max_pm_recepients, recipients_limit: max_allowed_message_recipients)
+          I18n.t(:max_pm_recipients, recipients_limit: max_allowed_message_recipients)
         )
 
         return false
       end
 
-      # Make sure none of the users have muted the creator
-      users = User.where(username: names).pluck(:id, :username).to_h
+      # Make sure none of the users have muted or ignored the creator
+      users = User.where(username_lower: names).pluck(:id, :username).to_h
 
       User
         .joins("LEFT JOIN user_options ON user_options.user_id = users.id")
@@ -128,6 +128,23 @@ class PostCreator
         errors.add(:base, I18n.t(:not_accepting_pms, username: users[m]))
       end
 
+      # Is Allowed PM users list enabled for any recipients?
+      users_with_allowed_pms = allowed_pms_enabled(users).pluck(:id).uniq
+
+      # If any of the users has allowed_pm_users enabled check to see if the creator
+      # is in their list
+      if users_with_allowed_pms.any?
+        users_sender_can_pm = allowed_pms_enabled(users)
+          .where("allowed_pm_users.allowed_pm_user_id" => @user.id.to_i)
+          .pluck(:id).uniq
+
+        # If not in the list add an error
+        users_not_allowed = users_with_allowed_pms - users_sender_can_pm
+        users_not_allowed.each do |id|
+          errors.add(:base, I18n.t(:not_accepting_pms, username: users[id]))
+        end
+      end
+
       return false if errors[:base].present?
     end
 
@@ -136,6 +153,25 @@ class PostCreator
       return false unless skip_validations? || validate_child(topic_creator)
     else
       @topic = Topic.find_by(id: @opts[:topic_id])
+
+      if @topic.present? && @opts[:archetype] == Archetype.private_message
+        errors.add(:base, I18n.t(:create_pm_on_existing_topic))
+        return false
+      end
+
+      if guardian.affected_by_slow_mode?(@topic)
+        tu = TopicUser.find_by(user: @user, topic: @topic)
+
+        if tu&.last_posted_at
+          threshold = tu.last_posted_at + @topic.slow_mode_seconds.seconds
+
+          if DateTime.now < threshold
+            errors.add(:base, I18n.t(:slow_mode_enabled))
+            return false
+          end
+        end
+      end
+
       unless @topic.present? && (@opts[:skip_guardian] || guardian.can_create?(Post, @topic))
         errors.add(:base, I18n.t(:topic_not_found))
         return false
@@ -177,13 +213,12 @@ class PostCreator
         update_topic_auto_close
         update_user_counts
         create_embedded_topic
-        link_post_uploads
+        @post.link_post_uploads
         update_uploads_secure_status
+        delete_owned_bookmarks
         ensure_in_allowed_users if guardian.is_staff?
-        unarchive_message
-        if !@opts[:import_mode]
-          DraftSequence.next!(@user, draft_key)
-        end
+        unarchive_message if !@opts[:import_mode]
+        DraftSequence.next!(@user, draft_key) if !@opts[:import_mode]
         @post.save_reply_relationships
       end
     end
@@ -204,7 +239,13 @@ class PostCreator
       auto_close
     end
 
-    handle_spam if !opts[:import_mode] && (@post || @spam)
+    if !opts[:import_mode]
+      handle_spam if (@spam || @post)
+
+      if !@spam && @post && errors.blank?
+        ReviewablePost.queue_for_review_if_possible(@post, @user)
+      end
+    end
 
     @post
   end
@@ -234,7 +275,7 @@ class PostCreator
   end
 
   def self.track_post_stats
-    Rails.env != "test".freeze || @track_post_stats
+    Rails.env != "test" || @track_post_stats
   end
 
   def self.track_post_stats=(val)
@@ -297,7 +338,7 @@ class PostCreator
 
   def draft_key
     @draft_key ||= @opts[:draft_key]
-    @draft_key ||= @topic ? "topic_#{@topic.id}" : "new_topic"
+    @draft_key ||= @topic ? @topic.draft_key : Draft::NEW_TOPIC
   end
 
   def build_post_stats
@@ -329,7 +370,8 @@ class PostCreator
         :closed, true, Discourse.system_user,
         message: I18n.t(
           'topic_statuses.autoclosed_message_max_posts',
-          count: SiteSetting.auto_close_messages_post_count
+          count: SiteSetting.auto_close_messages_post_count,
+          locale: SiteSetting.default_locale
         )
       )
     elsif !is_private_message &&
@@ -341,9 +383,15 @@ class PostCreator
         :closed, true, Discourse.system_user,
         message: I18n.t(
           'topic_statuses.autoclosed_topic_max_posts',
-          count: SiteSetting.auto_close_topics_post_count
+          count: SiteSetting.auto_close_topics_post_count,
+          locale: SiteSetting.default_locale
         )
       )
+
+      if SiteSetting.auto_close_topics_create_linked_topic?
+        # enqueue a job to create a linked topic
+        Jobs.enqueue_in(5.seconds, :create_linked_topic, post_id: @post.id)
+      end
     end
   end
 
@@ -368,22 +416,25 @@ class PostCreator
   # discourse post.
   def create_embedded_topic
     return unless @opts[:embed_url].present?
+
+    original_uri = URI.parse(@opts[:embed_url])
+    raise Discourse::InvalidParameters.new(:embed_url) unless original_uri.is_a?(URI::HTTP)
+
     embed = TopicEmbed.new(topic_id: @post.topic_id, post_id: @post.id, embed_url: @opts[:embed_url])
     rollback_from_errors!(embed) unless embed.save
   end
 
-  def link_post_uploads
-    disallowed_uploads = @post.link_post_uploads
-    if disallowed_uploads.is_a? Array
-      @post.errors.add(:base, I18n.t('secure_upload_not_allowed_in_public_topic', upload_filenames: disallowed_uploads.join(", ")))
-      rollback_from_errors!(@post)
-    end
+  def update_uploads_secure_status
+    @post.update_uploads_secure_status(source: "post creator") if SiteSetting.secure_media?
   end
 
-  def update_uploads_secure_status
-    if SiteSetting.secure_media? || SiteSetting.prevent_anons_from_downloading_files?
-      @post.update_uploads_secure_status
-    end
+  def delete_owned_bookmarks
+    return if !@post.topic_id
+    BookmarkManager.new(@user).destroy_for_topic(
+      Topic.with_deleted.find(@post.topic_id),
+      { auto_delete_preference: Bookmark.auto_delete_preferences[:on_owner_reply] },
+      @opts
+    )
   end
 
   def handle_spam
@@ -407,14 +458,18 @@ class PostCreator
 
   def ensure_in_allowed_users
     return unless @topic.private_message? && @topic.id
+    return if @post.whisper?
+    return if @topic.topic_allowed_users.exists?(user_id: @user.id)
 
-    unless @topic.topic_allowed_users.where(user_id: @user.id).exists?
-      unless @topic.topic_allowed_groups.where('group_id IN (
-                                              SELECT group_id FROM group_users where user_id = ?
-                                           )', @user.id).exists?
-        @topic.topic_allowed_users.create!(user_id: @user.id)
-      end
-    end
+    return if @topic
+      .topic_allowed_groups
+      .where(
+        "group_id IN (SELECT group_id FROM group_users where user_id = ?)",
+        @user.id
+      )
+      .exists?
+
+    @topic.topic_allowed_users.create!(user_id: @user.id)
   end
 
   def unarchive_message
@@ -430,6 +485,17 @@ class PostCreator
   end
 
   private
+
+  def allowed_pms_enabled(users)
+    User
+      .joins("LEFT JOIN user_options ON user_options.user_id = users.id")
+      .joins("LEFT JOIN allowed_pm_users ON allowed_pm_users.user_id = users.id")
+      .where("
+        user_options.user_id IS NOT NULL AND
+        user_options.user_id IN (:user_ids) AND
+        user_options.enable_allowed_pm_users
+      ", user_ids: users.keys)
+  end
 
   def create_topic
     return if @topic
@@ -450,13 +516,12 @@ class PostCreator
   def update_topic_stats
     attrs = { updated_at: Time.now }
 
-    if @post.post_type != Post.types[:whisper]
+    if @post.post_type != Post.types[:whisper] && !@opts[:silent]
       attrs[:last_posted_at] = @post.created_at
       attrs[:last_post_user_id] = @post.user_id
       attrs[:word_count] = (@topic.word_count || 0) + @post.word_count
       attrs[:excerpt] = @post.excerpt_for_topic if new_topic?
       attrs[:bumped_at] = @post.created_at unless @post.no_bump
-      @topic.update_columns(attrs)
     end
 
     @topic.update_columns(attrs)
@@ -472,11 +537,12 @@ class PostCreator
 
       if topic_timer &&
          topic_timer.based_on_last_post &&
-         topic_timer.duration > 0
+         topic_timer.duration_minutes.to_i > 0
 
         @topic.set_or_create_timer(TopicTimer.types[:close],
-          topic_timer.duration,
-          based_on_last_post: topic_timer.based_on_last_post
+          nil,
+          based_on_last_post: topic_timer.based_on_last_post,
+          duration_minutes: topic_timer.duration_minutes
         )
       end
     end
@@ -496,7 +562,12 @@ class PostCreator
     end
 
     post.extract_quoted_post_numbers
-    post.created_at = Time.zone.parse(@opts[:created_at].to_s) if @opts[:created_at].present?
+
+    post.created_at = if @opts[:created_at].is_a?(Time)
+      @opts[:created_at]
+    elsif @opts[:created_at].present?
+      Time.zone.parse(@opts[:created_at].to_s)
+    end
 
     if fields = @opts[:custom_fields]
       post.custom_fields = fields
@@ -536,11 +607,6 @@ class PostCreator
       @user.user_stat.topic_count += 1 if @post.is_first_post?
     end
 
-    # We don't count replies to your own topics
-    if !@opts[:import_mode] && @user.id != @topic.user_id
-      @user.user_stat.update_topic_reply_count
-    end
-
     @user.user_stat.save!
 
     if !@topic.private_message? && @post.post_type != Post.types[:whisper]
@@ -558,10 +624,12 @@ class PostCreator
       .first
 
     if !last_post_time
-      @post.custom_fields[Post::NOTICE_TYPE] = Post.notices[:new_user]
+      @post.custom_fields[Post::NOTICE] = { type: Post.notices[:new_user] }
     elsif SiteSetting.returning_users_days > 0 && last_post_time < SiteSetting.returning_users_days.days.ago
-      @post.custom_fields[Post::NOTICE_TYPE] = Post.notices[:returning_user]
-      @post.custom_fields[Post::NOTICE_ARGS] = last_post_time.iso8601
+      @post.custom_fields[Post::NOTICE] = {
+        type: Post.notices[:returning_user],
+        last_posted_at: last_post_time.iso8601
+      }
     end
   end
 
@@ -582,7 +650,7 @@ class PostCreator
                       @topic.id,
                       posted: true,
                       last_read_post_number: @post.post_number,
-                      highest_seen_post_number: @post.post_number)
+                      last_posted_at: Time.zone.now)
 
     # assume it took us 5 seconds of reading time to make a post
     PostTiming.record_timing(topic_id: @post.topic_id,

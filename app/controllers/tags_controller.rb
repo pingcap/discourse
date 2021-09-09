@@ -5,20 +5,29 @@ class TagsController < ::ApplicationController
   include TopicQueryParams
 
   before_action :ensure_tags_enabled
+  before_action :ensure_visible, only: [:show, :info]
+
+  def self.show_methods
+    Discourse.anonymous_filters.map { |f| :"show_#{f}" }
+  end
 
   requires_login except: [
     :index,
     :show,
     :tag_feed,
     :search,
-    :check_hashtag,
-    Discourse.anonymous_filters.map { |f| :"show_#{f}" }
-  ].flatten
+    :info,
+    *show_methods
+  ]
 
-  skip_before_action :check_xhr, only: [:tag_feed, :show, :index]
+  skip_before_action :check_xhr, only: [:tag_feed, :show, :index, *show_methods]
 
-  before_action :set_category_from_params, except: [:index, :update, :destroy,
-    :tag_feed, :search, :notifications, :update_notifications, :personal_messages]
+  before_action :set_category, except: [:index, :update, :destroy,
+    :tag_feed, :search, :notifications, :update_notifications, :personal_messages, :info]
+
+  before_action :fetch_tag, only: [:info, :create_synonyms, :destroy_synonym]
+
+  after_action :add_noindex_header, except: [:index, :show]
 
   def index
     @description_meta = I18n.t("tags.title")
@@ -31,24 +40,28 @@ class TagsController < ::ApplicationController
       ungrouped_tags = ungrouped_tags.where("tags.topic_count > 0") unless show_all_tags
 
       grouped_tag_counts = TagGroup.visible(guardian).order('name ASC').includes(:tags).map do |tag_group|
-        { id: tag_group.id, name: tag_group.name, tags: self.class.tag_counts_json(tag_group.tags) }
+        { id: tag_group.id, name: tag_group.name, tags: self.class.tag_counts_json(tag_group.tags.where(target_tag_id: nil), show_pm_tags: guardian.can_tag_pms?) }
       end
 
-      @tags = self.class.tag_counts_json(ungrouped_tags)
+      @tags = self.class.tag_counts_json(ungrouped_tags, show_pm_tags: guardian.can_tag_pms?)
       @extras = { tag_groups: grouped_tag_counts }
     else
       tags = show_all_tags ? Tag.all : Tag.where("tags.topic_count > 0")
-      unrestricted_tags = DiscourseTagging.filter_visible(tags, guardian)
+      unrestricted_tags = DiscourseTagging.filter_visible(tags.where(target_tag_id: nil), guardian)
 
       categories = Category.where("id IN (SELECT category_id FROM category_tags)")
         .where("id IN (?)", guardian.allowed_category_ids)
         .includes(:tags)
 
       category_tag_counts = categories.map do |c|
-        { id: c.id, tags: self.class.tag_counts_json(c.tags) }
-      end
+        category_tags = self.class.tag_counts_json(
+          DiscourseTagging.filter_visible(c.tags.where(target_tag_id: nil), guardian)
+        )
+        next if category_tags.empty?
+        { id: c.id, tags: category_tags }
+      end.compact
 
-      @tags = self.class.tag_counts_json(unrestricted_tags)
+      @tags = self.class.tag_counts_json(unrestricted_tags, show_pm_tags: guardian.can_tag_pms?)
       @extras = { categories: category_tag_counts }
     end
 
@@ -73,12 +86,17 @@ class TagsController < ::ApplicationController
       @additional_tags = params[:additional_tag_ids].to_s.split('/').map { |t| t.force_encoding("UTF-8") }
 
       list_opts = build_topic_list_options
+      @list = nil
 
-      @list = TopicQuery.new(current_user, list_opts).public_send("list_#{filter}")
+      if filter == :top
+        period = params[:period] || SiteSetting.top_page_default_timeframe.to_sym
+        TopTopic.validate_period(period)
 
-      @list.draft_key = Draft::NEW_TOPIC
-      @list.draft_sequence = DraftSequence.current(current_user, Draft::NEW_TOPIC)
-      @list.draft = Draft.get(current_user, @list.draft_key, @list.draft_sequence) if current_user
+        @list = TopicQuery.new(current_user, list_opts).public_send("list_top_for", period)
+        @list.for_period = period
+      else
+        @list = TopicQuery.new(current_user, list_opts).public_send("list_#{filter}")
+      end
 
       @list.more_topics_url = construct_url_with(:next, list_opts)
       @list.prev_topics_url = construct_url_with(:prev, list_opts)
@@ -86,8 +104,9 @@ class TagsController < ::ApplicationController
       @description_meta = I18n.t("rss_by_tag", tag: tag_params.join(' & '))
       @title = @description_meta
 
-      path_name = url_method(params.slice(:category, :parent_category))
-      canonical_url "#{Discourse.base_url_no_prefix}#{public_send(path_name, *(params.slice(:parent_category, :category, :tag_id).values.map { |t| t.force_encoding("UTF-8") }))}"
+      canonical_params = params.slice(:category_slug_path_with_id, :tag_id)
+      canonical_method = url_method(canonical_params)
+      canonical_url "#{Discourse.base_url_no_prefix}#{public_send(canonical_method, *(canonical_params.values.map { |t| t.force_encoding("UTF-8") }))}"
 
       if @list.topics.size == 0 && params[:tag_id] != 'none' && !Tag.where_name(@tag_id).exists?
         raise Discourse::NotFound.new("tag not found", check_permalinks: true)
@@ -98,9 +117,16 @@ class TagsController < ::ApplicationController
   end
 
   def show
-    raise Discourse::NotFound if DiscourseTagging.hidden_tag_names(guardian).include?(params[:tag_id])
-
     show_latest
+  end
+
+  def info
+    render_serialized(
+      @tag,
+      DetailedTagSerializer,
+      rest_serializer: true,
+      root: :tag_info
+    )
   end
 
   def update
@@ -180,10 +206,10 @@ class TagsController < ::ApplicationController
     discourse_expires_in 1.minute
 
     tag_id = params[:tag_id]
-    @link = "#{Discourse.base_url}/tags/#{tag_id}"
+    @link = "#{Discourse.base_url}/tag/#{tag_id}"
     @description = I18n.t("rss_by_tag", tag: tag_id)
     @title = "#{SiteSetting.title} - #{@description}"
-    @atom_link = "#{Discourse.base_url}/tags/#{tag_id}.rss"
+    @atom_link = "#{Discourse.base_url}/tag/#{tag_id}.rss"
 
     query = TopicQuery.new(current_user, tags: [tag_id])
     latest_results = query.latest_results
@@ -196,8 +222,14 @@ class TagsController < ::ApplicationController
     filter_params = {
       for_input: params[:filterForInput],
       selected_tags: params[:selected_tags],
-      limit: params[:limit]
+      limit: params[:limit],
+      exclude_synonyms: params[:excludeSynonyms],
+      exclude_has_synonyms: params[:excludeHasSynonyms]
     }
+
+    if filter_params[:limit] && filter_params[:limit].to_i < 0
+      raise Discourse::InvalidParameters.new(:limit)
+    end
 
     if params[:categoryId]
       filter_params[:category] = Category.find_by_id(params[:categoryId])
@@ -208,7 +240,7 @@ class TagsController < ::ApplicationController
       filter_params[:term] = clean_name
       filter_params[:order_search_results] = true
     else
-      filter_params[:order] = "topic_count DESC"
+      filter_params[:order_popularity] = true
     end
 
     tags_with_counts = DiscourseTagging.filter_allowed_tags(
@@ -216,7 +248,7 @@ class TagsController < ::ApplicationController
       filter_params
     )
 
-    tags = self.class.tag_counts_json(tags_with_counts)
+    tags = self.class.tag_counts_json(tags_with_counts, show_pm_tags: guardian.can_tag_pms?)
 
     json_response = { results: tags }
 
@@ -224,19 +256,25 @@ class TagsController < ::ApplicationController
       # filter_allowed_tags determined that the tag entered is not allowed
       json_response[:forbidden] = params[:q]
 
-      category_names = tag.categories.where(id: guardian.allowed_category_ids).pluck(:name)
-      category_names += Category.joins(tag_groups: :tags).where(id: guardian.allowed_category_ids, "tags.id": tag.id).pluck(:name)
-
-      if category_names.present?
-        category_names.uniq!
-        json_response[:forbidden_message] = I18n.t(
-          "tags.forbidden.restricted_to",
-          count: category_names.count,
-          tag_name: tag.name,
-          category_names: category_names.join(", ")
-        )
+      if filter_params[:exclude_synonyms] && tag.synonym?
+        json_response[:forbidden_message] = I18n.t("tags.forbidden.synonym", tag_name: tag.target_tag.name)
+      elsif filter_params[:exclude_has_synonyms] && tag.synonyms.exists?
+        json_response[:forbidden_message] = I18n.t("tags.forbidden.has_synonyms", tag_name: tag.name)
       else
-        json_response[:forbidden_message] = I18n.t("tags.forbidden.in_this_category", tag_name: tag.name)
+        category_names = tag.categories.where(id: guardian.allowed_category_ids).pluck(:name)
+        category_names += Category.joins(tag_groups: :tags).where(id: guardian.allowed_category_ids, "tags.id": tag.id).pluck(:name)
+
+        if category_names.present?
+          category_names.uniq!
+          json_response[:forbidden_message] = I18n.t(
+            "tags.forbidden.restricted_to",
+            count: category_names.count,
+            tag_name: tag.name,
+            category_names: category_names.join(", ")
+          )
+        else
+          json_response[:forbidden_message] = I18n.t("tags.forbidden.in_this_category", tag_name: tag.name)
+        end
       end
     end
 
@@ -255,15 +293,7 @@ class TagsController < ::ApplicationController
     raise Discourse::NotFound unless tag
     level = params[:tag_notification][:notification_level].to_i
     TagUser.change(current_user.id, tag.id, level)
-    render json: { notification_level: level }
-  end
-
-  def check_hashtag
-    valid_tags = Tag.where_name(params[:tag_values]).map do |tag|
-      { value: tag.name, url: tag.full_url }
-    end.compact
-
-    render json: { valid: valid_tags }
+    render json: { notification_level: level, tag_id: tag.id }
   end
 
   def personal_messages
@@ -276,37 +306,63 @@ class TagsController < ::ApplicationController
     render json: { tags: pm_tags }
   end
 
+  def create_synonyms
+    guardian.ensure_can_admin_tags!
+    value = DiscourseTagging.add_or_create_synonyms_by_name(@tag, params[:synonyms])
+    if value.is_a?(Array)
+      render json: failed_json.merge(
+        failed_tags: value.inject({}) { |h, t| h[t.name] = t.errors.full_messages.first; h }
+      )
+    else
+      render json: success_json
+    end
+  end
+
+  def destroy_synonym
+    guardian.ensure_can_admin_tags!
+    synonym = Tag.where_name(params[:synonym_id]).first
+    raise Discourse::NotFound unless synonym
+    if synonym.target_tag == @tag
+      synonym.update!(target_tag: nil)
+      render json: success_json
+    else
+      render json: failed_json, status: 400
+    end
+  end
+
   private
+
+  def fetch_tag
+    @tag = Tag.find_by_name(params[:tag_id].force_encoding("UTF-8"))
+    raise Discourse::NotFound unless @tag
+  end
 
   def ensure_tags_enabled
     raise Discourse::NotFound unless SiteSetting.tagging_enabled?
   end
 
-  def self.tag_counts_json(tags)
-    tags.map { |t| { id: t.name, text: t.name, count: t.topic_count, pm_count: t.pm_topic_count } }
+  def ensure_visible
+    raise Discourse::NotFound if DiscourseTagging.hidden_tag_names(guardian).include?(params[:tag_id])
   end
 
-  def set_category_from_params
+  def self.tag_counts_json(tags, show_pm_tags: true)
+    target_tags = Tag.where(id: tags.map(&:target_tag_id).compact.uniq).select(:id, :name)
+    tags.map do |t|
+      next if t.topic_count == 0 && t.pm_topic_count > 0 && !show_pm_tags
+
+      {
+        id: t.name,
+        text: t.name,
+        count: t.topic_count,
+        pm_count: show_pm_tags ? t.pm_topic_count : 0,
+        target_tag: t.target_tag_id ? target_tags.find { |x| x.id == t.target_tag_id }&.name : nil
+      }
+    end.compact
+  end
+
+  def set_category
     if request.path_parameters.include?(:category_slug_path_with_id)
-      parts = params[:category_slug_path_with_id].split('/')
-
-      if !parts.empty? && parts.last =~ /\A\d+\Z/
-        id = parts.pop.to_i
-      end
-      slug_path = parts unless parts.empty?
-
-      if id.present?
-        @filter_on_category = Category.find_by_id(id)
-      elsif slug_path.present?
-        if (1..2).include?(slug_path.size)
-          @filter_on_category = Category.find_by_slug(*slug_path.reverse)
-        end
-
-        # Legacy paths
-        if @filter_on_category.nil? && parts.last =~ /\A\d+-/
-          @filter_on_category = Category.find_by_id(parts.last.to_i)
-        end
-      end
+      @filter_on_category = Category.find_by_slug_path_with_id(params[:category_slug_path_with_id])
     else
       slug_or_id = params[:category]
       return true if slug_or_id.nil?
@@ -314,9 +370,16 @@ class TagsController < ::ApplicationController
       @filter_on_category = Category.query_category(slug_or_id, nil)
     end
 
-    category_redirect_or_not_found && (return) if !@filter_on_category
-
     guardian.ensure_can_see!(@filter_on_category)
+
+    if !@filter_on_category
+      permalink = Permalink.find_by_url("c/#{params[:category_slug_path_with_id]}")
+      if permalink.present? && permalink.category_id
+        return redirect_to "#{Discourse::base_path}/tags#{permalink.target_url}/#{params[:tag_id]}", status: :moved_permanently
+      end
+
+      raise Discourse::NotFound
+    end
   end
 
   def page_params
@@ -350,9 +413,7 @@ class TagsController < ::ApplicationController
   end
 
   def url_method(opts = {})
-    if opts[:parent_category] && opts[:category]
-      "tag_parent_category_category_#{action_name}_path"
-    elsif opts[:category]
+    if opts[:category_slug_path_with_id]
       "tag_category_#{action_name}_path"
     else
       "tag_#{action_name}_path"
@@ -360,8 +421,6 @@ class TagsController < ::ApplicationController
   end
 
   def construct_url_with(action, opts)
-    method = url_method(opts)
-
     page_params =
       case action
       when :prev
@@ -372,13 +431,13 @@ class TagsController < ::ApplicationController
         raise "unreachable"
       end
 
-    if page_params.include?(:category_slug_path_with_id)
-      opts = opts.dup
-      opts.delete(:category)
-    end
+    opts = opts.merge(page_params)
+    opts.delete(:category) if opts.include?(:category_slug_path_with_id)
+
+    method = url_method(opts)
 
     begin
-      url = public_send(method, opts.merge(page_params))
+      url = public_send(method, opts)
     rescue ActionController::UrlGenerationError
       raise Discourse::NotFound
     end
@@ -401,9 +460,11 @@ class TagsController < ::ApplicationController
       search: params[:search],
       q: params[:q]
     )
-    options[:no_subcategories] = true if params[:no_subcategories] == 'true'
+    options[:no_subcategories] = true if params[:no_subcategories] == true || params[:no_subcategories] == 'true'
+    options[:per_page] = params[:per_page].to_i.clamp(1, 30) if params[:per_page].present?
 
     if params[:tag_id] == 'none'
+      options.delete(:tags)
       options[:no_tags] = true
     else
       options[:tags] = tag_params
@@ -411,19 +472,6 @@ class TagsController < ::ApplicationController
     end
 
     options
-  end
-
-  def category_redirect_or_not_found
-    # automatic redirects for renamed categories
-    url = params[:parent_category] ? "c/#{params[:parent_category]}/#{params[:category]}" : "c/#{params[:category]}"
-    permalink = Permalink.find_by_url(url)
-
-    if permalink.present? && permalink.category_id
-      redirect_to "#{Discourse::base_uri}/tags#{permalink.target_url}/#{params[:tag_id]}", status: :moved_permanently
-    else
-      # redirect to 404
-      raise Discourse::NotFound
-    end
   end
 
   def tag_params

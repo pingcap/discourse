@@ -5,7 +5,7 @@
 # It simply drains all the requests (waits up to 4 seconds) and issues a HUP
 #  if you need a more sophisticated cycling restart for multiple thins it will need to be written
 #
-# This works fine for Discourse.org cause we host our app accross multiple machines, if you hosting
+# This works fine for Discourse.org cause we host our app across multiple machines, if you hosting
 #  on a single machine you have a trickier problem at hand as you need to cycle the processes in order
 #
 
@@ -29,7 +29,7 @@ Thread.new do
 
         if old_time != time
           Rails.logger.info "attempting to reload #{$$} #{$PROGRAM_NAME} in #{wait_seconds} seconds"
-          $shutdown = true
+          $shutdown = true # rubocop:disable Style/GlobalVars
           sleep wait_seconds
           Rails.logger.info "restarting #{$$}"
           Process.kill("USR2", $$)

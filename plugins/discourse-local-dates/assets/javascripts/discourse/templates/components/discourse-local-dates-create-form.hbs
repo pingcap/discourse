@@ -4,31 +4,32 @@
   style="overflow: auto"}}
 
   <div class="form">
-    {{#unless isValid}}
-      <div class="validation-error alert alert-error">
-        {{i18n "discourse_local_dates.create.form.invalid_date"}}
-      </div>
-    {{else}}
+    {{#if isValid}}
       {{#if timezoneIsDifferentFromUserTimezone}}
         <div class="preview alert alert-info">
           <b>{{formatedCurrentUserTimezone}} </b>{{currentPreview}}
         </div>
       {{/if}}
-    {{/unless}}
+    {{else}}
+      <div class="validation-error alert alert-error">
+        {{i18n "discourse_local_dates.create.form.invalid_date"}}
+      </div>
+    {{/if}}
 
     {{computeDate}}
 
     <div class="date-time-configuration">
       <div class="inputs-panel">
-        <div class="date-time-control from {{if fromSelected 'is-selected'}} {{if fromFilled 'is-filled'}}">
+        <div class="date-time-control from {{if fromSelected "is-selected"}} {{if fromFilled "is-filled"}}">
           {{d-icon "calendar-alt"}}
           {{d-button
+            id="from-date-time"
             action=(action "focusFrom")
             translatedLabel=formattedFrom
             class="date-time"}}
         </div>
 
-        <div class="date-time-control to {{if toSelected 'is-selected'}} {{if toFilled 'is-filled'}}">
+        <div class="date-time-control to {{if toSelected "is-selected"}} {{if toFilled "is-filled"}}">
           {{d-icon "calendar-alt"}}
           {{d-button
             action=(action "focusTo")
@@ -41,9 +42,10 @@
 
         {{#unless site.mobileView}}
           {{timezone-input
-            headerIcon="globe"
+            options=(hash icon="globe")
             value=timezone
-            onSelect=(action (mut timezone))}}
+            onChange=(action (mut timezone))
+          }}
         {{/unless}}
       </div>
 
@@ -54,25 +56,26 @@
         {{#if fromSelected}}
           <div class="time-pickers">
             {{d-icon "far-clock"}}
-            {{input maxlength=5 placeholder="hh:mm" input=(action "setTime") type="time" value=(unbound time) class="time-picker"}}
+            {{input maxlength=5 placeholder="hh:mm" input=(action "setTime") type="time" value=time class="time-picker"}}
           </div>
         {{/if}}
 
         {{#if toSelected}}
-        {{#if toDate}}
-          <div class="time-pickers">
-            {{d-icon "far-clock"}}
-            {{input maxlength=5 placeholder="hh:mm" input=(action "setToTime") type="time" value=(unbound toTime) class="time-picker"}}
-          </div>
-        {{/if}}
+          {{#if toDate}}
+            <div class="time-pickers">
+              {{d-icon "far-clock"}}
+              {{input maxlength=5 placeholder="hh:mm" input=(action "setToTime") type="time" value=toTime class="time-picker"}}
+            </div>
+          {{/if}}
         {{/if}}
       </div>
 
       {{#if site.mobileView}}
         {{timezone-input
-          headerIcon="globe"
           value=timezone
-          onSelect=(action (mut timezone))}}
+          options=(hash icon="globe")
+          onChange=(action (mut timezone))
+        }}
       {{/if}}
     </div>
 
@@ -83,13 +86,13 @@
             <label class="control-label">
               {{i18n "discourse_local_dates.create.form.recurring_title"}}
             </label>
-            <p>{{{i18n "discourse_local_dates.create.form.recurring_description"}}}</p>
+            <p>{{html-safe (i18n "discourse_local_dates.create.form.recurring_description")}}</p>
             <div class="controls">
               {{combo-box
                 content=recurringOptions
                 class="recurrence-input"
                 value=recurring
-                onSelect=(action (mut recurring))
+                onChange=(action (mut recurring))
                 none="discourse_local_dates.create.form.recurring_none"}}
             </div>
           </div>
@@ -99,7 +102,7 @@
           <label>{{i18n "discourse_local_dates.create.form.format_title"}}</label>
           <p>
             {{i18n "discourse_local_dates.create.form.format_description"}}
-            <a target="_blank" rel="noopener" href="https://momentjs.com/docs/#/parsing/string-format/">
+            <a target="_blank" href="https://momentjs.com/docs/#/parsing/string-format/" rel="noopener noreferrer">
               {{d-icon "question-circle"}}
             </a>
           </p>
@@ -126,7 +129,15 @@
           <label>{{i18n "discourse_local_dates.create.form.timezones_title"}}</label>
           <p>{{i18n "discourse_local_dates.create.form.timezones_description"}}</p>
           <div class="controls">
-            {{multi-select class="timezones-input" allowAny=false maximum=5 content=allTimezones values=timezones}}
+            {{multi-select
+              valueProperty=null
+              nameProperty=null
+              class="timezones-input"
+              allowAny=false
+              maximum=5
+              content=allTimezones
+              value=timezones
+            }}
           </div>
         </div>
       </div>

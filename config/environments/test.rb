@@ -12,8 +12,8 @@ Discourse::Application.configure do
   # Configure static asset server for tests with Cache-Control for performance
   config.public_file_server.enabled = true
 
-  # don't consider reqs local so we can properly handle exceptions like we do in prd
-  config.consider_all_requests_local       = false
+  # don't consider reqs local so we can properly handle exceptions like we do in prod
+  config.consider_all_requests_local = false
 
   # disable caching
   config.action_controller.perform_caching = false
@@ -47,7 +47,10 @@ Discourse::Application.configure do
 
   config.eager_load = false
 
-  unless ENV['RAILS_ENABLE_TEST_LOG']
+  if ENV['RAILS_ENABLE_TEST_LOG']
+    config.logger = Logger.new(STDOUT)
+    config.log_level = ENV['RAILS_TEST_LOG_LEVEL'].present? ? ENV['RAILS_TEST_LOG_LEVEL'].to_sym : :info
+  else
     config.logger = Logger.new(nil)
     config.log_level = :fatal
   end

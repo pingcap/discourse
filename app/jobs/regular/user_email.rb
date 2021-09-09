@@ -8,6 +8,19 @@ module Jobs
 
     sidekiq_options queue: 'low'
 
+    sidekiq_retry_in do |count, exception|
+      # retry in an hour when SMTP server is busy
+      # or use default sidekiq retry formula. returning
+      # nil/0 will trigger the default sidekiq
+      # retry formula
+      #
+      # See https://github.com/mperham/sidekiq/blob/3330df0ee37cfd3e0cd3ef01e3e66b584b99d488/lib/sidekiq/job_retry.rb#L216-L234
+      case exception.wrapped
+      when Net::SMTPServerBusy
+        return 1.hour + (rand(30) * (count + 1))
+      end
+    end
+
     # Can be overridden by subclass, for example critical email
     # should always consider being sent
     def quit_email_early?
@@ -22,20 +35,30 @@ module Jobs
       # of extra work when emails are disabled.
       return if quit_email_early?
 
+      send_user_email(args)
+
+      if args[:user_id].present? && args[:type].to_s == "digest"
+        # Record every attempt at sending a digest email, even if it was skipped
+        UserStat.where(user_id: args[:user_id]).update_all(digest_attempted_at: Time.zone.now)
+      end
+    end
+
+    def send_user_email(args)
       post = nil
       notification = nil
       type = args[:type]
       user = User.find_by(id: args[:user_id])
-      to_address = args[:to_address].presence || user.try(:email).presence || "no_email_found"
+      to_address = args[:to_address].presence || user&.primary_email&.email.presence || "no_email_found"
 
       set_skip_context(type, args[:user_id], to_address, args[:post_id])
 
-      return skip(SkippedEmailLog.reason_types[:user_email_no_user]) unless user
+      return skip(SkippedEmailLog.reason_types[:user_email_no_user]) if !user
+      return skip(SkippedEmailLog.reason_types[:user_email_no_email]) if to_address == "no_email_found"
 
       if args[:post_id].present?
         post = Post.find_by(id: args[:post_id])
 
-        unless post.present?
+        if post.blank?
           return skip(SkippedEmailLog.reason_types[:user_email_post_not_found])
         end
 
@@ -131,7 +154,8 @@ module Jobs
           email_args[:notification_type] = email_args[:notification_type].to_s
         end
 
-        if user.user_option.mailing_list_mode? &&
+        if !SiteSetting.disable_mailing_list_mode &&
+           user.user_option.mailing_list_mode? &&
            user.user_option.mailing_list_mode_frequency > 0 && # don't catch notifications for users on daily mailing list mode
            (!post.try(:topic).try(:private_message?)) &&
            NOTIFICATIONS_SENT_BY_MAILING_LIST.include?(email_args[:notification_type])
@@ -152,8 +176,19 @@ module Jobs
       # Make sure that mailer exists
       raise Discourse::InvalidParameters.new("type=#{type}") unless UserNotifications.respond_to?(type)
 
-      email_args[:email_token] = email_token if email_token.present?
-      email_args[:new_email] = user.email if type.to_s == "notify_old_email"
+      if email_token.present?
+        email_args[:email_token] = email_token
+
+        if type.to_s == "confirm_new_email"
+          change_req = EmailChangeRequest.find_by_new_token(email_token)
+
+          if change_req
+            email_args[:requested_by_admin] = change_req.requested_by_admin?
+          end
+        end
+      end
+
+      email_args[:new_email] = args[:new_email] || user.email if type.to_s == "notify_old_email" || type.to_s == "notify_old_email_add"
 
       if args[:client_ip] && args[:user_agent]
         email_args[:client_ip] = args[:client_ip]
@@ -172,6 +207,8 @@ module Jobs
         email_args[:user_history] = UserHistory.where(id: args[:user_history_id]).first
       end
 
+      email_args[:reject_reason] = args[:reject_reason]
+
       message = EmailLog.unique_email_per_post(post, user) do
         UserNotifications.public_send(type, user, email_args)
       end
@@ -180,22 +217,6 @@ module Jobs
       message.to = to_address if message && to_address.present?
 
       [message, nil]
-    end
-
-    sidekiq_retry_in do |count, exception|
-      # retry in an hour when SMTP server is busy
-      # or use default sidekiq retry formula
-      case exception.wrapped
-      when Net::SMTPServerBusy
-        1.hour + (rand(30) * (count + 1))
-      else
-        ::Jobs::UserEmail.seconds_to_delay(count)
-      end
-    end
-
-    # extracted from sidekiq
-    def self.seconds_to_delay(count)
-      (count**4) + 15 + (rand(30) * (count + 1))
     end
 
     private
@@ -219,13 +240,13 @@ module Jobs
           return SkippedEmailLog.reason_types[:user_email_post_deleted]
         end
 
-        if user.suspended? && !post.user&.staff?
+        if user.suspended? && (!post.user&.staff? || !post.user&.human?)
           return SkippedEmailLog.reason_types[:user_email_user_suspended]
         end
 
         already_read = user.user_option.email_level != UserOption.email_level_types[:always] && PostTiming.exists?(topic_id: post.topic_id, post_number: post.post_number, user_id: user.id)
         if already_read
-          return SkippedEmailLog.reason_types[:user_email_already_read]
+          SkippedEmailLog.reason_types[:user_email_already_read]
         end
       else
         false
@@ -243,11 +264,11 @@ module Jobs
     end
 
     def always_email_private_message?(user, type)
-      type == :user_private_message && user.user_option.email_messages_level == UserOption.email_level_types[:always]
+      type.to_s == "user_private_message" && user.user_option.email_messages_level == UserOption.email_level_types[:always]
     end
 
     def always_email_regular?(user, type)
-      type != :user_private_message && user.user_option.email_level == UserOption.email_level_types[:always]
+      type.to_s != "user_private_message" && user.user_option.email_level == UserOption.email_level_types[:always]
     end
   end
 

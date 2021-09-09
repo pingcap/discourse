@@ -1,18 +1,58 @@
 .directory {
   margin-bottom: 100px;
 
+  .directory-table-container {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .directory-table-top-scroll {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .open-edit-columns-btn {
+    vertical-align: top;
+    padding: 0.45em 0.8em;
+  }
+
+  &.users-directory {
+    .period-chooser {
+      .selected-name {
+        margin: 0;
+      }
+      .period-chooser-header .caret-icon {
+        margin: 0;
+      }
+    }
+    .directory-group-selector {
+      vertical-align: top;
+    }
+  }
+
   .user-info {
     margin-bottom: 0;
   }
 
-  .period-chooser {
-    float: left;
-  }
-  .filter-name {
-    float: right;
-  }
   .spinner {
     clear: both;
+  }
+
+  .directory-controls {
+    display: flex;
+    justify-content: space-between;
+    .total-rows {
+      color: var(--primary-medium);
+    }
+    .filter-name {
+      height: 1em;
+    }
+  }
+
+  .directory-last-updated {
+    margin-bottom: 0.5em;
+    color: var(--primary-medium);
+    font-size: $font-down-1;
   }
 
   table {
@@ -23,7 +63,7 @@
     th {
       padding: 0.5em;
       text-align: left;
-      border-bottom: 1px solid $primary-low;
+      border-bottom: 1px solid var(--primary-low);
       @media screen and (max-width: $small-width) {
         padding: 0.5em 0.25em;
       }
@@ -31,7 +71,7 @@
       .number,
       .time-read {
         font-size: $font-up-3;
-        color: $primary-medium;
+        color: var(--primary-medium);
         @media screen and (max-width: $small-width) {
           font-size: $font-up-1;
         }
@@ -39,24 +79,78 @@
       .time-read {
         white-space: nowrap;
       }
+      .user-field-value {
+        font-size: var(--font-up-1);
+        color: var(--primary-medium);
+        @media screen and (max-width: $small-width) {
+          font-size: $font-0;
+        }
+      }
     }
 
     th.sortable {
       width: 13%;
       .d-icon-heart {
-        color: $love;
+        color: var(--love);
         margin: 0 0.25em 0 0;
       }
     }
   }
   .me {
-    background-color: dark-light-choose($highlight-low, $highlight-medium);
+    background-color: var(--highlight-low-or-medium);
     .username a,
-    .name,
+    .name a,
     .title,
     .number,
     .time-read {
-      color: $primary-medium;
+      color: var(--primary-medium);
     }
   }
+}
+
+.edit-user-directory-columns-modal {
+  .edit-directory-columns-container {
+    .edit-directory-column {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--primary-low);
+
+      .column-name {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0;
+      }
+      .d-icon-heart {
+        color: var(--love);
+        margin: 0 0.25em 0 0;
+      }
+
+      .move-column-up {
+        margin-right: 5px;
+      }
+
+      .left-content,
+      .right-content {
+        display: flex;
+        align-items: center;
+      }
+
+      &:last-of-type {
+        border-bottom: none;
+      }
+    }
+  }
+  .modal-footer {
+    display: flex;
+    justify-content: space-between;
+
+    .reset-to-default {
+      margin-right: 0;
+    }
+  }
+}
+
+.edit-user-directory-columns-modal .modal-inner-container {
+  min-width: 450px;
 }

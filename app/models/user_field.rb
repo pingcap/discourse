@@ -7,10 +7,17 @@ class UserField < ActiveRecord::Base
   validates_presence_of :description, :field_type
   validates_presence_of :name, unless: -> { field_type == "confirm" }
   has_many :user_field_options, dependent: :destroy
+  has_one :directory_column, dependent: :destroy
   accepts_nested_attributes_for :user_field_options
+
+  after_save :queue_index_search
 
   def self.max_length
     2048
+  end
+
+  def queue_index_search
+    SearchIndexer.queue_users_reindex(UserCustomField.where(name: "user_field_#{self.id}").pluck(:user_id))
   end
 end
 
@@ -31,4 +38,5 @@ end
 #  show_on_user_card :boolean          default(FALSE), not null
 #  external_name     :string
 #  external_type     :string
+#  searchable        :boolean          default(FALSE), not null
 #

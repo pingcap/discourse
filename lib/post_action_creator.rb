@@ -7,8 +7,15 @@ class PostActionCreator
 
   # Shortcut methods for easier invocation
   class << self
-    def create(created_by, post, action_key, message: nil, created_at: nil)
-      new(created_by, post, PostActionType.types[action_key], message: message, created_at: created_at).perform
+    def create(created_by, post, action_key, message: nil, created_at: nil, reason: nil)
+      new(
+        created_by,
+        post,
+        PostActionType.types[action_key],
+        message: message,
+        created_at: created_at,
+        reason: reason
+      ).perform
     end
 
     [:like, :off_topic, :spam, :inappropriate, :bookmark].each do |action|
@@ -31,7 +38,9 @@ class PostActionCreator
     message: nil,
     take_action: false,
     flag_topic: false,
-    created_at: nil
+    created_at: nil,
+    queue_for_review: false,
+    reason: nil
   )
     @created_by = created_by
     @created_at = created_at || Time.zone.now
@@ -46,12 +55,17 @@ class PostActionCreator
     @message = message
     @flag_topic = flag_topic
     @meta_post = nil
+
+    @reason = reason
+    @queue_for_review = queue_for_review
+
+    if reason.nil? && @queue_for_review
+      @reason = 'queued_by_staff'
+    end
   end
 
-  def perform
-    result = CreateResult.new
-
-    unless guardian.post_can_act?(
+  def post_can_act?
+    guardian.post_can_act?(
       @post,
       @post_action_name,
       opts: {
@@ -59,12 +73,25 @@ class PostActionCreator
         taken_actions: PostAction.counts_for([@post].compact, @created_by)[@post&.id]
       }
     )
+  end
+
+  def perform
+    result = CreateResult.new
+
+    if !post_can_act? || (@queue_for_review && !guardian.is_staff?)
       result.forbidden = true
       result.add_error(I18n.t("invalid_access"))
       return result
     end
 
     PostAction.limit_action!(@created_by, @post, @post_action_type_id)
+
+    reviewable = Reviewable.includes(:reviewable_scores).find_by(target: @post)
+
+    if reviewable && flagging_post? && cannot_flag_again?(reviewable)
+      result.add_error(I18n.t("reviewables.already_handled"))
+      return result
+    end
 
     # create meta topic / post if needed
     if @message.present? && [:notify_moderators, :notify_user, :spam].include?(@post_action_name)
@@ -100,7 +127,7 @@ class PostActionCreator
 
       end
     rescue ActiveRecord::RecordNotUnique
-      # If the user already performed this action, it's proably due to a different browser tab
+      # If the user already performed this action, it's probably due to a different browser tab
       # or non-debounced clicking. We can ignore.
       result.success = true
       result.post_action = PostAction.find_by(
@@ -114,6 +141,19 @@ class PostActionCreator
   end
 
 private
+
+  def flagging_post?
+    PostActionType.notify_flag_type_ids.include?(@post_action_type_id)
+  end
+
+  def cannot_flag_again?(reviewable)
+    return false if @post_action_type_id == PostActionType.types[:notify_moderators]
+    flag_type_already_used = reviewable.reviewable_scores.any? { |rs| rs.reviewable_score_type == @post_action_type_id && rs.status != ReviewableScore.statuses[:pending] }
+    not_edited_since_last_review = @post.last_version_at.blank? || reviewable.updated_at > @post.last_version_at
+    handled_recently = reviewable.updated_at > SiteSetting.cooldown_hours_until_reflag.to_i.hours.ago
+
+    flag_type_already_used && not_edited_since_last_review && handled_recently
+  end
 
   def notify_subscribers
     if self.class.notify_types.include?(@post_action_name)
@@ -153,13 +193,22 @@ private
   def auto_hide_if_needed
     return if @post.hidden?
     return if !@created_by.staff? && @post.user&.staff?
-    return unless PostActionType.auto_action_flag_types.include?(@post_action_name)
 
-    # Special case: If you have TL3 and the user is TL0, and the flag is spam,
-    # hide it immediately.
-    if @post_action_name == :spam &&
-        @created_by.has_trust_level?(TrustLevel[3]) &&
-        @post.user&.trust_level == TrustLevel[0]
+    not_auto_action_flag_type = !PostActionType.auto_action_flag_types.include?(@post_action_name)
+    return if not_auto_action_flag_type && !@queue_for_review
+
+    if @queue_for_review
+      @post.topic.update_status('visible', false, @created_by) if @post.is_first_post?
+
+      @post.hide!(
+        @post_action_type_id,
+        Post.hidden_reasons[:flag_threshold_reached],
+        custom_message: :queued_by_staff
+      )
+      return
+    end
+
+    if trusted_spam_flagger?
       @post.hide!(@post_action_type_id, Post.hidden_reasons[:flagged_by_tl3_user])
       return
     end
@@ -168,6 +217,15 @@ private
     if score >= Reviewable.score_required_to_hide_post
       @post.hide!(@post_action_type_id)
     end
+  end
+
+  # Special case: If you have TL3 and the user is TL0, and the flag is spam,
+  # hide it immediately.
+  def trusted_spam_flagger?
+    SiteSetting.high_trust_flaggers_auto_hide_posts &&
+      @post_action_name == :spam &&
+      @created_by.has_trust_level?(TrustLevel[3]) &&
+      @post.user&.trust_level == TrustLevel[0]
   end
 
   def create_post_action
@@ -207,8 +265,13 @@ private
       end
     end
 
-    if post_action && PostActionType.notify_flag_type_ids.include?(@post_action_type_id)
-      DiscourseEvent.trigger(:flag_created, post_action)
+    if post_action
+      case @post_action_type_id
+      when *PostActionType.notify_flag_type_ids
+        DiscourseEvent.trigger(:flag_created, post_action)
+      when PostActionType.types[:like]
+        DiscourseEvent.trigger(:like_created, post_action)
+      end
     end
 
     GivenDailyLike.increment_for(@created_by.id) if @post_action_type_id == PostActionType.types[:like]
@@ -243,7 +306,11 @@ private
 
     if [:notify_moderators, :spam].include?(@post_action_name)
       create_args[:subtype] = TopicSubtype.notify_moderators
-      create_args[:target_group_names] = Group[:moderators].name
+      create_args[:target_group_names] = [Group[:moderators].name]
+
+      if SiteSetting.enable_category_group_moderation? && @post.topic&.category&.reviewable_by_group_id?
+        create_args[:target_group_names] << @post.topic.category.reviewable_by_group.name
+      end
     else
       create_args[:subtype] = TopicSubtype.notify_user
 
@@ -261,7 +328,7 @@ private
   end
 
   def create_reviewable(result)
-    return unless PostActionType.notify_flag_type_ids.include?(@post_action_type_id)
+    return unless flagging_post?
     return if @post.user_id.to_i < 0
 
     result.reviewable = ReviewableFlaggedPost.needs_review!(
@@ -274,12 +341,15 @@ private
         targets_topic: @targets_topic
       }
     )
+
     result.reviewable_score = result.reviewable.add_score(
       @created_by,
       @post_action_type_id,
       created_at: @created_at,
       take_action: @take_action,
       meta_topic_id: @meta_post&.topic_id,
+      reason: @reason,
+      force_review: trusted_spam_flagger?
     )
   end
 

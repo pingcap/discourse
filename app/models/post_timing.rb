@@ -31,13 +31,17 @@ class PostTiming < ActiveRecord::Base
   end
 
   def self.record_new_timing(args)
-    DB.exec("INSERT INTO post_timings (topic_id, user_id, post_number, msecs)
+    row_count = DB.exec("INSERT INTO post_timings (topic_id, user_id, post_number, msecs)
               SELECT :topic_id, :user_id, :post_number, :msecs
               ON CONFLICT DO NOTHING",
             args)
+
     # concurrency is hard, we are not running serialized so this can possibly
     # still happen, if it happens we just don't care, its an invalid record anyway
+    return if row_count == 0
     Post.where(['topic_id = :topic_id and post_number = :post_number', args]).update_all 'reads = reads + 1'
+
+    return if Topic.exists?(id: args[:topic_id], archetype: Archetype.private_message)
     UserStat.where(user_id: args[:user_id]).update_all 'posts_read_count = posts_read_count + 1'
   end
 
@@ -67,13 +71,14 @@ class PostTiming < ActiveRecord::Base
       end
 
       TopicUser.where(user_id: user.id, topic_id: topic.id).update_all(
-        highest_seen_post_number: last_read,
         last_read_post_number: last_read
       )
 
       topic.posts.find_by(post_number: post_number).decrement!(:reads)
 
-      if !topic.private_message?
+      if topic.private_message?
+        set_minimum_first_unread_pm!(topic: topic, user_id: user.id, date: topic.updated_at)
+      else
         set_minimum_first_unread!(user_id: user.id, date: topic.updated_at)
       end
     end
@@ -96,6 +101,27 @@ class PostTiming < ActiveRecord::Base
       if date
         set_minimum_first_unread!(user_id: user_id, date: date)
       end
+    end
+  end
+
+  def self.set_minimum_first_unread_pm!(topic:, user_id:, date:)
+    if topic.topic_allowed_users.exists?(user_id: user_id)
+      UserStat.where("first_unread_pm_at > ? AND user_id = ?", date, user_id)
+        .update_all(first_unread_pm_at: date)
+    else
+      DB.exec(<<~SQL, date: date, user_id: user_id, topic_id: topic.id)
+      UPDATE group_users gu
+      SET first_unread_pm_at = :date
+      FROM (
+        SELECT
+          gu2.user_id,
+          gu2.group_id
+        FROM group_users gu2
+        INNER JOIN topic_allowed_groups tag ON tag.group_id = gu2.group_id AND tag.topic_id = :topic_id
+        WHERE gu2.user_id = :user_id
+      ) Y
+      WHERE gu.user_id = Y.user_id AND gu.group_id = Y.group_id
+      SQL
     end
   end
 
@@ -140,7 +166,7 @@ class PostTiming < ActiveRecord::Base
     if join_table.length > 0
       sql = <<~SQL
       UPDATE post_timings t
-      SET msecs = t.msecs + x.msecs
+      SET msecs = LEAST(t.msecs::bigint + x.msecs, 2^31 - 1)
       FROM (#{join_table.join(" UNION ALL ")}) x
       WHERE x.topic_id = t.topic_id AND
             x.post_number = t.post_number AND
@@ -199,6 +225,5 @@ end
 # Indexes
 #
 #  index_post_timings_on_user_id  (user_id)
-#  post_timings_summary           (topic_id,post_number)
 #  post_timings_unique            (topic_id,post_number,user_id) UNIQUE
 #

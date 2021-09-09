@@ -1,9 +1,8 @@
-# encoding: utf-8
-#
-# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+# WARNING: Never edit this file.
+# It will be overwritten when translations are pulled from Crowdin.
 #
 # To work with us on translations, join this project:
-# https://www.transifex.com/projects/p/discourse-org/
+# https://translate.discourse.org/
 
 th:
   dates:
@@ -16,16 +15,31 @@ th:
       short_no_year: "%B %-d"
       date_only: "%B %-d, %Y"
       long: "%B %-d, %Y, %l:%M%P"
+      no_day: "%Y %B"
   date:
-    month_names: [~, มกราคม, กุมภาพันธ์, มีนาคม, เมษายน, พฤษภาคม, มิถุนายน, กรกฎาคม, สิงหาคม, กันยายน, ตุลาคม, พฤศจิกายน, ธันวาคม]
+    month_names:
+    - null
+    - มกราคม
+    - กุมภาพันธ์
+    - มีนาคม
+    - เมษายน
+    - พฤษภาคม
+    - มิถุนายน
+    - กรกฎาคม
+    - สิงหาคม
+    - กันยายน
+    - ตุลาคม
+    - พฤศจิกายน
+    - ธันวาคม
     <<: *datetime_formats
   time:
-    <<: *datetime_formats
     am: "am"
     pm: "pm"
+    <<: *datetime_formats
   title: "ดิสคอส"
   topics: "หัวข้อ"
   posts: "โพสต์"
+  views: "ดู"
   loading: "กำลังโหลด"
   powered_by_html: 'บอร์ดนี้ใช้<a href="https://www.discourse.org">Discourse</a> จะแสดงได้สมบูรณ์เมื่อเปิดการใช้งาน JavaScript'
   sign_up: "สมัคร"
@@ -34,8 +48,18 @@ th:
   disable_remote_images_download_reason: "ไม่สามารถดาวน์โหลดรูปได้เนื่องจากพื้นที่ไม่เพียงพอ"
   anonymous: "ไม่ระบุชื่อ"
   remove_posts_deleted_by_author: "ถูกลบโดยผู้โพส"
+  on_another_topic: "ในหัวข้ออื่น"
+  inline_oneboxer:
+    topic_page_title_post_number_by_user: "#%{post_number} โดย %{username}"
+  themes:
+    import_error:
+      unpack_failed: "แตกไฟล์ไม่สำเร็จ"
+      file_too_big: "ไฟล์ที่ไม่ถูกบีบอัดมีขนาดใหญ่เกินไป"
+    settings_errors:
+      invalid_yaml: "YAML ที่ให้มาไม่ถูกต้อง"
   emails:
     incoming:
+      default_subject: "หัวข้อนี้ต้องมีชื่อเรื่อง"
       errors:
         inactive_user_error: "เกิดขึ้นเมื่อผู้ส่งยังไม่มีการใช้งาน"
   errors: &errors
@@ -43,9 +67,6 @@ th:
       exclusion: ถูกจองแล้ว
       has_already_been_used: "ได้ถูกใช้แล้ว"
       invalid: ไม่ถูกต้อง
-  activemodel:
-    errors:
-      <<: *errors
   not_in_group:
     join_group: "เข้าร่วมกลุ่ม"
   likes: "ถูกใจ"
@@ -53,6 +74,9 @@ th:
     start_discussion: "เริ่มการสนทนา"
     continue: "ดำเนินการสนทนาต่อ"
     loading: "กำลังโหลดการสนทนา"
+    in_reply_to: "▶ %{username}"
+    replies:
+      other: "%{count} ตอบ"
     created: "สร้างเมื่อ"
   user_is_suspended: "ผู้ใช้ที่ถูกระงับการใช้งานไม่สามารถโพสได้"
   just_posted_that: "คล้ายกับสิ่งคุณเพิ่งโพสมากเกินไป"
@@ -60,7 +84,18 @@ th:
   next_page: "หน้าถัดไป →"
   prev_page: "← หน้าก่อนหน้า"
   page_num: "หน้า %{num}"
-  num_posts: "โพส"
+  home_title: "หน้าแรก"
+  rss_num_posts:
+    other: "%{count} โพสต์"
+  excerpt_image: "รูปภาพ"
+  bookmarks:
+    reminders:
+      later_today: "ภายหลังในวันนี้"
+      next_business_day: "ในวันทำการถัดไป"
+      tomorrow: "พรุ่งนี้"
+      next_week: "สัปดาห์หน้า"
+      next_month: "เดือนหน้า"
+      custom: "วันและเวลาที่กำหนดเอง"
   groups:
     default_names:
       everyone: "ทุกคน"
@@ -72,6 +107,8 @@ th:
       other: "%{count} โพส"
   activerecord:
     attributes:
+      category:
+        name: "ชื่อหมวดหมู่"
       topic:
         title: "ชื่อเรื่อง"
         category_id: "หมวดหมู่"
@@ -80,17 +117,56 @@ th:
   staff_category_name: "ทีมงาน"
   category:
     topic_prefix: "เกี่ยวกับหมวด %{category}"
+  trust_levels:
+    admin: "ผู้ดูแลระบบ"
+    staff: "ทีมงาน"
+  rate_limiter:
+    hours:
+      other: "%{count} ชั่วโมง"
   datetime:
     distance_in_words:
       half_a_minute: "< 1 นาที"
+      less_than_x_seconds:
+        other: "< %{count} วินาที"
+      x_seconds:
+        other: "%{count} วินาที"
+      less_than_x_minutes:
+        other: "%{count}นาที"
+      x_minutes:
+        other: "%{count} นาที"
+      about_x_hours:
+        other: "%{count} ชั่วโมง"
+      x_days:
+        other: "%{count} วัน"
+      about_x_months:
+        other: "%{count}เดือน"
+      x_months:
+        other: "%{count}เดือน"
+      about_x_years:
+        other: "%{count} ปี"
+      over_x_years:
+        other: "> %{count} ปี"
+      almost_x_years:
+        other: "%{count} ปี"
     distance_in_words_verbose:
       half_a_minute: "เมื่อสักครู่นี้"
       less_than_x_seconds: "เมื่อสักครู่นี้"
+      about_x_hours:
+        other: "%{count} ชั่วโมงที่แล้ว"
+      x_days:
+        other: "%{count} วันที่แล้ว"
+      x_months:
+        other: "%{count}เดือนที่แล้ว"
   password_reset:
     choose_new: "เลือกรหัสผู้ใช้ใหม่"
     choose: "เลือกรหัสผู้ใช้"
     save: "ตั้งรหัสผ่าน"
     title: "รีเซ็ทรหัสผ่าน"
+  change_email:
+    please_continue: "ดำเนินการต่อไปยัง %{site_name}"
+  activation:
+    continue_button: "ดำเนินการต่อไปยัง %{site_name}"
+    welcome_to: "ยินดีต้อนรับสู่ %{site_name}!"
   reviewable_score_types:
     needs_approval:
       title: "ต้องการอนุมัติ"
@@ -102,6 +178,9 @@ th:
   topic_flag_types:
     spam:
       title: "ขยะ"
+      long_form: "ปักธงไว้ว่าเป็นสแปม"
+    inappropriate:
+      long_form: "ปักธงไว้ว่าไม่เหมาะสม"
   archetypes:
     banner:
       title: "ป้ายหัวข้อ"
@@ -113,6 +192,14 @@ th:
       every_hour: "ทุกชั่วโมง"
       daily: "ทุกวัน"
       weekly: "รายสัปดาห์"
+      every_month: "ทุกเดือน"
+      every_six_months: "ทุกหกเดือน"
+  user_api_key:
+    read: "อ่าน"
+    otp_confirmation:
+      confirm_title: ดำเนินการต่อไปยัง %{site_name}
+      logging_in_as: กำลังเข้าสู่ระบบด้วย %{username}
+      confirm_button: เสร็จสิ้นการเข้าสู่ระบบ
   reports:
     post_edits:
       labels:
@@ -122,6 +209,7 @@ th:
     user_flagging_ratio:
       labels:
         user: ผู้ใช้
+        score: คะแนน
     moderators_activity:
       labels:
         moderator: ผู้ดูแล
@@ -152,6 +240,9 @@ th:
         admin: ผู้ดูแลระบบ
         moderator: ผู้ดูแล
         suspended: ระงับการใช้งาน
+    trending_search:
+      labels:
+        searches: ค้นหา
     system_private_messages:
       title: "ระบบ"
     top_referrers:
@@ -161,15 +252,21 @@ th:
         user: "ผู้ใช้"
         num_topics: "หัวข้อ"
     top_traffic_sources:
+      xaxis: "โดเมน"
       num_topics: "หัวข้อ"
       num_users: "ผู้ใช้"
       labels:
+        domain: โดเมน
         num_topics: หัวข้อ
     top_referred_topics:
       labels:
         topic: "หัวข้อ"
     page_view_anon_reqs:
       title: "ไม่ระบุชื่อ"
+    http_total_reqs:
+      title: "ทั้งหมด"
+    topics_with_no_response:
+      yaxis: "ทั้งหมด"
     suspicious_logins:
       labels:
         user: ผู้ใช้
@@ -178,12 +275,36 @@ th:
       labels:
         user: ผู้ใช้
         location: ที่อยู่
+    top_uploads:
+      labels:
+        filename: ชื่อไฟล์
+  site_settings:
+    disabled: "ปิดใช้งานแล้ว"
+    dark_mode_none: "ไม่มี"
   search:
+    within_post: "#%{post_number} ด้วย %{username}"
     types:
       category: "หมวดหมู่"
       user: "ผู้ใช้"
+  publish_page:
+    slug_errors:
+      invalid: "มีตัวอักษรที่ไม่สามารถใช้งานได้"
   login:
+    security_key_alternative: "ลองวิธีอื่น"
+    not_approved: "บัญชีของคุณยังไม่ได้รับการยืนยัน คุณจะได้รับการแจ้งเตือนทางอีเมลเมื่อคุณสามารถเข้าสู่ระบบได้"
     admin_not_allowed_from_ip_address: "คุณไม่สามารถเข้าสู่ระบบด้วยผู้ดูแลระบบด้วยไอพีนี้"
+    not_available: "ใช้การไม่ได้ ลอง%{suggestion}?"
+    omniauth_confirm_button: "ดำเนินการต่อ"
+  admin:
+    email:
+      sent_test: "ส่งแล้ว!"
+  system_messages:
+    queued_by_staff:
+      title: "โพสต์นี้ต้องได้รับการอนุมัติ"
+    welcome_user:
+      subject_template: "ยินดีต้อนรับสู่ %{site_name}!"
+    welcome_invite:
+      subject_template: "ยินดีต้อนรับสู่ %{site_name}!"
   subject_re: "ตอบ: "
   subject_pm: "[PM] "
   user_notifications:
@@ -288,17 +409,28 @@ th:
       title: "ลืมรหัสผ่าน"
     set_password:
       title: "ตั้งรหัสผ่าน"
+    post_approved:
+      title: "โพสต์ของคุณได้รับการอนุมัติ"
   page_not_found:
+    popular_topics: "ยอดนิยม"
     see_more: "อื่น"
+    search_title: "ค้นหาเว็บไซต์นี้"
     search_button: "ค้นหา"
+  deleted: "ลบ"
+  image: "รูปภาพ"
+  color_schemes:
+    default_theme_name: "ค่าเริ่มต้น"
   csv_export:
     boolean_yes: "ใช่"
     boolean_no: "ไม่ใช่"
+    rate_limit_error: "สามารถดาวน์โหลดโพสต์ได้วันละหนึ่งครั้งเท่านั้น กรุณาลองใหม่พรุ่งนี้"
   tos_topic:
     title: "เงื่อนไขการบริการ"
   privacy_topic:
     title: "นโยบายความเป็นส่วนตัว"
   badges:
+    member:
+      name: สมาชิก
     regular:
       name: ทั่วไป
     first_link:
@@ -309,29 +441,74 @@ th:
       name: ลิงค์ที่ได้รับความนิยม
   tags:
     title: "ป้าย"
+  finish_installation:
+    register:
+      button: "ลงทะเบียน"
+    resend_email:
+      title: "ส่งอีเมลยืนยันตัวตนอีกครั้ง"
   wizard:
     step:
       forum_title:
         title: "ชื่อ"
       privacy:
         title: "การเข้าถึง"
+        fields:
+          privacy:
+            choices:
+              open:
+                label: "สาธารณะ"
+              restricted:
+                label: "ส่วนตัว"
       contact:
         fields:
           contact_email:
             placeholder: "name@example.com"
       corporate:
         title: "องค์กร"
-      emoji:
-        title: "Emoji"
+      styling:
+        fields:
+          styling_preview:
+            label: "แสดงตัวอย่าง"
+          homepage_style:
+            choices:
+              categories_only:
+                label: "หมวดหมู่เท่านั้น"
+              categories_with_featured_topics:
+                label: "หมวดหมู่พร้อมด้วยกระทู้เด่น"
+              categories_and_latest_topics:
+                label: "หมวดหมู่และกระทู้ล่าสุด"
+              categories_and_top_topics:
+                label: "หมวดหมู่และกระทู้ยอดนิยม"
   joined: "สมัครสมาชิกเมื่อ"
+  discourse_push_notifications:
+    popup:
+      mentioned: '%{username} พูดถึงคุณใน "%{topic}" - %{site_title}'
+      group_mentioned: '%{username} พูดถึงคุณใน "%{topic}" - %{site_title}'
+      quoted: '%{username} อ้างอิงถึงคุณใน "%{topic}" - %{site_title}'
+      replied: '%{username} ตอบคุณใน "%{topic}" - %{site_title}'
+      posted: '%{username} โพสท์ใน "%{topic}" - %{site_title}'
+      linked: '%{username} ลิงค์โพสของคุณจาก "%{topic}" - %{site_title}'
+      watching_first_post: '%{username}ได้สร้างกระทู้ใหม่ "%{topic}"-%{site_title}'
+      confirm_title: "เปิดการแจ้งเตือนแล้ว - %{site_title}"
+      confirm_body: "สำเร็จแล้ว! การแจ้งเตือนถูกเปิดใช้งาน"
+      custom: "การแจ้งเตือนจาก %{username} บน %{site_title}"
   reviewables:
+    priorities:
+      low: "ต่ำ"
+      medium: "ปานกลาง"
+      high: "สูง"
+    sensitivity:
+      disabled: "ปิดใช้งานแล้ว"
+      low: "ต่ำ"
+      medium: "ปานกลาง"
+      high: "สูง"
     actions:
-      delete_spammer:
-        title: "ลบสแปมเมอร์"
       delete_single:
         title: "ลบ"
       disagree:
         title: "ไม่เห็นด้วย"
+      ignore:
+        title: "ไม่สนใจ"
       approve:
         title: "อนุมัติ"
       reject_user:
@@ -339,5 +516,6 @@ th:
           title: "ลบผู้ใช้"
       reject:
         title: "ละทิ้ง"
-      delete_user:
-        title: "ลบผู้ใช้"
+  activemodel:
+    errors:
+      <<: *errors

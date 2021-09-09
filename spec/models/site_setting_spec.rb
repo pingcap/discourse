@@ -163,7 +163,7 @@ describe SiteSetting do
 
     it 'should act as a proxy to the new methods' do
       begin
-        original_settings = SiteSettings::DeprecatedSettings::SETTINGS
+        original_settings = SiteSettings::DeprecatedSettings::SETTINGS.dup
         SiteSettings::DeprecatedSettings::SETTINGS.clear
 
         SiteSettings::DeprecatedSettings::SETTINGS.push([
@@ -178,7 +178,7 @@ describe SiteSetting do
         end.to change { @fake_logger.warnings.count }.by(2)
 
         expect do
-          expect(SiteSetting.use_https(warn: false))
+          SiteSetting.use_https(warn: false)
         end.to_not change { @fake_logger.warnings }
 
         SiteSetting.use_https = false
@@ -196,12 +196,12 @@ describe SiteSetting do
   end
 
   describe 'cached settings' do
-    it 'should recalcualte cached setting when dependent settings are changed' do
-      SiteSetting.attachment_filename_blacklist = 'foo'
-      expect(SiteSetting.attachment_filename_blacklist_regex).to eq(/foo/)
+    it 'should recalculate cached setting when dependent settings are changed' do
+      SiteSetting.blocked_attachment_filenames = 'foo'
+      expect(SiteSetting.blocked_attachment_filenames_regex).to eq(/foo/)
 
-      SiteSetting.attachment_filename_blacklist = 'foo|bar'
-      expect(SiteSetting.attachment_filename_blacklist_regex).to eq(/foo|bar/)
+      SiteSetting.blocked_attachment_filenames = 'foo|bar'
+      expect(SiteSetting.blocked_attachment_filenames_regex).to eq(/foo|bar/)
     end
   end
 end

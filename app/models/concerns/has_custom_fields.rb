@@ -72,15 +72,15 @@ module HasCustomFields
 
     # To avoid n+1 queries, use this function to retrieve lots of custom fields in one go
     # and create a "sideloaded" version for easy querying by id.
-    def self.custom_fields_for_ids(ids, whitelisted_fields)
+    def self.custom_fields_for_ids(ids, allowed_fields)
       klass = "#{name}CustomField".constantize
       foreign_key = "#{name.underscore}_id".to_sym
 
       result = {}
 
-      return result if whitelisted_fields.blank?
+      return result if allowed_fields.blank?
 
-      klass.where(foreign_key => ids, :name => whitelisted_fields)
+      klass.where(foreign_key => ids, :name => allowed_fields)
         .pluck(foreign_key, :name, :value).each do |cf|
         result[cf[0]] ||= {}
         append_custom_field(result[cf[0]], cf[1], cf[2])
@@ -142,6 +142,15 @@ module HasCustomFields
     super
   end
 
+  def on_custom_fields_change
+    # Callback when custom fields have changed
+    # Override in model
+  end
+
+  def custom_fields_preloaded?
+    !!@preloaded_custom_fields
+  end
+
   def custom_field_preloaded?(name)
     @preloaded_custom_fields && @preloaded_custom_fields.key?(name)
   end
@@ -161,7 +170,7 @@ module HasCustomFields
         @preloaded[key]
       else
         # for now you can not mix preload an non preload, it better just to fail
-        raise StandardError, "Attempting to access a non preloaded custom field, this is disallowed to prevent N+1 queries."
+        raise StandardError, "Attempted to access the non preloaded custom field '#{key}'. This is disallowed to prevent N+1 queries."
       end
     end
   end
@@ -193,13 +202,16 @@ module HasCustomFields
       if row_count == 0
         _custom_fields.create!(name: k, value: v)
       end
+
       custom_fields[k.to_s] = v # We normalize custom_fields as strings
     end
+
+    on_custom_fields_change
   end
 
   def save_custom_fields(force = false)
     if force || !custom_fields_clean?
-      dup = @custom_fields.dup
+      dup = @custom_fields.dup.with_indifferent_access
       array_fields = {}
 
       ActiveRecord::Base.transaction do
@@ -221,10 +233,10 @@ module HasCustomFields
             t = {}
             self.class.append_custom_field(t, f.name, f.value)
 
-            if dup[f.name] != t[f.name]
-              f.destroy!
-            else
+            if dup.has_key?(f.name) && dup[f.name] == t[f.name]
               dup.delete(f.name)
+            else
+              f.destroy!
             end
           end
         end
@@ -249,11 +261,12 @@ module HasCustomFields
         end
       end
 
+      on_custom_fields_change
       refresh_custom_fields_from_db
     end
   end
 
-  # We support unique indexes on certain fields. In the event two concurrenct processes attempt to
+  # We support unique indexes on certain fields. In the event two concurrent processes attempt to
   # update the same custom field we should catch the error and perform an update instead.
   def create_singular(name, value, field_type = nil)
     write_value = value.is_a?(Hash) || field_type == :json ? value.to_json : value
@@ -270,7 +283,7 @@ module HasCustomFields
 protected
 
   def refresh_custom_fields_from_db
-    target = Hash.new
+    target = HashWithIndifferentAccess.new
     _custom_fields.order('id asc').pluck(:name, :value).each do |key, value|
       self.class.append_custom_field(target, key, value)
     end

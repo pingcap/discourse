@@ -7,9 +7,14 @@ describe Jobs::NotifyMailingListSubscribers do
   fab!(:mailing_list_user) { Fabricate(:user) }
 
   before { mailing_list_user.user_option.update(mailing_list_mode: true, mailing_list_mode_frequency: 1) }
+  before do
+    SiteSetting.tagging_enabled = true
+  end
 
+  fab!(:tag) { Fabricate(:tag) }
+  fab!(:topic) { Fabricate(:topic, tags: [tag]) }
   fab!(:user) { Fabricate(:user) }
-  fab!(:post) { Fabricate(:post, user: user) }
+  fab!(:post) { Fabricate(:post, topic: topic, user: user) }
 
   shared_examples "no emails" do
     it "doesn't send any emails" do
@@ -60,6 +65,11 @@ describe Jobs::NotifyMailingListSubscribers do
       include_examples "no emails"
     end
 
+    context "with a empty post" do
+      before { post.update_columns(raw: "") }
+      include_examples "no emails"
+    end
+
     context "with a user_deleted post" do
       before { post.update(user_deleted: true) }
       include_examples "no emails"
@@ -67,6 +77,15 @@ describe Jobs::NotifyMailingListSubscribers do
 
     context "with a deleted topic" do
       before { post.topic.update(deleted_at: Time.now) }
+      include_examples "no emails"
+    end
+
+    context "with a private message" do
+      before do
+        post.topic.update!(archetype: Archetype.private_message, category: nil)
+        TopicAllowedUser.create(topic: post.topic, user: mailing_list_user)
+        post.topic.reload
+      end
       include_examples "no emails"
     end
 
@@ -124,6 +143,40 @@ describe Jobs::NotifyMailingListSubscribers do
 
       context "from a muted category" do
         before { CategoryUser.create(user: mailing_list_user, category: post.topic.category, notification_level: CategoryUser.notification_levels[:muted]) }
+        include_examples "no emails"
+      end
+
+      context "mute all categories by default setting" do
+        before { SiteSetting.mute_all_categories_by_default = true }
+        include_examples "no emails"
+      end
+
+      context "mute all categories by default setting but user is watching category" do
+        before do
+          SiteSetting.mute_all_categories_by_default = true
+          CategoryUser.create(user: mailing_list_user, category: post.topic.category, notification_level: CategoryUser.notification_levels[:watching])
+        end
+        include_examples "one email"
+      end
+
+      context "mute all categories by default setting but user is watching tag" do
+        before do
+          SiteSetting.mute_all_categories_by_default = true
+          TagUser.create(user: mailing_list_user, tag: tag, notification_level: TagUser.notification_levels[:watching])
+        end
+        include_examples "one email"
+      end
+
+      context "mute all categories by default setting but user is watching topic" do
+        before do
+          SiteSetting.mute_all_categories_by_default = true
+          TopicUser.create(user: mailing_list_user, topic: post.topic, notification_level: TopicUser.notification_levels[:watching])
+        end
+        include_examples "one email"
+      end
+
+      context "from a muted tag" do
+        before { TagUser.create(user: mailing_list_user, tag: tag, notification_level: TagUser.notification_levels[:muted]) }
         include_examples "no emails"
       end
 

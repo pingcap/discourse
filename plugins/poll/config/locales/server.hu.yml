@@ -1,9 +1,8 @@
-# encoding: utf-8
-#
-# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+# WARNING: Never edit this file.
+# It will be overwritten when translations are pulled from Crowdin.
 #
 # To work with us on translations, join this project:
-# https://www.transifex.com/projects/p/discourse-org/
+# https://translate.discourse.org/
 
 hu:
   site_settings:
@@ -12,8 +11,6 @@ hu:
     poll_edit_window_mins: "Percek száma miután még lehet szerkeszteni a bejegyzést."
     poll_minimum_trust_level_to_create: "Legkisebb szükséges bizalmi szint meghatározása szavazások létrehozásához."
   poll:
-    default_poll_must_have_at_least_2_options: "Legalább 2 választható tételt kell tartalmaznia a szavazásnak."
-    named_poll_must_have_at_least_2_options: "<strong>%{name}</strong> nevű szavazásnak legalább 2 választható tételt kell tartalmaznia."
     default_poll_must_have_less_options:
       one: "Szavazásnak kevesebb, mint %{count} lehetőséget kell tartalmaznia."
       other: "Szavazásnak legalább %{count} lehetőséget kell tartalmaznia."

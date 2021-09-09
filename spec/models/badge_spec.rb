@@ -3,13 +3,6 @@
 require 'rails_helper'
 
 describe Badge do
-  it { is_expected.to belong_to(:badge_type) }
-  it { is_expected.to belong_to(:badge_grouping) }
-  it { is_expected.to have_many(:user_badges).dependent(:destroy) }
-
-  it { is_expected.to validate_presence_of(:name) }
-  it { is_expected.to validate_presence_of(:badge_type) }
-  it { is_expected.to validate_uniqueness_of(:name) }
 
   it 'has a valid system attribute for new badges' do
     expect(Badge.create!(name: "test", badge_type_id: 1).system?).to be false
@@ -78,6 +71,16 @@ describe Badge do
     end
   end
 
+  describe '#image_url' do
+    it 'has CDN url' do
+      SiteSetting.enable_s3_uploads = true
+      SiteSetting.s3_cdn_url = "https://some-s3-cdn.amzn.com"
+      upload = Fabricate(:upload_s3)
+      badge = Fabricate(:badge, image_upload_id: upload.id)
+      expect(badge.image_url).to start_with("https://some-s3-cdn.amzn.com")
+    end
+  end
+
   describe '.i18n_name' do
     it 'transforms to lower case letters, and replaces spaces with underscores' do
       expect(Badge.i18n_name('Basic User')).to eq('basic_user')
@@ -120,6 +123,14 @@ describe Badge do
         expect(Badge.find_system_badge_id_from_translation_key(translation_key)).to eq(nil)
       end
     end
+
+    context "when translation key doesn't match its class" do
+      let(:translation_key) { "badges.licensed.long_description" }
+
+      it "returns nil" do
+        expect(Badge.find_system_badge_id_from_translation_key(translation_key)).to eq(nil)
+      end
+    end
   end
 
   context "First Quote" do
@@ -149,6 +160,21 @@ describe Badge do
       expect(user_badge.granted_at).to eq_time(post2.created_at)
 
     end
+  end
+
+  context "WikiEditor badge" do
+
+    it "is awarded" do
+      wiki_editor_badge = Badge.find(Badge::WikiEditor)
+      post = Fabricate(:post, wiki: true)
+      revisor = PostRevisor.new(post)
+      revisor.revise!(post.user, { raw: "I am editing a wiki" }, force_new_version: true)
+
+      BadgeGranter.backfill(wiki_editor_badge)
+
+      expect(UserBadge.where(user_id: post.user.id, badge_id: Badge::WikiEditor).count).to eq(1)
+    end
+
   end
 
   context "PopularLink badge" do
@@ -185,6 +211,20 @@ describe Badge do
       TopicLinkClick.create_from(url: "https://www.discourse.org/", post_id: post.id, topic_id: post.topic.id, ip: "192.168.0.101")
       BadgeGranter.backfill(popular_link_badge)
       expect(UserBadge.where(user_id: post.user.id, badge_id: Badge::PopularLink).count).to eq(0)
+    end
+  end
+
+  context "#seed" do
+
+    let(:regular_badge) do
+      Badge.find(Badge::Regular)
+    end
+
+    it "`allow_title` is not updated for existing records" do
+      regular_badge.update(allow_title: false)
+      SeedFu.seed
+      regular_badge.reload
+      expect(regular_badge.allow_title).to eq(false)
     end
   end
 end

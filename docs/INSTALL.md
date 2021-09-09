@@ -21,14 +21,14 @@ Hosting Rails applications is complicated. Even if you already have Postgres, Re
 
 ### Software Requirements
 
-- [Postgres 10+](https://www.postgresql.org/download/)
-- [Redis 2.6+](https://redis.io/download)
-- [Ruby 2.5+](https://www.ruby-lang.org/en/downloads/) (we recommend 2.5.2 or higher)
+- [Postgres 13+](https://www.postgresql.org/download/)
+- [Redis 6+](https://redis.io/download)
+- [Ruby 2.7](https://www.ruby-lang.org/en/downloads/) (we recommend 2.7.2)
 
 ## Security
 
-We take security very seriously at Discourse, and all our code is 100% open source and peer reviewed. Please read [our security guide](https://github.com/discourse/discourse/blob/master/docs/SECURITY.md) for an overview of security measures in Discourse.
+We take security very seriously at Discourse, and all our code is 100% open source and peer reviewed. Please read [our security guide](https://github.com/discourse/discourse/blob/main/docs/SECURITY.md) for an overview of security measures in Discourse.
 
-[basic]: https://github.com/discourse/discourse/blob/master/docs/INSTALL-cloud.md
+[basic]: https://github.com/discourse/discourse/blob/main/docs/INSTALL-cloud.md
 [advanced]: https://github.com/discourse/discourse_docker
 [swap]: https://meta.discourse.org/t/create-a-swapfile-for-your-linux-server/13880

@@ -86,7 +86,47 @@ describe UserStat do
       UserStat.ensure_consistency!
 
       post.user.user_stat.reload
-      expect(post.user.user_stat.first_unread_at).to eq_time(Time.now)
+      expect(post.user.user_stat.first_unread_at).to eq_time(Time.zone.now)
+    end
+
+    it 'updates first unread pm timestamp correctly' do
+      pm_topic = Fabricate(:private_message_topic)
+      user = pm_topic.user
+      user.update!(last_seen_at: Time.zone.now)
+      create_post(user: user, topic_id: pm_topic.id)
+
+      TopicUser.change(user.id, pm_topic.id,
+        notification_level: TopicUser.notification_levels[:tracking]
+      )
+
+      # user that is not tracking PM topic
+      user_2 = Fabricate(:user, last_seen_at: Time.zone.now)
+      pm_topic.allowed_users << user_2
+
+      TopicUser.change(user_2.id, pm_topic.id,
+        notification_level: TopicUser.notification_levels[:regular]
+      )
+
+      # User that has not been seen
+      user_3 = Fabricate(:user)
+      pm_topic.allowed_users << user_3
+
+      TopicUser.change(user_3.id, pm_topic.id,
+        notification_level: TopicUser.notification_levels[:tracking]
+      )
+
+      freeze_time 10.minutes.from_now
+
+      post = create_post(
+        user: Fabricate(:admin),
+        topic_id: pm_topic.id
+      )
+
+      UserStat.ensure_consistency!
+
+      expect(user.user_stat.reload.first_unread_pm_at).to eq_time(post.topic.updated_at)
+      expect(user_2.user_stat.reload.first_unread_pm_at).to_not eq_time(post.topic.updated_at)
+      expect(user_3.user_stat.reload.first_unread_pm_at).to_not eq_time(post.topic.updated_at)
     end
   end
 
@@ -98,13 +138,13 @@ describe UserStat do
       # this tests implementation which is not 100% ideal
       # that said, redis key leaks are not good
       stat.update_time_read!
-      ttl = $redis.ttl(UserStat.last_seen_key(user.id))
+      ttl = Discourse.redis.ttl(UserStat.last_seen_key(user.id))
       expect(ttl).to be > 0
       expect(ttl).to be <= UserStat::MAX_TIME_READ_DIFF
     end
 
     it 'makes no changes if nothing is cached' do
-      $redis.del(UserStat.last_seen_key(user.id))
+      Discourse.redis.del(UserStat.last_seen_key(user.id))
       stat.update_time_read!
       stat.reload
       expect(stat.time_read).to eq(0)
@@ -129,5 +169,71 @@ describe UserStat do
       expect(stat.time_read).to eq(0)
     end
 
+  end
+
+  describe 'update_distinct_badge_count' do
+    fab!(:user) { Fabricate(:user) }
+    let(:stat) { user.user_stat }
+    fab!(:badge1) { Fabricate(:badge) }
+    fab!(:badge2) { Fabricate(:badge) }
+
+    it "updates counts correctly" do
+      expect(stat.reload.distinct_badge_count).to eq(0)
+      BadgeGranter.grant(badge1, user)
+      expect(stat.reload.distinct_badge_count).to eq(1)
+      BadgeGranter.grant(badge1, user)
+      expect(stat.reload.distinct_badge_count).to eq(1)
+      BadgeGranter.grant(badge2, user)
+      expect(stat.reload.distinct_badge_count).to eq(2)
+      user.reload.user_badges.destroy_all
+      expect(stat.reload.distinct_badge_count).to eq(0)
+    end
+
+    it "can update counts for all users simultaneously" do
+      user2 = Fabricate(:user)
+      stat2 = user2.user_stat
+
+      BadgeGranter.grant(badge1, user)
+      BadgeGranter.grant(badge1, user)
+      BadgeGranter.grant(badge2, user)
+
+      BadgeGranter.grant(badge1, user2)
+
+      # Set some clearly incorrect values
+      stat.update(distinct_badge_count: 999)
+      stat2.update(distinct_badge_count: 999)
+
+      UserStat.ensure_consistency!
+
+      expect(stat.reload.distinct_badge_count).to eq(2)
+      expect(stat2.reload.distinct_badge_count).to eq(1)
+    end
+
+    it "ignores disabled badges" do
+      BadgeGranter.grant(badge1, user)
+      BadgeGranter.grant(badge2, user)
+      expect(stat.reload.distinct_badge_count).to eq(2)
+
+      badge2.update(enabled: false)
+      expect(stat.reload.distinct_badge_count).to eq(1)
+
+      badge2.update(enabled: true)
+      expect(stat.reload.distinct_badge_count).to eq(2)
+    end
+
+  end
+
+  describe '.update_draft_count' do
+    fab!(:user) { Fabricate(:user) }
+
+    it 'updates draft_count' do
+      Draft.create!(user: user, draft_key: "topic_1", data: {})
+      Draft.create!(user: user, draft_key: "new_topic", data: {})
+      Draft.create!(user: user, draft_key: "topic_2", data: {})
+      UserStat.update_all(draft_count: 0)
+
+      UserStat.update_draft_count(user.id)
+      expect(user.user_stat.draft_count).to eq(3)
+    end
   end
 end

@@ -28,8 +28,13 @@ describe Admin::ColorSchemesController do
         get "/admin/color_schemes.json"
 
         expect(response.status).to eq(200)
-        schemes = JSON.parse(response.body).map { |scheme| scheme["name"] }
-        expect(schemes).to include(scheme_name)
+        scheme_names = response.parsed_body.map { |scheme| scheme["name"] }
+        scheme_colors = response.parsed_body[0]["colors"]
+        base_scheme_colors = ColorScheme.base.colors
+
+        expect(scheme_names).to include(scheme_name)
+        expect(scheme_colors[0]["name"]).to eq(base_scheme_colors[0].name)
+        expect(scheme_colors[0]["hex"]).to eq(base_scheme_colors[0].hex)
       end
     end
 
@@ -38,7 +43,7 @@ describe Admin::ColorSchemesController do
         post "/admin/color_schemes.json", params: valid_params
 
         expect(response.status).to eq(200)
-        expect(::JSON.parse(response.body)['id']).to be_present
+        expect(response.parsed_body['id']).to be_present
       end
 
       it "returns failure with invalid params" do
@@ -48,7 +53,7 @@ describe Admin::ColorSchemesController do
         post "/admin/color_schemes.json", params: valid_params
 
         expect(response.status).to eq(422)
-        expect(::JSON.parse(response.body)['errors']).to be_present
+        expect(response.parsed_body['errors']).to be_present
       end
     end
 
@@ -77,7 +82,7 @@ describe Admin::ColorSchemesController do
         put "/admin/color_schemes/#{color_scheme.id}.json", params: params
 
         expect(response.status).to eq(422)
-        expect(::JSON.parse(response.body)['errors']).to be_present
+        expect(response.parsed_body['errors']).to be_present
       end
     end
 

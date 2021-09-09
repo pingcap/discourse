@@ -78,6 +78,14 @@ RSpec.describe Reviewable, type: :model do
       expect(r1.pending?).to eq(true)
       expect(r0.pending?).to eq(false)
     end
+
+    it "will create a new reviewable when an existing reviewable exists the same target with different type" do
+      r0 = Fabricate(:reviewable_queued_post)
+      r0.perform(admin, :approve_post)
+
+      r1 = ReviewableFlaggedPost.needs_review!(created_by: admin, target: r0.target)
+      expect(r1.pending?).to eq(true)
+    end
   end
 
   context ".list_for" do
@@ -105,7 +113,7 @@ RSpec.describe Reviewable, type: :model do
       end
 
       it "works with the reviewable by group" do
-        SiteSetting.enable_category_group_review = true
+        SiteSetting.enable_category_group_moderation = true
         group = Fabricate(:group)
         reviewable.reviewable_by_group_id = group.id
         reviewable.save!
@@ -121,7 +129,7 @@ RSpec.describe Reviewable, type: :model do
       end
 
       it "doesn't allow review by group when disabled" do
-        SiteSetting.enable_category_group_review = false
+        SiteSetting.enable_category_group_moderation = false
         group = Fabricate(:group)
         reviewable.reviewable_by_group_id = group.id
         reviewable.save!
@@ -149,6 +157,18 @@ RSpec.describe Reviewable, type: :model do
           expect(reviewables).not_to include(qp)
         end
 
+        it 'can filter by who reviewed the flag' do
+          reviewable = Fabricate(:reviewable_flagged_post)
+          admin = Fabricate(:admin)
+          reviewable.perform(admin, :ignore)
+
+          reviewables = Reviewable.list_for(
+            user, status: :all, reviewed_by: admin.username
+          )
+
+          expect(reviewables).to contain_exactly(reviewable)
+        end
+
         it 'Does not filter by status when status parameter is set to all' do
           rejected_reviewable = Fabricate(:reviewable, target: post, status: Reviewable.statuses[:rejected])
           reviewables = Reviewable.list_for(user, status: :all)
@@ -159,11 +179,11 @@ RSpec.describe Reviewable, type: :model do
           r0 = Fabricate(:reviewable, score: 100, created_at: 3.months.ago)
           r1 = Fabricate(:reviewable, score: 999, created_at: 1.month.ago)
 
-          list = Reviewable.list_for(user, sort_order: 'priority')
+          list = Reviewable.list_for(user, sort_order: 'score')
           expect(list[0].id).to eq(r1.id)
           expect(list[1].id).to eq(r0.id)
 
-          list = Reviewable.list_for(user, sort_order: 'priority_asc')
+          list = Reviewable.list_for(user, sort_order: 'score_asc')
           expect(list[0].id).to eq(r0.id)
           expect(list[1].id).to eq(r1.id)
 
@@ -174,6 +194,27 @@ RSpec.describe Reviewable, type: :model do
           list = Reviewable.list_for(user, sort_order: 'created_at_asc')
           expect(list[0].id).to eq(r0.id)
           expect(list[1].id).to eq(r1.id)
+        end
+
+        describe "Including pending queued posts even if they don't pass the minimum priority threshold" do
+          before do
+            SiteSetting.reviewable_default_visibility = :high
+            Reviewable.set_priorities(high: 10)
+            @queued_post = Fabricate(:reviewable_queued_post, score: 0, target: post, force_review: true)
+            @queued_user = Fabricate(:reviewable_user, score: 0, force_review: true)
+          end
+
+          it 'includes queued posts when searching for pending reviewables' do
+            expect(Reviewable.list_for(user)).to contain_exactly(@queued_post, @queued_user)
+          end
+
+          it 'excludes pending queued posts when applying a different status filter' do
+            expect(Reviewable.list_for(user, status: :deleted)).to be_empty
+          end
+
+          it 'excludes pending queued posts when applying a different type filter' do
+            expect(Reviewable.list_for(user, type: ReviewableFlaggedPost.name)).to be_empty
+          end
         end
       end
     end
@@ -203,7 +244,6 @@ RSpec.describe Reviewable, type: :model do
         expect(Reviewable.list_for(moderator)).to include(reviewable)
       end
     end
-
   end
 
   it "valid_types returns the appropriate types" do
@@ -247,7 +287,7 @@ RSpec.describe Reviewable, type: :model do
     end
 
     it "triggers a notification on update" do
-      reviewable = PostActionCreator.spam(moderator, post).reviewable
+      reviewable = PostActionCreator.create(moderator, post, :inappropriate).reviewable
       reviewable.perform(moderator, :disagree)
 
       expect { PostActionCreator.spam(Fabricate(:user), post) }
@@ -268,6 +308,7 @@ RSpec.describe Reviewable, type: :model do
       job = Jobs::NotifyReviewable.jobs.last
 
       expect(job["args"].first["reviewable_id"]).to eq(reviewable.id)
+      expect(job["args"].first["updated_reviewable_ids"]).to contain_exactly(reviewable.id)
     end
 
     it "triggers a notification on pending -> reject" do
@@ -280,22 +321,33 @@ RSpec.describe Reviewable, type: :model do
       job = Jobs::NotifyReviewable.jobs.last
 
       expect(job["args"].first["reviewable_id"]).to eq(reviewable.id)
+      expect(job["args"].first["updated_reviewable_ids"]).to contain_exactly(reviewable.id)
     end
 
-    it "doesn't trigger a notification on approve -> reject" do
+    it "triggers a notification on approve -> reject to update status" do
       reviewable = Fabricate(:reviewable_queued_post, status: Reviewable.statuses[:approved])
 
       expect do
         reviewable.perform(moderator, :reject_post)
-      end.to_not change { Jobs::NotifyReviewable.jobs.size }
+      end.to change { Jobs::NotifyReviewable.jobs.size }.by(1)
+
+      job = Jobs::NotifyReviewable.jobs.last
+
+      expect(job["args"].first["reviewable_id"]).to eq(reviewable.id)
+      expect(job["args"].first["updated_reviewable_ids"]).to contain_exactly(reviewable.id)
     end
 
-    it "doesn't trigger a notification on reject -> approve" do
+    it "triggers a notification on reject -> approve to update status" do
       reviewable = Fabricate(:reviewable_queued_post, status: Reviewable.statuses[:rejected])
 
       expect do
         reviewable.perform(moderator, :approve_post)
-      end.to_not change { Jobs::NotifyReviewable.jobs.size }
+      end.to change { Jobs::NotifyReviewable.jobs.size }.by(1)
+
+      job = Jobs::NotifyReviewable.jobs.last
+
+      expect(job["args"].first["reviewable_id"]).to eq(reviewable.id)
+      expect(job["args"].first["updated_reviewable_ids"]).to contain_exactly(reviewable.id)
     end
   end
 
@@ -458,6 +510,60 @@ RSpec.describe Reviewable, type: :model do
 
       expect(results.size).to eq(1)
       expect(results.first).to eq first_reviewable
+    end
+
+    context "when listing for a moderator with a custom filter that joins tables with same named columns" do
+      it "should not error" do
+        first_reviewable = Fabricate(:reviewable)
+        second_reviewable = Fabricate(:reviewable)
+        custom_filter = [
+          :troublemaker,
+          Proc.new do |results, value|
+            results.joins(<<~SQL
+          INNER JOIN posts p ON p.id = target_id
+          INNER JOIN topics t ON t.id = p.topic_id
+          INNER JOIN topic_custom_fields tcf ON tcf.topic_id = t.id
+          INNER JOIN users u ON u.id = tcf.value::integer
+                          SQL
+                         )
+              .where(target_type: Post.name)
+              .where('tcf.name = ?', 'troublemaker_user_id')
+              .where('u.username = ?', value)
+          end
+        ]
+
+        Reviewable.add_custom_filter(custom_filter)
+        mod = Fabricate(:moderator)
+        results = Reviewable.list_for(mod, additional_filters: { troublemaker: 'badguy' })
+        expect { results.first }.not_to raise_error
+      end
+    end
+  end
+
+  describe '.by_status' do
+    it 'includes reviewables with deleted targets when passing the reviewed status' do
+      reviewable = Fabricate(:reviewable_queued_post, status: Reviewable.statuses[:deleted])
+
+      expect(Reviewable.by_status(Reviewable.all, :reviewed)).to contain_exactly(reviewable)
+    end
+  end
+
+  context 'default actions' do
+    let(:reviewable) { Reviewable.new }
+    let(:actions) { Reviewable::Actions.new(reviewable, Guardian.new) }
+
+    describe '#delete_user_actions' do
+      it 'adds a bundle with the delete_user action' do
+        reviewable.delete_user_actions(actions)
+
+        expect(actions.has?(:delete_user)).to be true
+      end
+
+      it 'adds a bundle with the delete_user_block action' do
+        reviewable.delete_user_actions(actions)
+
+        expect(actions.has?(:delete_user_block)).to be true
+      end
     end
   end
 end

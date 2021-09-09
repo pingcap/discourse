@@ -6,16 +6,17 @@ class ReviewablesController < ApplicationController
   PER_PAGE = 10
 
   before_action :version_required, only: [:update, :perform]
+  before_action :ensure_can_see, except: [:destroy]
 
   def index
     offset = params[:offset].to_i
 
     if params[:type].present?
-      raise Discourse::InvalidParameter.new(:type) unless Reviewable.valid_type?(params[:type])
+      raise Discourse::InvalidParameters.new(:type) unless Reviewable.valid_type?(params[:type])
     end
 
     status = (params[:status] || 'pending').to_sym
-    raise Discourse::InvalidParameter.new(:status) unless allowed_statuses.include?(status)
+    raise Discourse::InvalidParameters.new(:status) unless allowed_statuses.include?(status)
 
     topic_id = params[:topic_id] ? params[:topic_id].to_i : nil
     category_id = params[:category_id] ? params[:category_id].to_i : nil
@@ -23,13 +24,14 @@ class ReviewablesController < ApplicationController
     custom_keys = Reviewable.custom_filters.map(&:first)
     additional_filters = JSON.parse(params.fetch(:additional_filters, {}), symbolize_names: true).slice(*custom_keys)
     filters = {
+      ids: params[:ids],
       status: status,
       category_id: category_id,
       topic_id: topic_id,
       additional_filters: additional_filters.reject { |_, v| v.blank? }
     }
 
-    %i[priority username from_date to_date type sort_order].each do |filter_key|
+    %i[priority username reviewed_by from_date to_date type sort_order].each do |filter_key|
       filters[filter_key] = params[filter_key]
     end
 
@@ -65,6 +67,10 @@ class ReviewablesController < ApplicationController
     json.merge!(hash)
 
     render_json_dump(json, rest_serializer: true)
+  end
+
+  def count
+    render_json_dump(count: Reviewable.pending_count(current_user))
   end
 
   def topics
@@ -169,7 +175,7 @@ class ReviewablesController < ApplicationController
         render_json_error(reviewable.errors)
       end
     rescue Reviewable::UpdateConflict
-      return render_json_error(I18n.t('reviewables.conflict'), status: 409)
+      render_json_error(I18n.t('reviewables.conflict'), status: 409)
     end
   end
 
@@ -184,10 +190,21 @@ class ReviewablesController < ApplicationController
         return render_json_error(error)
       end
 
+      args.merge!(reject_reason: params[:reject_reason], send_email: params[:send_email] != "false") if reviewable.type == 'ReviewableUser'
+
+      plugin_params = DiscoursePluginRegistry.reviewable_params.select do |reviewable_param|
+        reviewable.type == reviewable_param[:type].to_s.classify
+      end
+      args.merge!(params.slice(*plugin_params.map { |pp| pp[:param] }).permit!)
+
       result = reviewable.perform(current_user, params[:action_id].to_sym, args)
     rescue Reviewable::InvalidAction => e
-      # Consider InvalidAction an InvalidAccess
-      raise Discourse::InvalidAccess.new(e.message)
+      if reviewable.type == 'ReviewableUser' && !reviewable.pending? && reviewable.target.blank?
+        raise Discourse::NotFound.new(e.message, custom_message: "reviewables.already_handled_and_user_not_exist")
+      else
+        # Consider InvalidAction an InvalidAccess
+        raise Discourse::InvalidAccess.new(e.message)
+      end
     rescue Reviewable::UpdateConflict
       return render_json_error(I18n.t('reviewables.conflict'), status: 409)
     end
@@ -227,11 +244,12 @@ protected
     return if SiteSetting.reviewable_claiming == "disabled" || reviewable.topic_id.blank?
 
     claimed_by_id = ReviewableClaimedTopic.where(topic_id: reviewable.topic_id).pluck(:user_id)[0]
-    if SiteSetting.reviewable_claiming == "required" && claimed_by_id.blank?
-      return I18n.t('reviewables.must_claim')
-    end
 
-    claimed_by_id.present? && claimed_by_id != current_user.id
+    if SiteSetting.reviewable_claiming == "required" && claimed_by_id.blank?
+      I18n.t('reviewables.must_claim')
+    elsif claimed_by_id.present? && claimed_by_id != current_user.id
+      I18n.t('reviewables.user_claimed')
+    end
   end
 
   def find_reviewable
@@ -259,4 +277,7 @@ protected
     }
   end
 
+  def ensure_can_see
+    Guardian.new(current_user).ensure_can_see_review_queue!
+  end
 end

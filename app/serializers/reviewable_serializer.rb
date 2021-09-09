@@ -17,15 +17,16 @@ class ReviewableSerializer < ApplicationSerializer
     :can_edit,
     :score,
     :version,
+    :target_created_by_trust_level
   )
 
-  has_one :created_by, serializer: BasicUserSerializer, root: 'users'
-  has_one :target_created_by, serializer: BasicUserSerializer, root: 'users'
+  has_one :created_by, serializer: UserWithCustomFieldsSerializer, root: 'users'
+  has_one :target_created_by, serializer: UserWithCustomFieldsSerializer, root: 'users'
   has_one :topic, serializer: ListableTopicSerializer
   has_many :editable_fields, serializer: ReviewableEditableFieldSerializer, embed: :objects
   has_many :reviewable_scores, serializer: ReviewableScoreSerializer
   has_many :bundled_actions, serializer: ReviewableBundledActionSerializer
-  has_one :claimed_by, serializer: BasicUserSerializer, root: 'users'
+  has_one :claimed_by, serializer: UserWithCustomFieldsSerializer, root: 'users'
 
   # Used to keep track of our payload attributes
   class_attribute :_payload_for_serialization
@@ -128,6 +129,10 @@ class ReviewableSerializer < ApplicationSerializer
 
   def include_category_id?
     object.category_id.present?
+  end
+
+  def target_created_by_trust_level
+    object&.target_created_by&.trust_level
   end
 
 end

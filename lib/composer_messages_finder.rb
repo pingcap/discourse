@@ -78,7 +78,7 @@ class ComposerMessagesFinder
     # - "disable avatar education message" is enabled
     # - "sso overrides avatar" is enabled
     # - "allow uploaded avatars" is disabled
-    return if SiteSetting.disable_avatar_education_message || SiteSetting.sso_overrides_avatar || !SiteSetting.allow_uploaded_avatars
+    return if SiteSetting.disable_avatar_education_message || SiteSetting.discourse_connect_overrides_avatar || !TrustLevelAndStaffAndDisabledSetting.matches?(SiteSetting.allow_uploaded_avatars, @user)
 
     # If we got this far, log that we've nagged them about the avatar
     UserHistory.create!(action: UserHistory.actions[:notified_about_avatar], target_user_id: @user.id)
@@ -117,6 +117,7 @@ class ComposerMessagesFinder
       templateName: 'education',
       wait_for_typing: true,
       extraClass: 'education-message',
+      hide_if_whisper: true,
       body: PrettyText.cook(I18n.t('education.sequential_replies'))
     }
   end
@@ -141,9 +142,9 @@ class ComposerMessagesFinder
 
     {
       id: 'dominating_topic',
-      templateName: 'education',
+      templateName: 'dominating-topic',
       wait_for_typing: true,
-      extraClass: 'education-message',
+      extraClass: 'education-message dominating-topic-message',
       body: PrettyText.cook(I18n.t('education.dominating_topic', percent: (ratio * 100).round))
     }
   end
@@ -151,6 +152,7 @@ class ComposerMessagesFinder
   def check_get_a_room(min_users_posted: 5)
     return unless educate_reply?(:notified_about_get_a_room)
     return unless @details[:post_id].present?
+    return if @topic.category&.read_restricted
 
     reply_to_user_id = Post.where(id: @details[:post_id]).pluck(:user_id)[0]
 
@@ -174,9 +176,10 @@ class ComposerMessagesFinder
 
     {
       id: 'get_a_room',
-      templateName: 'education',
+      templateName: 'get-a-room',
       wait_for_typing: true,
-      extraClass: 'education-message',
+      reply_username: reply_username,
+      extraClass: 'education-message get-a-room',
       body: PrettyText.cook(
         I18n.t(
           'education.get_a_room',

@@ -1,9 +1,8 @@
-# encoding: utf-8
-#
-# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+# WARNING: Never edit this file.
+# It will be overwritten when translations are pulled from Crowdin.
 #
 # To work with us on translations, join this project:
-# https://www.transifex.com/projects/p/discourse-org/
+# https://translate.discourse.org/
 
 tr_TR:
   js:
@@ -18,22 +17,26 @@ tr_TR:
       public:
         title: "Oylar <strong>halka açıktır</strong>."
       results:
+        groups:
+          title: "Bu ankette oy kullanabilmek için %{groups} üyesi olmanız gerekiyor."
         vote:
           title: "Sonuçlar <strong>oylamada</strong> gösterilecektir."
         closed:
           title: "Sonuçlar oylama <strong>kapatıldıktan</strong> sonra gösterilecektir."
+        staff:
+          title: "Sonuçlar yalnızca <strong>moderatöre</strong> gösterilir."
       multiple:
         help:
           at_least_min_options:
-            one: "En az <strong>%{count}</strong> seçeneği seçin"
-            other: "En az <strong>%{count}</strong> seçecek seçiniz"
+            one: "En az <strong>%{count}</strong> seçeneği seçin."
+            other: "En az <strong>%{count}</strong> seçeneği seçin."
           up_to_max_options:
-            one: "<strong>%{count}</strong> seçeneğe kadar seçebilirsiniz"
-            other: "<strong>%{count}</strong> seçeneğe kadar seçebilirsiniz"
+            one: "En fazla <strong>%{count}</strong> seçeneği seçin."
+            other: "En fazla <strong>%{count}</strong> seçeneği seçin."
           x_options:
-            one: "<strong>%{count}</strong> seçenek seçiniz"
-            other: "<strong>%{count}</strong> seçenek seçiniz"
-          between_min_and_max_options: "<strong>%{min}</strong> ve <strong>%{max}</strong> arasında seçenek seçiniz"
+            one: "<strong>%{count}</strong> seçeneği seçin."
+            other: "<strong>%{count}</strong> seçeneği seçin."
+          between_min_and_max_options: "En az <strong>%{min}</strong>, en çok <strong>%{max}</strong> seçeneği seçin."
       cast-votes:
         title: "Oyunuzu kullanın"
         label: "Şimdi oylayın!"
@@ -42,7 +45,13 @@ tr_TR:
         label: "Sonuçları göster"
       hide-results:
         title: "Oylarınıza dönün"
-        label: "Sonuçları gizle"
+        label: "Oylamayı göster"
+      group-results:
+        title: "Kullanıcı alanına göre oyları gruplandır"
+        label: "Dökümü göster"
+      export-results:
+        title: "Anket sonuçlarını dışa aktarma"
+        label: "Dışa Aktar"
       open:
         title: "Anketi başlat"
         label: "Başlat"
@@ -54,14 +63,24 @@ tr_TR:
       automatic_close:
         closes_in: "Kapatılmasına zaman <strong>%{timeLeft}</strong>"
         age: "<strong>%{age}</strong> kapanmış."
+      breakdown:
+        title: "Anket sonuçları"
+        votes: "%{count} oy"
+        breakdown: "Detaylar"
+        percentage: "Yüzde"
+        count: "say"
       error_while_toggling_status: "Üzgünüz, anket durumunu değiştirme sırasında hata meydana geldi."
       error_while_casting_votes: "Üzgünüz, oylarınızı dönüştürme sırasında hata meydana geldi."
       error_while_fetching_voters: "Üzgünüz, oy verenleri görüntüleme sırasında hata meydana geldi"
+      error_while_exporting_results: "Maalesef anket sonuçları dışa aktarılırken bir hata oluştu."
       ui_builder:
         title: Anket Oluştur
         insert: Anket Ekle
         help:
-          options_count: En az 2 seçenek ekleyin
+          options_min_count: En az 1 seçenek girin.
+          options_max_count: En fazla %{count} seçenek girin.
+          invalid_min_value: Minimum değer en az 1 olmalıdır.
+          invalid_max_value: Maksimum değer en az 1 olmalı, ancak seçeneklerin sayısından küçük veya ona eşit olmalıdır.
           invalid_values: Minimum değer maksimum değerden küçük olmalıdır.
           min_step_value: Minimum adım değeri 1
         poll_type:
@@ -70,17 +89,29 @@ tr_TR:
           multiple: Çoklu Seçim
           number: Sayısal Değerlendirme
         poll_result:
-          label: Sonuçlar
+          label: Sonuçları göster...
           always: Her zaman görünür
-          vote: Oylamada
-          closed: Kapatıldığında
+          vote: Sadece oylamadan sonra
+          closed: Anket kapatıldığında
+          staff: Yalnızca moderatörler
+        poll_groups:
+          label: Oylamayı bu gruplarla sınırlandırın
+        poll_chart_type:
+          label: Sonuç grafiği
+          bar: Çubuk
+          pie: Pasta
         poll_config:
-          max: En fazla
-          min: En az
+          max: Maksimum Seçenek
+          min: Minimum Seçenek
           step: Aralık
         poll_public:
           label: Kimlerin oy verdiğini göster
+        poll_title:
+          label: Başlık (isteğe bağlı)
         poll_options:
-          label: Her satıra bir anket seçeneği girin
+          label: Seçenekler (satır başına bir tane)
+          add: Seçenek ekle
         automatic_close:
           label: Seçimi otomatik olarak kapat
+        show_advanced: "Gelişmiş Seçenekleri Göster"
+        hide_advanced: "Gelişmiş Seçenekleri Gizle"

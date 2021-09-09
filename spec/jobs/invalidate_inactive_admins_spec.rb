@@ -29,20 +29,27 @@ describe Jobs::InvalidateInactiveAdmins do
         expect(not_seen_admin.reload.email_tokens.where(confirmed: true).exists?).to eq(false)
       end
 
-      it 'makes the user as not active' do
+      it 'makes the user as not active and logs the action' do
+        subject
+        expect(not_seen_admin.reload.active).to eq(false)
+
+        log = UserHistory.last
+        expect(log.target_user_id).to eq(not_seen_admin.id)
+        expect(log.action).to eq(UserHistory.actions[:deactivate_user])
+      end
+
+      it 'adds a staff log' do
         subject
         expect(not_seen_admin.reload.active).to eq(false)
       end
 
       context 'with social logins' do
         before do
-          GithubUserInfo.create!(user_id: not_seen_admin.id, screen_name: 'bob', github_user_id: 100)
           UserAssociatedAccount.create!(provider_name: "google_oauth2", user_id: not_seen_admin.id, provider_uid: 100, info: { email: "bob@google.account.com" })
         end
 
         it 'removes the social logins' do
           subject
-          expect(GithubUserInfo.where(user_id: not_seen_admin.id).exists?).to eq(false)
           expect(UserAssociatedAccount.where(user_id: not_seen_admin.id).exists?).to eq(false)
         end
       end

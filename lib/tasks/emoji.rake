@@ -262,7 +262,6 @@ DEFAULT_SET ||= "twitter"
 # Replace the platform by another when downloading the image (accepts names or categories)
 EMOJI_IMAGES_PATCH ||= {
   "apple" => { "snowboarder" => "twitter" },
-  "emoji_one" => { "country-flag" => "twitter" },
   "windows" => { "country-flag" => "twitter" }
 }
 
@@ -272,7 +271,6 @@ EMOJI_SETS ||= {
   "google_blob" => "google_classic",
   "facebook" => "facebook_messenger",
   "twitter" => "twitter",
-  "emoji_one" => "emoji_one",
   "windows" => "win10",
 }
 
@@ -322,7 +320,9 @@ def copy_emoji_db
   path = "#{EMOJI_IMAGES_PATH}/**/*"
   confirm_overwrite(path)
   puts "Cleaning emoji folder..."
-  FileUtils.rm_rf(Dir.glob(path))
+  emoji_assets = Dir.glob(path)
+  emoji_assets.delete_if { |x| x == "#{EMOJI_IMAGES_PATH}/emoji_one" }
+  FileUtils.rm_rf(emoji_assets)
 
   EMOJI_SETS.each do |set_name, set_destination|
     origin = File.join(GENERATED_PATH, set_name)
@@ -353,7 +353,7 @@ def generate_emoji_groups(keywords, sections)
   puts "Generating groups..."
 
   list = open(EMOJI_ORDERING_URL).read
-  doc = Nokogiri::HTML(list)
+  doc = Nokogiri::HTML5(list)
   table = doc.css("table")[0]
 
   EMOJI_GROUPS.map do |group|
@@ -537,7 +537,7 @@ class TestEmojiUpdate < MiniTest::Test
     assert_equal File.size(original_image), File.size(alias_image)
 
     original_image = image_path("twitter", "macau")
-    alias_image = image_path("emoji_one", "macau")
+    alias_image = image_path("win10", "macau")
     assert_equal File.size(original_image), File.size(alias_image)
   end
 end

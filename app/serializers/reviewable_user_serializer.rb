@@ -2,12 +2,14 @@
 
 class ReviewableUserSerializer < ReviewableSerializer
 
-  attributes :link_admin, :user_fields
+  attributes :link_admin, :user_fields, :reject_reason
 
   payload_attributes(
     :username,
     :email,
-    :name
+    :name,
+    :bio,
+    :website
   )
 
   def link_admin

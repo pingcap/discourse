@@ -49,9 +49,10 @@ describe EmbedController do
 
         it "returns information about the topic" do
           get '/embed/info.json',
-            params: { embed_url: topic_embed.embed_url, api_key: api_key.key, api_username: "system" }
+            params: { embed_url: topic_embed.embed_url },
+            headers: { HTTP_API_KEY: api_key.key, HTTP_API_USERNAME: "system" }
 
-          json = JSON.parse(response.body)
+          json = response.parsed_body
           expect(json['topic_id']).to eq(topic_embed.topic.id)
           expect(json['post_id']).to eq(topic_embed.post.id)
           expect(json['topic_slug']).to eq(topic_embed.topic.slug)
@@ -61,9 +62,10 @@ describe EmbedController do
       context "without invalid embed url" do
         it "returns error response" do
           get '/embed/info.json',
-            params: { embed_url: "http://nope.com", api_key: api_key.key, api_username: "system" }
+            params: { embed_url: "http://nope.com" },
+            headers: { HTTP_API_KEY: api_key.key, HTTP_API_USERNAME: "system" }
 
-          json = JSON.parse(response.body)
+          json = response.parsed_body
           expect(json["error_type"]).to eq("not_found")
         end
       end
@@ -92,10 +94,55 @@ describe EmbedController do
           'REFERER' => 'https://example.com/evil-trout'
         }
         expect(response.status).to eq(200)
-        expect(response.headers['X-Frame-Options']).to eq("ALLOWALL")
+        expect(response.headers['X-Frame-Options']).to be_nil
         expect(response.body).to match("data-embed-id=\"de-1234\"")
         expect(response.body).to match("data-topic-id=\"#{topic.id}\"")
         expect(response.body).to match("data-referer=\"https://example.com/evil-trout\"")
+      end
+
+      it "returns a list of top topics" do
+        bad_topic = Fabricate(:topic)
+        good_topic = Fabricate(:topic, like_count: 1000, posts_count: 100)
+        TopTopic.refresh!
+
+        get '/embed/topics?discourse_embed_id=de-1234&top_period=yearly', headers: {
+          'REFERER' => 'https://example.com/evil-trout'
+        }
+        expect(response.status).to eq(200)
+        expect(response.headers['X-Frame-Options']).to be_nil
+        expect(response.body).to match("data-embed-id=\"de-1234\"")
+        expect(response.body).to match("data-topic-id=\"#{good_topic.id}\"")
+        expect(response.body).not_to match("data-topic-id=\"#{bad_topic.id}\"")
+        expect(response.body).to match("data-referer=\"https://example.com/evil-trout\"")
+      end
+
+      it "returns a list of topics if the top_period is not valid" do
+        topic1 = Fabricate(:topic)
+        topic2 = Fabricate(:topic)
+        good_topic = Fabricate(:topic, like_count: 1000, posts_count: 100)
+        TopTopic.refresh!
+        TopicQuery.any_instance.expects(:list_top_for).never
+
+        get '/embed/topics?discourse_embed_id=de-1234&top_period=decadely', headers: {
+          'REFERER' => 'https://example.com/evil-trout'
+        }
+        expect(response.status).to eq(200)
+        expect(response.headers['X-Frame-Options']).to be_nil
+        expect(response.body).to match("data-embed-id=\"de-1234\"")
+        expect(response.body).to match("data-topic-id=\"#{good_topic.id}\"")
+        expect(response.body).to match("data-topic-id=\"#{topic1.id}\"")
+        expect(response.body).to match("data-topic-id=\"#{topic2.id}\"")
+        expect(response.body).to match("data-referer=\"https://example.com/evil-trout\"")
+      end
+
+      it "wraps the list in a custom class" do
+        topic = Fabricate(:topic)
+        get '/embed/topics?discourse_embed_id=de-1234&embed_class=my-special-class', headers: {
+          'REFERER' => 'https://example.com/evil-trout'
+        }
+        expect(response.status).to eq(200)
+        expect(response.headers['X-Frame-Options']).to be_nil
+        expect(response.body).to match("class='topics-list my-special-class'")
       end
 
       it "returns no referer if not supplied" do
@@ -122,9 +169,9 @@ describe EmbedController do
       Jobs.run_immediately!
     end
 
-    it "raises an error with no referer" do
+    it "doesn't raises an error with no referer" do
       get '/embed/comments', params: { embed_url: embed_url }
-      expect(response.body).to match(I18n.t('embed.error'))
+      expect(response.body).not_to match(I18n.t('embed.error'))
     end
 
     it "includes CSS from embedded_scss field" do
@@ -144,7 +191,7 @@ describe EmbedController do
 
       get '/embed/comments', params: { embed_url: embed_url }, headers: headers
 
-      html = Nokogiri::HTML.fragment(response.body)
+      html = Nokogiri::HTML5.fragment(response.body)
       css_link = html.at("link[data-target=embedded_theme]").attribute("href").value
 
       get css_link
@@ -155,7 +202,7 @@ describe EmbedController do
     context "success" do
       after do
         expect(response.status).to eq(200)
-        expect(response.headers['X-Frame-Options']).to eq("ALLOWALL")
+        expect(response.headers['X-Frame-Options']).to be_nil
       end
 
       it "tells the topic retriever to work when no previous embed is found" do
@@ -182,6 +229,14 @@ describe EmbedController do
 
         expect(response.body).to match(I18n.t('embed.continue'))
         expect(response.body).to match(post.cooked)
+        expect(response.body).to match("<span class='replies'>1 reply</span>")
+
+        small_action = Fabricate(:small_action, topic: topic_embed.topic)
+
+        get '/embed/comments', params: { embed_url: embed_url }, headers: headers
+
+        expect(response.body).not_to match("post-#{small_action.id}")
+        expect(response.body).to match("<span class='replies'>1 reply</span>")
       end
 
       it "provides the topic retriever with the discourse username when provided" do
@@ -238,14 +293,22 @@ describe EmbedController do
 
         expect(response.body).to match('class="example"')
       end
+    end
 
-      it "doesn't work with a made up host" do
+    context "CSP frame-ancestors enabled" do
+      before do
+        SiteSetting.content_security_policy_frame_ancestors = true
+      end
+
+      it "includes all the hosts" do
         get '/embed/comments',
-          params: { embed_url: embed_url },
-          headers: { 'REFERER' => "http://codinghorror.com/invalid-url" }
+        params: { embed_url: embed_url },
+        headers: { 'REFERER' => "http://eviltrout.com/wat/1-2-3.html" }
 
-        expect(response.body).to match(I18n.t('embed.error'))
+        expect(response.headers['Content-Security-Policy']).to match(/frame-ancestors.*https:\/\/discourse\.org/)
+        expect(response.headers['Content-Security-Policy']).to match(/frame-ancestors.*https:\/\/example\.com/)
       end
     end
+
   end
 end

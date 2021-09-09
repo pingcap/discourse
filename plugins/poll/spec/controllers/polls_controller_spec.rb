@@ -25,7 +25,7 @@ describe ::DiscoursePoll::PollsController do
 
       expect(response.status).to eq(200)
 
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["poll"]["name"]).to eq("poll")
       expect(json["poll"]["voters"]).to eq(1)
       expect(json["vote"]).to eq(["5c24fc1df56d764b550ceae1b9319125"])
@@ -53,7 +53,7 @@ describe ::DiscoursePoll::PollsController do
 
       expect(response.status).to eq(200)
 
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["poll"]["name"]).to eq("poll")
       expect(json["poll"]["voters"]).to eq(1)
       expect(json["vote"]).to eq(["5c24fc1df56d764b550ceae1b9319125"])
@@ -80,7 +80,7 @@ describe ::DiscoursePoll::PollsController do
 
       expect(response.status).to eq(200)
 
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["poll"]["name"]).to eq("poll")
       expect(json["poll"]["voters"]).to eq(1)
       expect(json["vote"]).to eq(["5c24fc1df56d764b550ceae1b9319125"])
@@ -96,7 +96,7 @@ describe ::DiscoursePoll::PollsController do
       }, format: :json
 
       expect(response.status).not_to eq(200)
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["errors"][0]).to eq(I18n.t("poll.requires_at_least_1_valid_option"))
     end
 
@@ -112,7 +112,7 @@ describe ::DiscoursePoll::PollsController do
       }, format: :json
 
       expect(response.status).to eq(200)
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["poll"]["voters"]).to eq(1)
       expect(json["poll"]["options"][0]["votes"]).to eq(0)
       expect(json["poll"]["options"][1]["votes"]).to eq(1)
@@ -136,7 +136,7 @@ describe ::DiscoursePoll::PollsController do
       }, format: :json
 
       expect(response.status).not_to eq(200)
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["errors"][0]).to eq(I18n.t("poll.topic_must_be_open_to_vote"))
     end
 
@@ -148,7 +148,7 @@ describe ::DiscoursePoll::PollsController do
       }, format: :json
 
       expect(response.status).not_to eq(200)
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["errors"][0]).to eq(I18n.t("poll.post_is_deleted"))
     end
 
@@ -160,7 +160,7 @@ describe ::DiscoursePoll::PollsController do
       }, format: :json
 
       expect(response.status).not_to eq(200)
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["errors"][0]).to eq(I18n.t("poll.user_cant_post_in_topic"))
     end
 
@@ -170,7 +170,7 @@ describe ::DiscoursePoll::PollsController do
       }, format: :json
 
       expect(response.status).not_to eq(200)
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["errors"][0]).to eq(I18n.t("poll.no_poll_with_this_name", name: "foobar"))
     end
 
@@ -182,8 +182,20 @@ describe ::DiscoursePoll::PollsController do
       }, format: :json
 
       expect(response.status).not_to eq(200)
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["errors"][0]).to eq(I18n.t("poll.poll_must_be_open_to_vote"))
+    end
+
+    it "ensures user has required trust level" do
+      poll = create_post(raw: "[poll groups=#{Fabricate(:group).name}]\n- A\n- B\n[/poll]")
+
+      put :vote, params: {
+        post_id: poll.id, poll_name: "poll", options: ["5c24fc1df56d764b550ceae1b9319125"]
+      }, format: :json
+
+      expect(response.status).not_to eq(200)
+      json = response.parsed_body
+      expect(json["errors"][0]).to eq(I18n.t("js.poll.results.groups.title", groups: poll.polls.first.groups))
     end
 
     it "doesn't discard anonymous votes when someone votes" do
@@ -198,7 +210,7 @@ describe ::DiscoursePoll::PollsController do
 
       expect(response.status).to eq(200)
 
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["poll"]["voters"]).to eq(18)
       expect(json["poll"]["options"][0]["votes"]).to eq(12)
       expect(json["poll"]["options"][1]["votes"]).to eq(6)
@@ -218,7 +230,7 @@ describe ::DiscoursePoll::PollsController do
         expect(response.status).to eq(200)
       end.first
 
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["poll"]["status"]).to eq("closed")
       expect(message.channel).to eq(channel)
     end
@@ -236,7 +248,7 @@ describe ::DiscoursePoll::PollsController do
         expect(response.status).to eq(200)
       end.first
 
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["poll"]["status"]).to eq("closed")
       expect(message.channel).to eq(channel)
     end
@@ -249,7 +261,7 @@ describe ::DiscoursePoll::PollsController do
       }, format: :json
 
       expect(response.status).not_to eq(200)
-      json = ::JSON.parse(response.body)
+      json = response.parsed_body
       expect(json["errors"][0]).to eq(I18n.t("poll.post_is_deleted"))
     end
 
@@ -291,7 +303,7 @@ describe ::DiscoursePoll::PollsController do
 
       expect(response.status).to eq(200)
 
-      json = JSON.parse(response.body)
+      json = response.parsed_body
 
       # no user3 cause voter_limit is 2
       expect(json["voters"][first].map { |h| h["id"] }).to contain_exactly(user1.id, user2.id)
@@ -311,7 +323,7 @@ describe ::DiscoursePoll::PollsController do
 
       expect(response.status).to eq(200)
 
-      json = JSON.parse(response.body)
+      json = response.parsed_body
 
       expect(json["voters"][first].size).to eq(1)
 
@@ -335,7 +347,7 @@ describe ::DiscoursePoll::PollsController do
 
       expect(response.status).to eq(200)
 
-      json = JSON.parse(response.body)
+      json = response.parsed_body
 
       expect(json["voters"][first].size).to eq(1)
       expect(json["voters"][second].size).to eq(1)
@@ -366,11 +378,55 @@ describe ::DiscoursePoll::PollsController do
 
       expect(response.status).to eq(200)
 
-      json = JSON.parse(response.body)
+      json = response.parsed_body
 
       expect(json["voters"][first].size).to eq(1)
     end
 
   end
 
+  describe '#current_user_voted' do
+    let(:logged_user) { Fabricate(:user) }
+    let(:post_with_poll) { Fabricate(:post, raw: "[poll]\n- A\n- B\n[/poll]") }
+
+    before { log_in_user(logged_user) }
+
+    it 'returns true if the logged user already voted' do
+      poll = post_with_poll.polls.last
+      PollVote.create!(poll: poll, user: logged_user)
+
+      get :current_user_voted, params: { id: poll.id }, format: :json
+      parsed_body = JSON.parse(response.body)
+
+      expect(response.status).to eq(200)
+      expect(parsed_body['voted']).to eq(true)
+    end
+
+    it 'returns a 404 if there is no poll' do
+      unknown_poll_id = 999999
+
+      get :current_user_voted, params: { id: unknown_poll_id }, format: :json
+
+      expect(response.status).to eq(404)
+    end
+
+    it "returns a 404 if the user doesn't have access to the poll" do
+      pm_with_poll = Fabricate(:private_message_post, raw: "[poll]\n- A\n- B\n[/poll]")
+      poll = pm_with_poll.polls.last
+
+      get :current_user_voted, params: { id: poll.id }, format: :json
+
+      expect(response.status).to eq(404)
+    end
+
+    it "returns false if the user didn't vote yet" do
+      poll = post_with_poll.polls.last
+
+      get :current_user_voted, params: { id: poll.id }, format: :json
+      parsed_body = JSON.parse(response.body)
+
+      expect(response.status).to eq(200)
+      expect(parsed_body['voted']).to eq(false)
+    end
+  end
 end

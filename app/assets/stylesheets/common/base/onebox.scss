@@ -7,7 +7,7 @@ a.loading-onebox {
     position: relative;
     height: 10px;
     width: 10px;
-    border: 2px solid $primary-low-mid;
+    border: 2px solid var(--primary-low-mid);
     border-right-color: transparent;
     border-radius: 50%;
     -webkit-animation: rotate-forever 1s infinite linear;
@@ -25,7 +25,7 @@ a.loading-onebox {
     margin-bottom: 12px;
     margin-right: 10px;
     display: block;
-    color: $primary;
+    color: var(--primary);
     position: relative;
     height: 20px;
     .info {
@@ -49,7 +49,7 @@ a.loading-onebox {
       max-width: 25%;
       height: auto;
       float: left;
-      margin-right: 10px;
+      margin-right: 1em;
     }
     h3,
     h4 {
@@ -87,35 +87,40 @@ a.loading-onebox {
 
 @mixin onebox-favicon($class, $image) {
   &.#{$class} .source {
-    background: image-url("favicons/#{$image}.png") no-repeat 0% 50%;
+    background: absolute-image-url("/favicons/#{$image}.png") no-repeat 0% 50%;
     background-size: 16px 16px;
     padding-left: 20px;
   }
 }
 
 aside.onebox {
-  border: 5px solid $primary-low;
-  margin-bottom: 1em;
-  padding: 12px 25px 12px 12px;
+  border: 5px solid var(--primary-low);
+  margin: 1em 0;
+  padding: 1em;
   font-size: $font-0;
+  background: var(--secondary);
 
   header {
-    margin-bottom: 8px;
+    align-items: center;
+    display: flex;
+    margin-bottom: 1em;
+
+    .d-icon {
+      margin-right: 5px;
+      margin-top: 2px;
+
+      &.d-icon-fab-twitter {
+        color: var(--twitter);
+      }
+    }
+
     a[href] {
-      color: dark-light-choose($primary-medium, $secondary-medium);
+      color: var(--primary-med-or-secondary-med);
       text-decoration: none;
     }
   }
 
   @include onebox-favicon("stackexchange", "stackexchange");
-  @include onebox-favicon("twitterstatus", "twitter");
-  @include onebox-favicon("wikipedia", "wikipedia");
-  @include onebox-favicon("githubblob", "github");
-  @include onebox-favicon("githubcommit", "github");
-  @include onebox-favicon("githubpullrequest", "github");
-  @include onebox-favicon("githubissue", "github");
-  @include onebox-favicon("githubgist", "github");
-  @include onebox-favicon("amazon", "amazon");
   @include onebox-favicon("instagram", "instagram");
   @include onebox-favicon("googledocs", "google_branding/logo_drive_48px");
   @include onebox-favicon("googledrive", "google_branding/logo_drive_48px");
@@ -130,12 +135,12 @@ aside.onebox {
     }
 
     a[href] {
-      color: dark-light-choose($tertiary, $tertiary);
+      color: var(--tertiary);
       text-decoration: none;
     }
 
     a[href]:visited {
-      color: dark-light-choose($tertiary, $tertiary);
+      color: var(--tertiary);
     }
 
     img {
@@ -147,12 +152,30 @@ aside.onebox {
       height: auto;
       width: auto;
       float: left;
-      margin-right: 10px;
+      margin-right: 1em;
       &.onebox-full-image {
         max-height: none;
         max-width: none;
         width: initial;
         height: initial;
+      }
+    }
+
+    .github-body-container {
+      margin: 1em 0 0 0;
+      color: var(--primary-very-high);
+      max-height: 400px;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      word-break: break-word;
+      font-family: Consolas, Menlo, Monaco, "Lucida Console", "Liberation Mono",
+        "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Courier New", monospace;
+      flex: 1 0 100%;
+      box-sizing: border-box;
+
+      .show-more {
+        // padding on right for larger hitzone
+        padding: 0.5em 1.5em 0em 0.25em;
       }
     }
 
@@ -172,7 +195,7 @@ aside.onebox {
         width: calc(128px * var(--magic-ratio));
         max-width: 20%;
         float: left;
-        margin-right: 10px;
+        margin-right: 1em;
         height: auto;
 
         img {
@@ -187,7 +210,8 @@ aside.onebox {
 
       // full size images for instagram, twitter, etc.
       .aspect-image-full-size {
-        max-height: 500px;
+        margin: 0.5em 0;
+        max-height: 100%;
         width: calc(500px * var(--aspect-ratio));
         max-width: 100%;
 
@@ -197,7 +221,6 @@ aside.onebox {
           max-width: initial;
           max-height: initial;
           float: none;
-          padding: 5px 5px 5px 5px;
         }
       }
 
@@ -275,7 +298,7 @@ aside.onebox {
           '<svg xmlns="http://www.w3.org/2000/svg" width="32px" height="32px" viewBox="0 0 512 512" fill="white"><path d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z"></path></svg>'
         );
       }
-      bottom: 10px;
+      bottom: 15px;
       right: 10px;
       position: absolute;
     }
@@ -284,7 +307,9 @@ aside.onebox {
 
 @mixin gdocs-logo($type) {
   &.g-#{$type}-logo {
-    background: image-url("favicons/google_branding/logo_#{$type}_48px.png")
+    background: absolute-image-url(
+        "/favicons/google_branding/logo_#{$type}_48px.png"
+      )
       no-repeat;
   }
 }
@@ -303,15 +328,17 @@ aside.onebox {
 
 // Google Calendar Placeholder
 .gdocs-onebox-splash {
-  background-color: blend-primary-secondary(30%);
-  color: $primary;
-  border: 1px inset $primary;
+  background-color: var(--primary-low-mid);
+  color: var(--primary);
+  border: 1px inset var(--primary);
   .gdocs-onebox-logo {
     display: inline-block;
     width: 128px;
     height: 128px;
     &.g-calendar-logo {
-      background: image-url("favicons/google_branding/logo_calendar_128px.png")
+      background: absolute-image-url(
+          "/favicons/google_branding/logo_calendar_128px.png"
+        )
         no-repeat;
     }
   }
@@ -328,6 +355,10 @@ blockquote {
   aside.onebox {
     @include post-aside;
   }
+}
+
+pre.onebox {
+  margin-bottom: 0;
 }
 
 // -- Onebox Github Code Blob --
@@ -350,7 +381,7 @@ pre.onebox code ol {
   line-height: $line-height-large;
 }
 pre.onebox code {
-  background-color: dark-light-choose(#fff, #000);
+  background-color: var(--primary-very-low);
 }
 pre.onebox code li {
   padding-left: 5px;
@@ -371,11 +402,21 @@ pre.onebox code ol.lines li {
 }
 
 pre.onebox code li.selected {
-  background-color: dark-light-choose(#f8eec7, #541);
+  background-color: var(--highlight-low-or-medium);
 }
 
 pre.onebox code {
   white-space: normal;
+}
+
+.onebox-warning-message {
+  margin-top: 5px;
+  color: var(--primary-med-or-secondary-med);
+  img.emoji {
+    width: 20px;
+    height: 20px;
+    float: none;
+  }
 }
 
 // Onebox - Github - PR, Commit & Issue
@@ -405,7 +446,7 @@ pre.onebox code {
   }
 
   .github-icon {
-    fill: $primary-high;
+    fill: var(--primary-high);
     width: 40px;
     height: 40px;
   }
@@ -439,10 +480,10 @@ pre.onebox code {
       font-weight: bold;
 
       .added {
-        color: $success;
+        color: var(--success);
       }
       .removed {
-        color: $danger;
+        color: var(--danger);
       }
     }
   }
@@ -458,15 +499,60 @@ pre.onebox code {
     max-width: none;
   }
 
-  .github-content {
-    margin: 5px 0 0 0;
-  }
-
   .labels span {
     // !important required to override inline style attribute
-    background-color: $primary-medium !important;
-    color: $secondary !important;
+    background-color: var(--primary-medium) !important;
+    color: var(--secondary) !important;
     padding: 2px 4px !important;
+  }
+
+  .emoji {
+    max-height: 15px;
+    margin: 0.2em;
+    min-width: 15px;
+  }
+}
+
+.onebox.githubactions {
+  h4 {
+    margin-top: 5px;
+    margin-bottom: 5px;
+  }
+
+  .github-row {
+    display: flex;
+  }
+
+  .github-icon-container {
+    display: flex;
+    align-items: flex-start;
+    margin-right: 5px;
+  }
+
+  .github-icon {
+    fill: var(--primary-medium);
+    width: var(--font-up-3);
+    height: var(--font-up-3);
+  }
+
+  .github-icon-success {
+    fill: var(--success);
+  }
+
+  .github-icon-failure {
+    fill: var(--danger);
+  }
+
+  .github-icon-pending {
+    fill: #dbab0a;
+  }
+
+  .github-info {
+    color: var(--primary-high);
+  }
+
+  .github-run-number {
+    color: var(--primary-medium);
   }
 }
 
@@ -503,10 +589,6 @@ pre.onebox code {
   background-color: #bd2c00;
 }
 
-.onebox-body .github-content-right {
-  margin-left: 100px;
-}
-
 //Onebox - Twitter - Status
 aside.onebox.twitterstatus .onebox-body {
   h4 {
@@ -516,21 +598,25 @@ aside.onebox.twitterstatus .onebox-body {
 
 // thumbnail, oddly, ONLY applies to twitter avatar
 .onebox.twitterstatus {
-  .thumbnail {
-    width: 48px;
-    height: 48px;
+  .thumbnail,
+  .thumbnail.onebox-avatar {
+    width: 36px;
+    height: 36px;
+    margin-right: 12px;
+  }
+  .twitter-screen-name {
+    font-size: var(--font-down-1);
   }
   p,
   .tweet {
-    white-space: pre-line;
-    padding-top: 3px;
-    margin-left: 70px;
+    clear: left;
+    padding: 1em 0;
 
     .quoted {
-      border: 1px solid $primary-low;
-      padding: 0px 14px 0px 12px;
+      border: 1px solid var(--primary-low);
+      padding: 0.5em 1em;
+      margin-top: 1em;
       white-space: normal;
-      margin-top: 15px;
 
       .quoted-link {
         color: inherit;
@@ -538,11 +624,12 @@ aside.onebox.twitterstatus .onebox-body {
 
       .quoted-title {
         font-weight: bold;
-        margin: 5px 2px;
+        margin: 0.5em 0;
+        padding: 0;
 
         span {
           font-weight: lighter;
-          color: $primary-medium;
+          color: var(--primary-medium);
         }
       }
 
@@ -551,8 +638,27 @@ aside.onebox.twitterstatus .onebox-body {
       }
     }
   }
+
   .date {
-    clear: left;
+    display: flex;
+    line-height: $line-height-small;
+
+    .timestamp {
+      color: var(--primary-medium);
+    }
+  }
+
+  .like,
+  .retweet {
+    align-items: center;
+    color: var(--primary-medium);
+    display: flex;
+    margin-left: 0.75em;
+
+    svg {
+      fill: currentColor;
+      margin-right: 0.25em;
+    }
   }
 }
 
@@ -566,7 +672,7 @@ aside.onebox.twitterstatus .onebox-body {
     color: #fff;
     background-color: rgba(0, 0, 0, 0.6);
     @include ellipsis;
-    max-width: 690px;
+    max-width: 100%;
     padding: 5px 0;
 
     .inner-box {
@@ -599,14 +705,12 @@ aside.onebox.stackexchange .onebox-body {
 }
 
 .onebox-metadata {
-  color: dark-light-choose($primary-medium, $secondary-medium);
+  color: var(--primary-med-or-secondary-med);
 }
 
-.onebox.xkcd .onebox-body {
-  img {
-    max-width: 100% !important;
-    float: none !important;
-  }
+aside.onebox.xkcd .onebox-body img {
+  float: none;
+  max-height: unset;
 }
 
 // pdf onebox
@@ -615,7 +719,7 @@ aside.onebox.stackexchange .onebox-body {
     width: 60px;
     height: 50px;
     float: left;
-    background: image-url("favicons/pdf_64px.png") no-repeat;
+    background: absolute-image-url("/favicons/pdf_64px.png") no-repeat;
     background-size: 48px 48px;
     display: inline-block;
   }
@@ -624,11 +728,12 @@ aside.onebox.stackexchange .onebox-body {
   }
 }
 
-// whitelistedgeneric twitter labels
+// allowlistedgeneric twitter labels
+.onebox.allowlistedgeneric,
 .onebox.whitelistedgeneric {
   .label1,
   .label2 {
-    color: dark-light-choose($primary-medium, $secondary-medium);
+    color: var(--primary-med-or-secondary-med);
   }
   .label1 {
     float: left;
@@ -639,13 +744,20 @@ aside.onebox.stackexchange .onebox-body {
 }
 
 .onebox {
+  &.allowlistedgeneric,
   &.whitelistedgeneric,
-  &.gfycat {
+  &.gfycat,
+  &.githubfolder {
     .site-icon {
       width: 16px;
       height: 16px;
-      margin-right: 3px;
+      margin-right: 0.5em;
     }
+  }
+  &.category-onebox {
+    border: 1px solid var(--primary-low);
+    padding-left: calc(1em - 5px);
+    margin-left: 5px;
   }
 }
 
@@ -657,26 +769,37 @@ aside.onebox.stackexchange .onebox-body {
 
 .onebox.instagram {
   div.instagram-description {
-    color: dark-light-choose($primary-medium, $secondary-medium);
+    color: var(--primary-med-or-secondary-med);
     padding-top: 10px;
+  }
+}
+
+.onebox.reddit {
+  div.aspect-image-full-size {
+    position: relative;
+  }
+  div.description {
+    color: var(--primary-med-or-secondary-med);
+  }
+}
+
+.onebox.githubfolder {
+  .thumbnail {
+    width: 60px;
+    height: 60px;
+    &.onebox-full-image {
+      max-height: 60px;
+      max-width: 60px;
+    }
+  }
+  .label1 {
+    color: var(--primary-med-or-secondary-med);
   }
 }
 
 .onebox.githubcommit {
   pre.message {
     padding: 0;
-  }
-}
-
-.onebox.twitterstatus {
-  .like,
-  .retweet {
-    color: dark-light-choose($primary-medium, $secondary-medium);
-    padding-left: 10px;
-    svg {
-      fill: currentColor;
-      vertical-align: middle;
-    }
   }
 }
 
@@ -691,7 +814,8 @@ aside.onebox.stackexchange .onebox-body {
 }
 
 // Force oneboxed videos to 16:9 aspect ratio
-.onebox.video-onebox {
+.onebox.video-onebox,
+.video-container {
   position: relative;
   padding: 0 0 56.25% 0;
   width: 100%;
@@ -703,11 +827,31 @@ aside.onebox.stackexchange .onebox-body {
   }
 }
 
+.video-container {
+  .notice {
+    background-color: var(--highlight-medium);
+    padding: 10px 20px;
+    position: absolute;
+    width: calc(100% - 40px);
+    animation: 0.5s fadeIn;
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
 .onebox-placeholder-container {
   position: relative;
   width: 100%;
   padding: 0 0 48.25% 0;
-  background-color: $primary-low;
+  background-color: var(--primary-low);
 
   .placeholder-icon {
     position: absolute;
@@ -733,6 +877,14 @@ aside.onebox.stackexchange .onebox-body {
         );
       }
     }
+    &.map {
+      &:before {
+        opacity: 0.4;
+        content: svg-uri(
+          '<svg width="128px" height="128px" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><path fill="currentColor" d="M288 0c-69.59 0-126 56.41-126 126 0 56.26 82.35 158.8 113.9 196.02 6.39 7.54 17.82 7.54 24.2 0C331.65 284.8 414 182.26 414 126 414 56.41 357.59 0 288 0zm0 168c-23.2 0-42-18.8-42-42s18.8-42 42-42 42 18.8 42 42-18.8 42-42 42zM20.12 215.95A32.006 32.006 0 0 0 0 245.66v250.32c0 11.32 11.43 19.06 21.94 14.86L160 448V214.92c-8.84-15.98-16.07-31.54-21.25-46.42L20.12 215.95zM288 359.67c-14.07 0-27.38-6.18-36.51-16.96-19.66-23.2-40.57-49.62-59.49-76.72v182l192 64V266c-18.92 27.09-39.82 53.52-59.49 76.72-9.13 10.77-22.44 16.95-36.51 16.95zm266.06-198.51L416 224v288l139.88-55.95A31.996 31.996 0 0 0 576 426.34V176.02c0-11.32-11.43-19.06-21.94-14.86z"></path></svg>'
+        );
+      }
+    }
     &.generic {
       &:before {
         opacity: 0.4;
@@ -742,4 +894,10 @@ aside.onebox.stackexchange .onebox-body {
       }
     }
   }
+}
+
+aside.onebox.preview-error .site-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 0.5em;
 }

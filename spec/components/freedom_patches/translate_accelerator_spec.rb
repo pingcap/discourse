@@ -3,18 +3,14 @@
 require "rails_helper"
 
 describe "translate accelerator" do
-  before(:all) do
+  before do
     @original_i18n_load_path = I18n.load_path.dup
     I18n.load_path += Dir["#{Rails.root}/spec/fixtures/i18n/translate_accelerator.*.yml"]
     I18n.reload!
   end
 
-  after(:all) do
-    I18n.load_path = @original_i18n_load_path
-    I18n.reload!
-  end
-
   after do
+    I18n.load_path = @original_i18n_load_path
     I18n.reload!
   end
 
@@ -30,7 +26,7 @@ describe "translate accelerator" do
     orig = I18n.t('i_am_an_unknown_key99')
 
     expect(I18n.t('i_am_an_unknown_key99').object_id).to eq(orig.object_id)
-    expect(I18n.t('i_am_an_unknown_key99')).to eq("translation missing: en_US.i_am_an_unknown_key99")
+    expect(I18n.t('i_am_an_unknown_key99')).to eq("translation missing: en.i_am_an_unknown_key99")
   end
 
   it "returns the correct language" do
@@ -44,6 +40,13 @@ describe "translate accelerator" do
     I18n.with_locale(:de) do
       expect(I18n.t('foo')).to eq('Foo in :de')
     end
+  end
+
+  it "converts language keys to symbols" do
+    expect(I18n.t('foo', locale: :en)).to eq('Foo in :en')
+    expect(I18n.t('foo', locale: "en")).to eq('Foo in :en')
+
+    expect(I18n.instance_variable_get(:@loaded_locales)).to contain_exactly(:en)
   end
 
   it "overrides for both string and symbol keys" do
@@ -68,8 +71,8 @@ describe "translate accelerator" do
 
       expect(I18n.instance_variable_get(:@overrides_by_site)).to eq(
         'default' => {
-          'en' => { 'got' => 'summer' },
-          'zh_TW' => { 'got' => '冬季' }
+          en: { 'got' => 'summer' },
+          zh_TW: { 'got' => '冬季' }
         }
       )
     end
@@ -170,6 +173,22 @@ describe "translate accelerator" do
       override_translation('en', 'items.other', '%{count} fishies')
       expect(I18n.t('items', count: 13)).to eq('13 fishies')
       expect(I18n.t('items', count: 1)).to eq('one fish')
+    end
+
+    it "works with strings and symbols for non-pluralized string when count is given" do
+      override_translation('en', 'fish', 'trout')
+      expect(I18n.t(:fish, count: 1)).to eq('trout')
+      expect(I18n.t('fish', count: 1)).to eq('trout')
+    end
+
+    it "supports one and other with fallback locale" do
+      override_translation('en_GB', 'items.one', 'one fish')
+      override_translation('en_GB', 'items.other', '%{count} fishies')
+
+      I18n.with_locale(:en_GB) do
+        expect(I18n.t('items', count: 13)).to eq('13 fishies')
+        expect(I18n.t('items', count: 1)).to eq('one fish')
+      end
     end
 
     it "supports one and other when only a single pluralization key is overridden" do

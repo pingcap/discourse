@@ -37,6 +37,13 @@ class Demon::Base
     end
   end
 
+  def self.kill(signal)
+    return unless @demons
+    @demons.values.each do |demon|
+      demon.kill(signal)
+    end
+  end
+
   attr_reader :pid, :parent_pid, :started, :index
   attr_accessor :stop_timeout
 
@@ -61,6 +68,10 @@ class Demon::Base
     else
       false
     end
+  end
+
+  def kill(signal)
+    Process.kill(signal, @pid)
   end
 
   def stop_signal
@@ -130,14 +141,13 @@ class Demon::Base
   end
 
   def run
-    if @pid = fork
-      write_pid_file
-      return
+    @pid = fork do
+      Process.setproctitle("discourse #{self.class.prefix}")
+      monitor_parent
+      establish_app
+      after_fork
     end
-
-    monitor_parent
-    establish_app
-    after_fork
+    write_pid_file
   end
 
   def already_running?

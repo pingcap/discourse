@@ -3,49 +3,54 @@
     &.toolbar-popup-menu-options {
       .select-kit-body {
         box-shadow: none;
-        padding: 10px 10px 5px 10px;
         width: 230px;
+        border-radius: 0;
       }
 
-      .select-kit-row {
-        margin-bottom: 5px;
-        padding: 6px 3px;
-        background: $primary-low;
-        transition: all 0.25s;
+      .select-kit-header {
+        width: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
 
-        .name,
-        .d-icon {
-          font-size: $font-0;
-          font-weight: normal;
-          color: $primary;
+        &:focus {
+          border-color: var(--tertiary);
         }
 
         .d-icon {
-          opacity: 0.7;
-        }
-
-        &.is-highlighted {
-          background: $primary-medium;
-
-          .name,
-          .d-icon {
-            color: $secondary;
-          }
+          color: var(--primary-medium);
         }
 
         &:hover {
-          background: $primary-medium;
-          color: $secondary;
+          .d-icon {
+            color: var(--primary-low);
+          }
+        }
+      }
+
+      .select-kit-row {
+        padding: 0.75em 0.5em;
+        border-bottom: 1px solid rgba(var(--primary-low-rgb), 0.5);
+
+        &:last-child {
+          border: none;
         }
 
-        &.is-selected {
-          color: $primary;
-          background: $primary-low;
+        .texts .name,
+        .icons .d-icon {
+          font-size: $font-0;
+          font-weight: normal;
         }
 
-        &.is-selected.is-highlighted {
-          background: $primary-medium;
-          color: $primary;
+        .d-icon {
+          color: var(--primary-medium);
+        }
+
+        &.is-highlighted,
+        &.is-selected,
+        &:hover {
+          background: var(--tertiary-low);
+          color: var(--primary);
         }
       }
     }

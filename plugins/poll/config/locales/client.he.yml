@@ -1,9 +1,8 @@
-# encoding: utf-8
-#
-# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+# WARNING: Never edit this file.
+# It will be overwritten when translations are pulled from Crowdin.
 #
 # To work with us on translations, join this project:
-# https://www.transifex.com/projects/p/discourse-org/
+# https://translate.discourse.org/
 
 he:
   js:
@@ -22,6 +21,8 @@ he:
       public:
         title: "ההצבעות הן <strong>ציבוריות</strong>."
       results:
+        groups:
+          title: "עליך להיות חבר בקבוצה %{groups} כדי להצביע לסקר הזה."
         vote:
           title: "התוצאות יופיעו לאחר <strong>ההצבעה</strong>."
         closed:
@@ -31,21 +32,21 @@ he:
       multiple:
         help:
           at_least_min_options:
-            one: "נא לבחור באפשרות <strong>אחת</strong> לפחות"
-            two: "נא לבחור ב־<strong>%{count}</strong> אפשרויות לפחות"
-            many: "נא לבחור ב־<strong>%{count}</strong> אפשרויות לפחות"
-            other: "נא לבחור ב־<strong>%{count}</strong> אפשרויות לפחות"
+            one: "יש לבחור באפשרות <strong>%{count}</strong> לפחות."
+            two: "יש לבחור <strong>%{count}</strong> אפשרויות לפחות."
+            many: "יש לבחור <strong>%{count}</strong> אפשרויות לפחות."
+            other: "יש לבחור <strong>%{count}</strong> אפשרויות לפחות."
           up_to_max_options:
-            one: "נא לבחור עד אפשרות <strong>אחת</strong>."
-            two: "נא לבחור עד <strong>%{count}</strong> אפשרויות"
-            many: "נא לבחור עד <strong>%{count}</strong> אפשרויות"
-            other: "נא לבחור עד <strong>%{count}</strong> אפשרויות"
+            one: "יש לבחור אפשרות <strong>%{count}</strong> לכל היותר."
+            two: "יש לבחור עד <strong>%{count}</strong> אפשרויות."
+            many: "יש לבחור עד <strong>%{count}</strong> אפשרויות."
+            other: "יש לבחור עד <strong>%{count}</strong> אפשרויות."
           x_options:
-            one: "נא לבחור באפשרות אחת"
-            two: "נא לבחור <strong>%{count}</strong> אפשרויות"
-            many: "נא לבחור <strong>%{count}</strong> אפשרויות"
-            other: "נא לבחור <strong>%{count}</strong> אפשרויות"
-          between_min_and_max_options: "נא לבחור בין <strong>%{min}</strong> ל־<strong>%{max}</strong> אפשרויות"
+            one: "יש לבחור באפשרות <strong>%{count}</strong>."
+            two: "יש לבחור <strong>%{count}</strong> אפשרויות."
+            many: "יש לבחור <strong>%{count}</strong> אפשרויות."
+            other: "יש לבחור <strong>%{count}</strong> אפשרויות."
+          between_min_and_max_options: "נא לבחור בין <strong>%{min}</strong> ל־<strong>%{max}</strong> אפשרויות."
       cast-votes:
         title: "להצביע"
         label: "להצביע עכשיו!"
@@ -54,7 +55,13 @@ he:
         label: "הצגת תוצאות"
       hide-results:
         title: "חזרה להצבעות שלך"
-        label: "הסתרת תוצאות"
+        label: "הצגת הצבעה"
+      group-results:
+        title: "קיבוץ הצבעות לפי משתמש"
+        label: "הצגת פילוח"
+      export-results:
+        title: "ייצוא תוצאות הסקר"
+        label: "ייצוא"
       open:
         title: "פתיחת הסקר"
         label: "פתיחה"
@@ -66,14 +73,24 @@ he:
       automatic_close:
         closes_in: "נסגר בעוד <strong>%{timeLeft}</strong>."
         age: "נסגר ב־<strong>%{age}</strong>"
+      breakdown:
+        title: "תוצאות הסקר"
+        votes: "%{count} הצבעות"
+        breakdown: "פילוח"
+        percentage: "אחוזים"
+        count: "ספירה"
       error_while_toggling_status: " חלה שגיאה בשינוי המצב של סקר זה, עמך הסליחה."
       error_while_casting_votes: "חלה שגיאה בהצבעתך, עמך הסליחה."
       error_while_fetching_voters: "חלה שגיאה בהצגת המצביעים, עמך הסליחה."
+      error_while_exporting_results: "אירעה שגיאה בייצוא תוצאות הסקר."
       ui_builder:
         title: בניית סקר
         insert: הכנסת סקר
         help:
-          options_count: יש להכניס 2 אפשרויות לפחות
+          options_min_count: יש למלא אפשרות אחת לפחות.
+          options_max_count: יש למלא עד %{count} אפשרויות.
+          invalid_min_value: הערך המזערי חייב להיות 1 לפחות.
+          invalid_max_value: הערך המרבי חייב להיות 1 לפחות אך פחות מאשר או שווה למספר האפשרויות.
           invalid_values: הערך המזערי חייב להיות קטן מהערך המרבי.
           min_step_value: ערך הצעד המזערי הוא 1
         poll_type:
@@ -82,18 +99,29 @@ he:
           multiple: בחירה מרובה
           number: ציון מספרי
         poll_result:
-          label: תוצאות
+          label: להציג תוצאות...
           always: גלוי תמיד
-          vote: בהליכי הצבעה
-          closed: כאשר סגור
+          vote: רק לאחר הצבעה
+          closed: כשהסקר סגור
           staff: סגל בלבד
+        poll_groups:
+          label: להגביל את ההצבעה לקבוצות אלה
+        poll_chart_type:
+          label: תרשים תוצאות
+          bar: עמודות
+          pie: עוגה
         poll_config:
-          max: מרבי
-          min: מזערי
+          max: כמות האפשרויות המרבית
+          min: כמות האפשרויות המזערית
           step: צעד
         poll_public:
           label: להציג מי המצביעים
+        poll_title:
+          label: כותרת (רשות)
         poll_options:
-          label: נא להכניס אפשרות בחירה אחת בכל שורה
+          label: אפשרויות (אחת בכל שורה)
+          add: הוספת אפשרות
         automatic_close:
           label: לסגור את הסקר אוטומטית
+        show_advanced: "הצגת אפשרויות מתקדמות"
+        hide_advanced: "הסתרת אפשרויות מתקדמות"

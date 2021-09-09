@@ -29,7 +29,7 @@
   .topics .badge-notification,
   .category .badge-notification {
     background-color: transparent;
-    color: dark-light-choose($primary-medium, $secondary-high);
+    color: var(--primary-med-or-secondary-high);
   }
 
   .topics {
@@ -38,6 +38,7 @@
 
     .value {
       font-size: $font-up-1;
+      font-weight: bold;
     }
     .unit {
       font-size: $font-down-1;
@@ -61,7 +62,7 @@
     .badge-wrapper {
       margin-right: 0.5em;
     }
-    .badge-notification.new-posts {
+    .badge-notification.unread-posts {
       display: block;
       padding: 0;
     }
@@ -77,16 +78,13 @@
     a.last-posted-at,
     a.last-posted-at:visited {
       font-size: $font-down-1;
-      color: dark-light-choose($primary-medium, $secondary-high);
+      color: var(--primary-med-or-secondary-high);
     }
     .title {
       @include ellipsis;
       flex: 0 1 auto;
     }
-    .topic-statuses {
-      margin-right: 0.15em;
-    }
-    .topic-post-badges .badge.new-posts,
+    .topic-post-badges .badge.unread-posts,
     .title {
       margin-right: 5px;
     }
@@ -95,12 +93,20 @@
   tbody {
     .category {
       border-left: 6px solid;
-      h3 {
-        font-size: $font-up-2;
+      h3,
+      h4 {
         line-height: $line-height-medium;
         a[href] {
-          color: $primary;
+          color: var(--primary);
         }
+      }
+
+      h3 {
+        font-size: $font-up-2;
+      }
+
+      h4 {
+        font-size: $font-up-1;
       }
     }
 
@@ -134,7 +140,6 @@
   }
 
   .discourse-tags {
-    display: inline-block;
     .discourse-tag {
       font-size: $font-down-1;
     }
@@ -142,5 +147,11 @@
 
   .topic-featured-link {
     padding-left: 8px;
+  }
+
+  .subcategories-with-subcategories {
+    .category-description {
+      display: none;
+    }
   }
 }

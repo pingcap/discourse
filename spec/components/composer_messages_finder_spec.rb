@@ -138,13 +138,13 @@ describe ComposerMessagesFinder do
       expect(finder.check_avatar_notification).to be_blank
     end
 
-    it "doesn't notify users if 'sso_overrides_avatar' setting is enabled" do
-      SiteSetting.sso_overrides_avatar = true
+    it "doesn't notify users if 'discourse_connect_overrides_avatar' setting is enabled" do
+      SiteSetting.discourse_connect_overrides_avatar = true
       expect(finder.check_avatar_notification).to be_blank
     end
 
     it "doesn't notify users if 'allow_uploaded_avatars' setting is disabled" do
-      SiteSetting.allow_uploaded_avatars = false
+      SiteSetting.allow_uploaded_avatars = 'disabled'
       expect(finder.check_avatar_notification).to be_blank
     end
   end
@@ -157,9 +157,11 @@ describe ComposerMessagesFinder do
       SiteSetting.educate_until_posts = 10
       user.stubs(:post_count).returns(11)
 
-      Fabricate(:post, topic: topic, user: user)
-      Fabricate(:post, topic: topic, user: user)
-      Fabricate(:post, topic: topic, user: user, post_type: Post.types[:small_action])
+      freeze_time(5.minutes.ago) do
+        Fabricate(:post, topic: topic, user: user)
+        Fabricate(:post, topic: topic, user: user)
+        Fabricate(:post, topic: topic, user: user, post_type: Post.types[:small_action])
+      end
 
       SiteSetting.sequential_replies_threshold = 2
     end
@@ -341,6 +343,13 @@ describe ComposerMessagesFinder do
       expect(ComposerMessagesFinder.new(user, composer_action: 'reply').check_get_a_room(min_users_posted: 2)).to be_blank
     end
 
+    it "does not give a message if the topic's category is read_restricted" do
+      topic.category.update(read_restricted: true)
+      finder = ComposerMessagesFinder.new(user, composer_action: 'reply', topic_id: topic.id, post_id: op.id)
+      finder.check_get_a_room(min_users_posted: 2)
+      expect(UserHistory.exists_for_user?(user, :notified_about_get_a_room)).to eq(false)
+    end
+
     context "reply" do
       let(:finder) { ComposerMessagesFinder.new(user, composer_action: 'reply', topic_id: topic.id, post_id: op.id) }
 
@@ -414,7 +423,7 @@ describe ComposerMessagesFinder do
           expect(message).to be_present
           expect(message[:id]).to eq('get_a_room')
           expect(message[:wait_for_typing]).to eq(true)
-          expect(message[:templateName]).to eq('education')
+          expect(message[:templateName]).to eq('get-a-room')
 
           expect(UserHistory.exists_for_user?(user, :notified_about_get_a_room)).to eq(true)
         end

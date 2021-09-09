@@ -27,9 +27,9 @@ RSpec.describe CurrentUserSerializer do
     end
 
     it "should include the external_id" do
-      SiteSetting.sso_url = "http://example.com/discourse_sso"
-      SiteSetting.sso_secret = "12345678910"
-      SiteSetting.enable_sso = true
+      SiteSetting.discourse_connect_url = "http://example.com/discourse_sso"
+      SiteSetting.discourse_connect_secret = "12345678910"
+      SiteSetting.enable_discourse_connect = true
       payload = serializer.as_json
       expect(payload[:external_id]).to eq("12345")
     end
@@ -65,6 +65,25 @@ RSpec.describe CurrentUserSerializer do
 
       payload = serializer.as_json
       expect(payload[:top_category_ids]).to eq([category2.id, category1.id])
+    end
+  end
+
+  context "#muted_tag_ids" do
+    fab!(:user) { Fabricate(:user) }
+    fab!(:tag) { Fabricate(:tag) }
+    let!(:tag_user) do
+      TagUser.create!(user_id: user.id,
+                      notification_level: TagUser.notification_levels[:muted],
+                      tag_id: tag.id
+                     )
+    end
+    let :serializer do
+      CurrentUserSerializer.new(user, scope: Guardian.new, root: false)
+    end
+
+    it 'include muted tag ids' do
+      payload = serializer.as_json
+      expect(payload[:muted_tag_ids]).to eq([tag.id])
     end
   end
 
@@ -109,14 +128,64 @@ RSpec.describe CurrentUserSerializer do
     it "should only show visible groups" do
       Fabricate.build(:group, visibility_level: Group.visibility_levels[:public])
       hidden_group = Fabricate.build(:group, visibility_level: Group.visibility_levels[:owners])
-      public_group = Fabricate.build(:group, visibility_level: Group.visibility_levels[:public])
+      public_group = Fabricate.build(:group, visibility_level: Group.visibility_levels[:public], name: "UppercaseGroupName")
       hidden_group.add(member)
       hidden_group.save!
       public_group.add(member)
       public_group.save!
       payload = serializer.as_json
 
-      expect(payload[:groups]).to eq([{ id: public_group.id, name: public_group.name }])
+      expect(payload[:groups]).to contain_exactly(
+        { id: public_group.id, name: public_group.name, has_messages: false }
+      )
+    end
+  end
+
+  context "#has_topic_draft" do
+    fab!(:user) { Fabricate(:user) }
+    let :serializer do
+      CurrentUserSerializer.new(user, scope: Guardian.new, root: false)
+    end
+
+    it "is not included by default" do
+      payload = serializer.as_json
+      expect(payload).not_to have_key(:has_topic_draft)
+    end
+
+    it "returns true when user has a draft" do
+      Draft.set(user, Draft::NEW_TOPIC, 0, "test1")
+
+      payload = serializer.as_json
+      expect(payload[:has_topic_draft]).to eq(true)
+    end
+
+    it "clearing a draft removes has_topic_draft from payload" do
+      sequence = Draft.set(user, Draft::NEW_TOPIC, 0, "test1")
+      Draft.clear(user, Draft::NEW_TOPIC, sequence)
+
+      payload = serializer.as_json
+      expect(payload).not_to have_key(:has_topic_draft)
+    end
+
+  end
+
+  context '#can_review' do
+    it 'return false for regular users' do
+      serializer = serializer(Fabricate(:user))
+      payload = serializer.as_json
+
+      expect(payload[:can_review]).to eq(false)
+    end
+
+    it 'returns trus for staff' do
+      serializer = serializer(Fabricate(:admin))
+      payload = serializer.as_json
+
+      expect(payload[:can_review]).to eq(true)
+    end
+
+    def serializer(user)
+      CurrentUserSerializer.new(user, scope: Guardian.new(user), root: false)
     end
   end
 end

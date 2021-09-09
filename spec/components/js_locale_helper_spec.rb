@@ -19,9 +19,8 @@ describe JsLocaleHelper do
 
   JsLocaleHelper.extend StubLoadTranslations
 
-  after do
-    JsLocaleHelper.clear_cache!
-  end
+  before { JsLocaleHelper.clear_cache! }
+  after { JsLocaleHelper.clear_cache! }
 
   describe "#output_locale" do
 
@@ -119,18 +118,18 @@ describe JsLocaleHelper do
       expect(message).not_to match 'Plural Function not found'
     end
 
-    it "includes uses message formats from fallback locale" do
-      translations = JsLocaleHelper.translations_for(:en_US)
-      en_us_message_formats = JsLocaleHelper.remove_message_formats!(translations, :en_US)
-      expect(en_us_message_formats).to_not be_empty
+    it "uses message formats from fallback locale" do
+      translations = JsLocaleHelper.translations_for(:en_GB)
+      en_gb_message_formats = JsLocaleHelper.remove_message_formats!(translations, :en_GB)
+      expect(en_gb_message_formats).to_not be_empty
 
       translations = JsLocaleHelper.translations_for(:en)
       en_message_formats = JsLocaleHelper.remove_message_formats!(translations, :en)
-      expect(en_us_message_formats).to eq(en_message_formats)
+      expect(en_gb_message_formats).to eq(en_message_formats)
     end
   end
 
-  it 'performs fallbacks to english if a translation is not available' do
+  it 'performs fallbacks to English if a translation is not available' do
     JsLocaleHelper.set_translations('en', "en" => {
         "js" => {
           "only_english" => "1-en",
@@ -161,12 +160,12 @@ describe JsLocaleHelper do
     expected = {
       "none" => "[uk.js.none]",
       "only_english" => "1-en",
-      "only_site" => "2-ru",
-      "english_and_site" => "3-ru",
+      "only_site" => "[uk.js.only_site]",
+      "english_and_site" => "3-en",
       "only_user" => "4-uk",
       "english_and_user" => "5-uk",
       "site_and_user" => "6-uk",
-      "all_three" => "7-uk",
+      "all_three" => "7-uk"
     }
 
     SiteSetting.default_locale = 'ru'
@@ -178,9 +177,9 @@ describe JsLocaleHelper do
     ctx.eval(JsLocaleHelper.output_locale(I18n.locale))
     ctx.eval('I18n.defaultLocale = "ru";')
 
-    expect(ctx.eval('I18n.translations.en.js').keys).to contain_exactly("only_english")
-    expect(ctx.eval('I18n.translations.ru.js').keys).to contain_exactly("only_site", "english_and_site")
+    expect(ctx.eval('I18n.translations').keys).to contain_exactly("uk", "en")
     expect(ctx.eval('I18n.translations.uk.js').keys).to contain_exactly("all_three", "english_and_user", "only_user", "site_and_user")
+    expect(ctx.eval('I18n.translations.en.js').keys).to contain_exactly("only_english", "english_and_site")
 
     expected.each do |key, expect|
       expect(ctx.eval("I18n.t(#{"js.#{key}".inspect})")).to eq(expect)
@@ -207,4 +206,15 @@ describe JsLocaleHelper do
     end
   end
 
+  describe ".find_message_format_locale" do
+    it "finds locale for en_GB" do
+      locale, filename = JsLocaleHelper.find_message_format_locale([:en_GB],  fallback_to_english: false)
+      expect(locale).to eq("en")
+      expect(filename).to end_with("/en.js")
+
+      locale, filename = JsLocaleHelper.find_message_format_locale(["en_GB"],  fallback_to_english: false)
+      expect(locale).to eq("en")
+      expect(filename).to end_with("/en.js")
+    end
+  end
 end

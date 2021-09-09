@@ -1,12 +1,17 @@
-import { isEmpty } from "@ember/utils";
-import { schedule } from "@ember/runloop";
-import Component from "@ember/component";
 /* global Pikaday:true */
-import { propertyNotEqual } from "discourse/lib/computed";
-import loadScript from "discourse/lib/load-script";
-import { default as computed } from "ember-addons/ember-computed-decorators";
+import computed, { observes } from "discourse-common/utils/decorators";
+import Component from "@ember/component";
+import EmberObject from "@ember/object";
+import I18n from "I18n";
+import { INPUT_DELAY } from "discourse-common/config/environment";
+import { Promise } from "rsvp";
 import { cookAsync } from "discourse/lib/text";
-import discourseDebounce from "discourse/lib/debounce";
+import discourseDebounce from "discourse-common/lib/debounce";
+import { isEmpty } from "@ember/utils";
+import loadScript from "discourse/lib/load-script";
+import { notEmpty } from "@ember/object/computed";
+import { propertyNotEqual } from "discourse/lib/computed";
+import { schedule } from "@ember/runloop";
 
 export default Component.extend({
   timeFormat: "HH:mm:ss",
@@ -20,12 +25,11 @@ export default Component.extend({
   formats: null,
   recurring: null,
   advancedMode: false,
-  isValid: true,
   timezone: null,
   fromSelected: null,
-  fromFilled: Ember.computed.notEmpty("date"),
+  fromFilled: notEmpty("date"),
   toSelected: null,
-  toFilled: Ember.computed.notEmpty("toDate"),
+  toFilled: notEmpty("toDate"),
 
   init() {
     this._super(...arguments);
@@ -36,33 +40,40 @@ export default Component.extend({
       timezones: [],
       formats: (this.siteSettings.discourse_local_dates_default_formats || "")
         .split("|")
-        .filter(f => f),
+        .filter((f) => f),
       timezone: moment.tz.guess(),
-      date: moment().format(this.dateFormat)
+      date: moment().format(this.dateFormat),
     });
   },
 
   didInsertElement() {
     this._super(...arguments);
 
-    this._setupPicker().then(picker => {
+    this._setupPicker().then((picker) => {
       this._picker = picker;
       this.send("focusFrom");
     });
   },
 
-  _renderPreview: discourseDebounce(function() {
-    const markup = this.markup;
+  @observes("markup")
+  _renderPreview() {
+    discourseDebounce(
+      this,
+      function () {
+        const markup = this.markup;
 
-    if (markup) {
-      cookAsync(markup).then(result => {
-        this.set("currentPreview", result);
-        schedule("afterRender", () =>
-          this.$(".preview .discourse-local-date").applyLocalDates()
-        );
-      });
-    }
-  }, 250).observes("markup"),
+        if (markup) {
+          cookAsync(markup).then((result) => {
+            this.set("currentPreview", result);
+            schedule("afterRender", () =>
+              this.$(".preview .discourse-local-date").applyLocalDates()
+            );
+          });
+        }
+      },
+      INPUT_DELAY
+    );
+  },
 
   @computed("date", "toDate", "toTime")
   isRange(date, toDate, toTime) {
@@ -111,12 +122,12 @@ export default Component.extend({
       format = "LL";
     }
 
-    return Ember.Object.create({
+    return EmberObject.create({
       date: dateTime.format(this.dateFormat),
       time,
       dateTime,
       format,
-      range: isRange ? "start" : false
+      range: isRange ? "start" : false,
     });
   },
 
@@ -144,22 +155,22 @@ export default Component.extend({
       format = "LL";
     }
 
-    return Ember.Object.create({
+    return EmberObject.create({
       date: dateTime.format(this.dateFormat),
       time,
       dateTime,
       format,
-      range: isRange ? "end" : false
+      range: isRange ? "end" : false,
     });
   },
 
   @computed("recurring", "timezones", "timezone", "format")
   options(recurring, timezones, timezone, format) {
-    return Ember.Object.create({
+    return EmberObject.create({
       recurring,
       timezones,
       timezone,
-      format
+      format,
     });
   },
 
@@ -169,10 +180,10 @@ export default Component.extend({
     "options.{recurring,timezones,timezone,format}"
   )
   computedConfig(fromConfig, toConfig, options) {
-    return Ember.Object.create({
+    return EmberObject.create({
       from: fromConfig,
       to: toConfig,
-      options
+      options,
     });
   },
 
@@ -193,18 +204,15 @@ export default Component.extend({
 
   @computed("currentUserTimezone")
   formatedCurrentUserTimezone(timezone) {
-    return timezone
-      .replace("_", " ")
-      .replace("Etc/", "")
-      .split("/");
+    return timezone.replace("_", " ").replace("Etc/", "").split("/");
   },
 
   @computed("formats")
   previewedFormats(formats) {
-    return formats.map(format => {
+    return formats.map((format) => {
       return {
         format: format,
-        preview: moment().format(format)
+        preview: moment().format(format),
       };
     });
   },
@@ -216,36 +224,36 @@ export default Component.extend({
     return [
       {
         name: I18n.t(`${key}.every_day`),
-        id: "1.days"
+        id: "1.days",
       },
       {
         name: I18n.t(`${key}.every_week`),
-        id: "1.weeks"
+        id: "1.weeks",
       },
       {
         name: I18n.t(`${key}.every_two_weeks`),
-        id: "2.weeks"
+        id: "2.weeks",
       },
       {
         name: I18n.t(`${key}.every_month`),
-        id: "1.months"
+        id: "1.months",
       },
       {
         name: I18n.t(`${key}.every_two_months`),
-        id: "2.months"
+        id: "2.months",
       },
       {
         name: I18n.t(`${key}.every_three_months`),
-        id: "3.months"
+        id: "3.months",
       },
       {
         name: I18n.t(`${key}.every_six_months`),
-        id: "6.months"
+        id: "6.months",
       },
       {
         name: I18n.t(`${key}.every_year`),
-        id: "1.years"
-      }
+        id: "1.years",
+      },
     ];
   },
 
@@ -355,7 +363,7 @@ export default Component.extend({
 
     cancel() {
       this._closeModal();
-    }
+    },
   },
 
   _setTimeIfValid(time, key) {
@@ -370,7 +378,7 @@ export default Component.extend({
   },
 
   _setupPicker() {
-    return new Ember.RSVP.Promise(resolve => {
+    return new Promise((resolve) => {
       loadScript("/javascripts/pikaday.js").then(() => {
         const options = {
           field: this.$(`.fake-input`)[0],
@@ -386,9 +394,9 @@ export default Component.extend({
             nextMonth: I18n.t("dates.next_month"),
             months: moment.months(),
             weekdays: moment.weekdays(),
-            weekdaysShort: moment.weekdaysMin()
+            weekdaysShort: moment.weekdaysMin(),
           },
-          onSelect: date => {
+          onSelect: (date) => {
             const formattedDate = moment(date).format("YYYY-MM-DD");
 
             if (this.fromSelected) {
@@ -398,7 +406,7 @@ export default Component.extend({
             if (this.toSelected) {
               this.set("toDate", formattedDate);
             }
-          }
+          },
         };
 
         resolve(new Pikaday(options));
@@ -429,5 +437,5 @@ export default Component.extend({
   _closeModal() {
     const composer = Discourse.__container__.lookup("controller:composer");
     composer.send("closeModal");
-  }
+  },
 });

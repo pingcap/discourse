@@ -7,7 +7,7 @@ class SingleSignOnProvider < SingleSignOn
     set_return_sso_url(payload)
     if sso_secret.blank? && self.sso_secret.blank?
       host = URI.parse(@return_sso_url).host
-      Rails.logger.warn("SSO failed; website #{host} is not in the `sso_provider_secrets` site settings")
+      Rails.logger.warn("SSO failed; website #{host} is not in the `discourse_connect_provider_secrets` site settings")
       raise BlankSecret
     end
 
@@ -19,13 +19,14 @@ class SingleSignOnProvider < SingleSignOn
     decoded = Base64.decode64(parsed["sso"])
     decoded_hash = Rack::Utils.parse_query(decoded)
 
+    raise ParseError unless decoded_hash.key? 'return_sso_url'
     @return_sso_url = decoded_hash['return_sso_url']
   end
 
   def self.sso_secret
-    return nil unless @return_sso_url && SiteSetting.enable_sso_provider
+    return nil unless @return_sso_url && SiteSetting.enable_discourse_connect_provider
 
-    provider_secrets = SiteSetting.sso_provider_secrets.split(/[|\n]/)
+    provider_secrets = SiteSetting.discourse_connect_provider_secrets.split(/[|\n]/)
     provider_secrets_hash = Hash[*provider_secrets]
     return_url_host = URI.parse(@return_sso_url).host
     # moves wildcard domains to the end of hash

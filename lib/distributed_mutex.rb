@@ -17,7 +17,7 @@ class DistributedMutex
   def initialize(key, redis: nil, validity: DEFAULT_VALIDITY)
     @key = key
     @using_global_redis = true if !redis
-    @redis = redis || $redis
+    @redis = redis || Discourse.redis
     @mutex = Mutex.new
     @validity = validity
   end
@@ -95,7 +95,7 @@ class DistributedMutex
         result =
           redis.multi do
             redis.set key, expire_time.to_s
-            redis.expire key, validity
+            redis.expireat key, expire_time + 1
           end
 
         got_lock = !result.nil?

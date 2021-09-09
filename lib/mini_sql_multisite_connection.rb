@@ -32,7 +32,12 @@ class MiniSqlMultisiteConnection < MiniSql::Postgres::Connection
     end
 
     def committed!(*)
-      @callback.call
+      if DB.transaction_open?
+        # Nested transaction. Pass the callback to the parent
+        ActiveRecord::Base.connection.add_transaction_record(self)
+      else
+        @callback.call
+      end
     end
 
     def before_committed!(*); end
@@ -42,9 +47,26 @@ class MiniSqlMultisiteConnection < MiniSql::Postgres::Connection
     end
   end
 
+  def transaction_open?
+    ActiveRecord::Base.connection.transaction_open?
+  end
+
+  if Rails.env.test?
+    def test_transaction=(transaction)
+      @test_transaction = transaction
+    end
+
+    def transaction_open?
+      ActiveRecord::Base.connection.current_transaction != @test_transaction
+    end
+  end
+
   # Allows running arbitrary code after the current transaction has been committed.
-  # Works even with nested transactions. Useful for scheduling sidekiq jobs.
+  # Works with nested ActiveRecord transaction blocks. Useful for scheduling sidekiq jobs.
+  # If not currently in a transaction, will execute immediately
   def after_commit(&blk)
+    return blk.call if !transaction_open?
+
     ActiveRecord::Base.connection.add_transaction_record(
       AfterCommitWrapper.new(&blk)
     )
@@ -58,6 +80,20 @@ class MiniSqlMultisiteConnection < MiniSql::Postgres::Connection
   # correct multisite connection
   def raw_connection
     ActiveRecord::Base.connection.raw_connection
+  end
+
+  # make for a multisite friendly prepared statement cache
+  def prepared(condition = true)
+    if condition
+      conn = raw_connection.instance_variable_get(:@mini_sql_prepared_connection)
+      if !conn
+        conn = MiniSql::Postgres::PreparedConnection.new(self)
+        raw_connection.instance_variable_set(:@mini_sql_prepared_connection, conn)
+      end
+      conn
+    else
+      self
+    end
   end
 
   def build(sql)

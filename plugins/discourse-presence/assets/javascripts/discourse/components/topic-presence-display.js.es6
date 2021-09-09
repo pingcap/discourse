@@ -1,62 +1,37 @@
-import { debounce } from "@ember/runloop";
-import { cancel } from "@ember/runloop";
+import discourseComputed, { on } from "discourse-common/utils/decorators";
 import Component from "@ember/component";
-import {
-  default as computed,
-  on
-} from "ember-addons/ember-computed-decorators";
-import {
-  keepAliveDuration,
-  bufferTime
-} from "discourse/plugins/discourse-presence/discourse/components/composer-presence-display";
-
-const MB_GET_LAST_MESSAGE = -2;
+import { TOPIC_TYPE } from "discourse/plugins/discourse-presence/discourse/lib/presence";
+import { gt } from "@ember/object/computed";
+import { inject as service } from "@ember/service";
 
 export default Component.extend({
+  topic: null,
   topicId: null,
-  presenceUsers: null,
+  presenceManager: service(),
 
-  clear() {
-    if (!this.isDestroyed) this.set("presenceUsers", []);
+  @discourseComputed("topic.id")
+  users(topicId) {
+    return this.presenceManager.users(topicId);
+  },
+
+  shouldDisplay: gt("users.length", 0),
+
+  didReceiveAttrs() {
+    this._super(...arguments);
+    if (this.topicId) {
+      this.presenceManager.unsubscribe(this.topicId, TOPIC_TYPE);
+    }
+    this.set("topicId", this.get("topic.id"));
   },
 
   @on("didInsertElement")
-  _inserted() {
-    this.clear();
-
-    this.messageBus.subscribe(
-      this.channel,
-      message => {
-        if (!this.isDestroyed) this.set("presenceUsers", message.users);
-        this._clearTimer = debounce(
-          this,
-          "clear",
-          keepAliveDuration + bufferTime
-        );
-      },
-      MB_GET_LAST_MESSAGE
-    );
+  subscribe() {
+    this.set("topicId", this.get("topic.id"));
+    this.presenceManager.subscribe(this.get("topic.id"), TOPIC_TYPE);
   },
 
   @on("willDestroyElement")
   _destroyed() {
-    cancel(this._clearTimer);
-    this.messageBus.unsubscribe(this.channel);
+    this.presenceManager.unsubscribe(this.get("topic.id"), TOPIC_TYPE);
   },
-
-  @computed("topicId")
-  channel(topicId) {
-    return `/presence/topic/${topicId}`;
-  },
-
-  @computed("presenceUsers", "currentUser.{id,ignored_users}")
-  users(users, currentUser) {
-    const ignoredUsers = currentUser.ignored_users || [];
-    return (users || []).filter(
-      user =>
-        user.id !== currentUser.id && !ignoredUsers.includes(user.username)
-    );
-  },
-
-  shouldDisplay: Ember.computed.gt("users.length", 0)
 });

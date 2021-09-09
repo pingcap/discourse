@@ -13,7 +13,6 @@ class AdminUserListSerializer < BasicUserSerializer
              :last_seen_age,
              :last_emailed_age,
              :created_at_age,
-             :username_lower,
              :trust_level,
              :manual_locked_trust_level,
              :flag_level,
@@ -107,9 +106,9 @@ class AdminUserListSerializer < BasicUserSerializer
   end
 
   def include_second_factor_enabled?
-    !SiteSetting.enable_sso &&
+    !SiteSetting.enable_discourse_connect &&
       SiteSetting.enable_local_logins &&
-      object.totps.present?
+      object.has_any_second_factor_methods_enabled?
   end
 
   def second_factor_enabled

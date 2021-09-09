@@ -65,6 +65,25 @@ describe Discourse do
     end
   end
 
+  context "asset_filter_options" do
+    it "obmits path if request is missing" do
+      opts = Discourse.asset_filter_options(:js, nil)
+      expect(opts[:path]).to be_blank
+    end
+
+    it "returns a hash with a path from the request" do
+      req = stub(fullpath: "/hello", headers: {})
+      opts = Discourse.asset_filter_options(:js, req)
+      expect(opts[:path]).to eq("/hello")
+    end
+
+    it "overwrites the path if the asset path is present" do
+      req = stub(fullpath: "/bootstrap.json", headers: { "HTTP_X_DISCOURSE_ASSET_PATH" => "/hello" })
+      opts = Discourse.asset_filter_options(:js, req)
+      expect(opts[:path]).to eq("/hello")
+    end
+  end
+
   context 'plugins' do
     let(:plugin_class) do
       Class.new(Plugin::Instance) do
@@ -75,21 +94,45 @@ describe Discourse do
       end
     end
 
-    let(:plugin1) { plugin_class.new.tap { |p| p.enabled = true } }
-    let(:plugin2) { plugin_class.new.tap { |p| p.enabled = false } }
+    let(:plugin1) { plugin_class.new.tap { |p| p.enabled = true; p.path = "my-plugin-1" } }
+    let(:plugin2) { plugin_class.new.tap { |p| p.enabled = false; p.path = "my-plugin-1" } }
 
-    before { Discourse.plugins.append(plugin1, plugin2) }
-    after { Discourse.plugins.clear }
+    before do
+      Discourse.plugins.append(plugin1, plugin2)
+    end
+
+    after do
+      Discourse.plugins.delete plugin1
+      Discourse.plugins.delete plugin2
+    end
+
+    before do
+      plugin_class.any_instance.stubs(:css_asset_exists?).returns(true)
+      plugin_class.any_instance.stubs(:js_asset_exists?).returns(true)
+    end
 
     it 'can find plugins correctly' do
-      expect(Discourse.plugins).to contain_exactly(plugin1, plugin2)
+      expect(Discourse.plugins).to include(plugin1, plugin2)
 
       # Exclude disabled plugins by default
-      expect(Discourse.find_plugins({})).to contain_exactly(plugin1)
+      expect(Discourse.find_plugins({})).to include(plugin1)
 
       # Include disabled plugins when requested
-      expect(Discourse.find_plugins(include_disabled: true)).to contain_exactly(plugin1, plugin2)
+      expect(Discourse.find_plugins(include_disabled: true)).to include(plugin1, plugin2)
     end
+
+    it 'can find plugin assets' do
+      plugin2.enabled = true
+
+      expect(Discourse.find_plugin_css_assets({}).length).to eq(2)
+      expect(Discourse.find_plugin_js_assets({}).length).to eq(2)
+      plugin1.register_asset_filter do |type, request, opts|
+        false
+      end
+      expect(Discourse.find_plugin_css_assets({}).length).to eq(1)
+      expect(Discourse.find_plugin_js_assets({}).length).to eq(1)
+    end
+
   end
 
   context 'authenticators' do
@@ -185,62 +228,39 @@ describe Discourse do
     let(:user_readonly_mode_key) { Discourse::USER_READONLY_MODE_KEY }
 
     after do
-      $redis.del(readonly_mode_key)
-      $redis.del(user_readonly_mode_key)
+      Discourse.redis.del(readonly_mode_key)
+      Discourse.redis.del(user_readonly_mode_key)
     end
 
     def assert_readonly_mode(message, key, ttl = -1)
       expect(message.channel).to eq(Discourse.readonly_channel)
       expect(message.data).to eq(true)
-      expect($redis.get(key)).to eq("1")
-      expect($redis.ttl(key)).to eq(ttl)
+      expect(Discourse.redis.get(key)).to eq("1")
+      expect(Discourse.redis.ttl(key)).to eq(ttl)
     end
 
     def assert_readonly_mode_disabled(message, key)
       expect(message.channel).to eq(Discourse.readonly_channel)
       expect(message.data).to eq(false)
-      expect($redis.get(key)).to eq(nil)
-    end
-
-    def get_readonly_message
-      message = nil
-
-      messages = MessageBus.track_publish do
-        yield
-      end
-
-      expect(messages.any? { |m| m.channel == Site::SITE_JSON_CHANNEL })
-        .to eq(true)
-
-      messages.find { |m| m.channel == Discourse.readonly_channel }
+      expect(Discourse.redis.get(key)).to eq(nil)
     end
 
     describe ".enable_readonly_mode" do
       it "adds a key in redis and publish a message through the message bus" do
-        expect($redis.get(readonly_mode_key)).to eq(nil)
-        message = get_readonly_message { Discourse.enable_readonly_mode }
-        assert_readonly_mode(message, readonly_mode_key, readonly_mode_ttl)
+        expect(Discourse.redis.get(readonly_mode_key)).to eq(nil)
       end
 
       context 'user enabled readonly mode' do
         it "adds a key in redis and publish a message through the message bus" do
-          expect($redis.get(user_readonly_mode_key)).to eq(nil)
-          message = get_readonly_message { Discourse.enable_readonly_mode(user_readonly_mode_key) }
-          assert_readonly_mode(message, user_readonly_mode_key)
+          expect(Discourse.redis.get(user_readonly_mode_key)).to eq(nil)
         end
       end
     end
 
     describe ".disable_readonly_mode" do
-      it "removes a key from redis and publish a message through the message bus" do
-        message = get_readonly_message { Discourse.disable_readonly_mode }
-        assert_readonly_mode_disabled(message, readonly_mode_key)
-      end
-
       context 'user disabled readonly mode' do
         it "removes readonly key in redis and publish a message through the message bus" do
-          Discourse.enable_readonly_mode(user_enabled: true)
-          message = get_readonly_message { Discourse.disable_readonly_mode(user_enabled: true) }
+          message = MessageBus.track_publish { Discourse.disable_readonly_mode(user_readonly_mode_key) }.first
           assert_readonly_mode_disabled(message, user_readonly_mode_key)
         end
       end
@@ -252,7 +272,7 @@ describe Discourse do
       end
 
       it "returns true when the key is present in redis" do
-        $redis.set(readonly_mode_key, 1)
+        Discourse.redis.set(readonly_mode_key, 1)
         expect(Discourse.readonly_mode?).to eq(true)
       end
 
@@ -397,6 +417,16 @@ describe Discourse do
       expect(Discourse::Utils.execute_command("pwd", chdir: "plugins").strip).to eq("#{Rails.root.to_s}/plugins")
     end
 
+    it "supports timeouts" do
+      expect do
+        Discourse::Utils.execute_command("sleep", "999999999999", timeout: 0.001)
+      end.to raise_error(RuntimeError)
+
+      expect do
+        Discourse::Utils.execute_command({ "MYENV" => "MYVAL" }, "sleep", "999999999999", timeout: 0.001)
+      end.to raise_error(RuntimeError)
+    end
+
     it "works with a block" do
       Discourse::Utils.execute_command do |runner|
         expect(runner.exec("pwd").strip).to eq(Rails.root.to_s)
@@ -426,6 +456,21 @@ describe Discourse do
       expect(Discourse::Utils.execute_command("pwd").strip).to eq(Rails.root.to_s)
       has_checked_chdir = true
       thread.join
+    end
+
+    it "raises error for unsafe shell" do
+      expect(Discourse::Utils.execute_command("pwd").strip).to eq(Rails.root.to_s)
+
+      expect do
+        Discourse::Utils.execute_command("echo a b c")
+      end.to raise_error(RuntimeError)
+
+      expect do
+        Discourse::Utils.execute_command({ "ENV1" => "VAL" }, "echo a b c")
+      end.to raise_error(RuntimeError)
+
+      expect(Discourse::Utils.execute_command("echo", "a", "b", "c").strip).to eq("a b c")
+      expect(Discourse::Utils.execute_command("echo a b c", unsafe_shell: true).strip).to eq("a b c")
     end
   end
 

@@ -42,17 +42,20 @@ describe Jobs::UserEmail do
 
     context 'not emailed recently' do
       before do
+        freeze_time
         user.update!(last_emailed_at: 8.days.ago)
       end
 
       it "calls the mailer when the user exists" do
         Jobs::UserEmail.new.execute(type: :digest, user_id: user.id)
         expect(ActionMailer::Base.deliveries).to_not be_empty
+        expect(user.user_stat.reload.digest_attempted_at).to eq_time(Time.zone.now)
       end
     end
 
     context 'recently emailed' do
       before do
+        freeze_time
         user.update!(last_emailed_at: 2.hours.ago)
         user.user_option.update!(digest_after_minutes: 1.day.to_i / 60)
       end
@@ -60,6 +63,7 @@ describe Jobs::UserEmail do
       it 'skips sending digest email' do
         Jobs::UserEmail.new.execute(type: :digest, user_id: user.id)
         expect(ActionMailer::Base.deliveries).to eq([])
+        expect(user.user_stat.reload.digest_attempted_at).to eq_time(Time.zone.now)
       end
     end
   end
@@ -145,6 +149,30 @@ describe Jobs::UserEmail do
       )
     end
 
+    it "sends an email with no gsub substitution bugs" do
+      upload = Fabricate(:upload)
+
+      post.update!(raw: <<~RAW)
+      This is a test post
+
+      With a \\0 \\1 \\2 in it
+      RAW
+      Jobs::UserEmail.new.execute(
+        type: :user_private_message,
+        user_id: user.id,
+        post_id: post.id,
+        notification_id: notification.id
+      )
+
+      email = ActionMailer::Base.deliveries.first
+
+      expect(email.to).to contain_exactly(user.email)
+
+      html_part = email.parts.find { |x| x.content_type.include? "html" }
+      expect(html_part.body.to_s).to_not include('%{email_content}')
+      expect(html_part.body.to_s).to include('\0')
+    end
+
     it "sends an email by default for a PM to a user that's been recently seen" do
       upload = Fabricate(:upload)
 
@@ -174,6 +202,21 @@ describe Jobs::UserEmail do
       MD
     end
 
+    it "sends a PM email to a user that's been recently seen and has email_messages_level set to always" do
+      user.user_option.update(email_messages_level: UserOption.email_level_types[:always])
+      user.user_option.update(email_level: UserOption.email_level_types[:never])
+      Jobs::UserEmail.new.execute(
+        type: :user_private_message,
+        user_id: user.id,
+        post_id: post.id,
+        notification_id: notification.id
+      )
+
+      expect(ActionMailer::Base.deliveries.first.to).to contain_exactly(
+        user.email
+      )
+    end
+
     it "doesn't send a PM email to a user that's been recently seen and has email_messages_level set to never" do
       user.user_option.update(email_messages_level: UserOption.email_level_types[:never])
       user.user_option.update(email_level: UserOption.email_level_types[:always])
@@ -192,18 +235,21 @@ describe Jobs::UserEmail do
   end
 
   context "email_log" do
-    fab!(:post) { Fabricate(:post) }
+    fab!(:post) { Fabricate(:post, created_at: 30.seconds.ago) }
 
     before do
       SiteSetting.editing_grace_period = 0
-      post
     end
 
     it "creates an email log when the mail is sent (via Email::Sender)" do
-      last_emailed_at = user.last_emailed_at
+      freeze_time
+
+      last_emailed_at = 7.days.ago
+      user.update!(last_emailed_at: last_emailed_at)
+      Topic.last.update(created_at: 1.minute.ago)
 
       expect do
-        Jobs::UserEmail.new.execute(type: :digest, user_id: user.id,)
+        Jobs::UserEmail.new.execute(type: :digest, user_id: user.id)
       end.to change { EmailLog.count }.by(1)
 
       email_log = EmailLog.last
@@ -211,12 +257,17 @@ describe Jobs::UserEmail do
       expect(email_log.user).to eq(user)
       expect(email_log.post).to eq(nil)
       # last_emailed_at should have changed
-      expect(email_log.user.last_emailed_at).to_not eq(last_emailed_at)
+      expect(email_log.user.last_emailed_at).to_not eq_time(last_emailed_at)
     end
 
     it "creates a skipped email log when the mail is skipped" do
-      last_emailed_at = user.last_emailed_at
-      user.update_columns(suspended_till: 1.year.from_now)
+      freeze_time
+
+      last_emailed_at = 7.days.ago
+      user.update!(
+        last_emailed_at: last_emailed_at,
+        suspended_till: 1.year.from_now
+      )
 
       expect do
         Jobs::UserEmail.new.execute(type: :digest, user_id: user.id)
@@ -231,7 +282,7 @@ describe Jobs::UserEmail do
       )).to eq(true)
 
       # last_emailed_at doesn't change
-      expect(user.last_emailed_at).to eq(last_emailed_at)
+      expect(user.last_emailed_at).to eq_time(last_emailed_at)
     end
 
     it "creates a skipped email log when the user isn't allowed to see the post" do
@@ -263,6 +314,46 @@ describe Jobs::UserEmail do
 
       expect(mail.to).to contain_exactly(user.email)
       expect(mail.body).to include("asdfasdf")
+    end
+
+    context "confirm_new_email" do
+      let(:email_token) { Fabricate(:email_token, user: user) }
+      before do
+        EmailChangeRequest.create!(
+          user: user,
+          requested_by: requested_by,
+          new_email_token: email_token,
+          new_email: "testnew@test.com",
+          change_state: EmailChangeRequest.states[:authorizing_new]
+        )
+      end
+
+      context "when the change was requested by admin" do
+        let(:requested_by) { Fabricate(:admin) }
+        it "passes along true for the requested_by_admin param which changes the wording in the email" do
+          Jobs::UserEmail.new.execute(type: :confirm_new_email, user_id: user.id, email_token: email_token.token)
+          mail = ActionMailer::Base.deliveries.first
+          expect(mail.body).to include("This email change was requested by a site admin.")
+        end
+      end
+
+      context "when the change was requested by the user" do
+        let(:requested_by) { user }
+        it "passes along false for the requested_by_admin param which changes the wording in the email" do
+          Jobs::UserEmail.new.execute(type: :confirm_new_email, user_id: user.id, email_token: email_token.token)
+          mail = ActionMailer::Base.deliveries.first
+          expect(mail.body).not_to include("This email change was requested by a site admin.")
+        end
+      end
+
+      context "when requested_by record is not present" do
+        let(:requested_by) { nil }
+        it "passes along false for the requested_by_admin param which changes the wording in the email" do
+          Jobs::UserEmail.new.execute(type: :confirm_new_email, user_id: user.id, email_token: email_token.token)
+          mail = ActionMailer::Base.deliveries.first
+          expect(mail.body).not_to include("This email change was requested by a site admin.")
+        end
+      end
     end
 
     context "post" do
@@ -317,6 +408,26 @@ describe Jobs::UserEmail do
           expect(ActionMailer::Base.deliveries.first.to).to contain_exactly(
             suspended.email
           )
+        end
+
+        it "doesn't send PM from system user" do
+          pm_from_system = SystemMessage.create(suspended, :unsilenced)
+
+          system_pm_notification = Fabricate(:notification,
+            user: suspended,
+            topic: pm_from_system.topic,
+            post_number: pm_from_system.post_number,
+            data: { original_post_id: pm_from_system.id }.to_json
+          )
+
+          Jobs::UserEmail.new.execute(
+            type: :user_private_message,
+            user_id: suspended.id,
+            post_id: pm_from_system.id,
+            notification_id: system_pm_notification.id
+          )
+
+          expect(ActionMailer::Base.deliveries).to eq([])
         end
       end
 
@@ -403,6 +514,19 @@ describe Jobs::UserEmail do
         expect(ActionMailer::Base.deliveries.first.to).to contain_exactly(
           user.email
         )
+      end
+
+      it "sends the mail if the user enabled mailing list mode, but mailing list mode is disabled globally" do
+        user.user_option.update(mailing_list_mode: true, mailing_list_mode_frequency: 1)
+
+        Jobs::UserEmail.new.execute(
+          type: :user_mentioned,
+          user_id: user.id,
+          post_id: post.id,
+          notification_id: notification.id
+        )
+
+        expect(ActionMailer::Base.deliveries.first.to).to contain_exactly(user.email)
       end
 
       context "recently seen" do
@@ -540,6 +664,8 @@ describe Jobs::UserEmail do
       end
 
       it "doesn't send the mail if the user is using individual mailing list mode" do
+        SiteSetting.disable_mailing_list_mode = false
+
         user.user_option.update(mailing_list_mode: true, mailing_list_mode_frequency: 1)
         # sometimes, we pass the notification_id
         Jobs::UserEmail.new.execute(type: :user_mentioned, user_id: user.id, notification_id: notification.id, post_id: post.id)
@@ -556,6 +682,8 @@ describe Jobs::UserEmail do
       end
 
       it "doesn't send the mail if the user is using individual mailing list mode with no echo" do
+        SiteSetting.disable_mailing_list_mode = false
+
         user.user_option.update(mailing_list_mode: true, mailing_list_mode_frequency: 2)
         # sometimes, we pass the notification_id
         Jobs::UserEmail.new.execute(type: :user_mentioned, user_id: user.id, notification_id: notification.id, post_id: post.id)

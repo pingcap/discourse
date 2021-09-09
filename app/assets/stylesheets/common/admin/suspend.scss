@@ -5,6 +5,10 @@
 
   .suspend-reason {
     width: 100%;
+
+    &.combo-box {
+      margin-bottom: 9px;
+    }
   }
 
   .suspend-reason-label,
@@ -29,6 +33,26 @@
 
     textarea {
       height: 10em;
+    }
+  }
+  .penalty-history {
+    margin-bottom: 1em;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid var(--primary-low);
+    display: flex;
+    & > * {
+      flex-basis: 100%;
+      text-align: center;
+      padding: 1em 0;
+      font-weight: 600;
+      label {
+        font-weight: 600;
+        justify-content: center;
+      }
+    }
+    .danger {
+      background-color: var(--danger);
+      color: var(--secondary);
     }
   }
 }

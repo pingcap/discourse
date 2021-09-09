@@ -6,14 +6,13 @@ class SiteSerializer < ApplicationSerializer
     :default_archetype,
     :notification_types,
     :post_types,
+    :trust_levels,
     :groups,
     :filters,
     :periods,
     :top_menu_items,
     :anonymous_top_menu_items,
     :uncategorized_category_id, # this is hidden so putting it here
-    :is_readonly,
-    :disabled_plugins,
     :user_field_max_length,
     :post_action_types,
     :topic_flag_types,
@@ -25,12 +24,16 @@ class SiteSerializer < ApplicationSerializer
     :wizard_required,
     :topic_featured_link_allowed_category_ids,
     :user_themes,
+    :user_color_schemes,
+    :default_dark_color_scheme,
     :censored_regexp,
-    :shared_drafts_category_id
+    :shared_drafts_category_id,
+    :custom_emoji_translation,
+    :watched_words_replace,
+    :watched_words_link,
+    :categories
   )
 
-  has_many :categories, serializer: SiteCategorySerializer, embed: :objects
-  has_many :trust_levels, embed: :objects
   has_many :archetypes, embed: :objects, serializer: ArchetypeSerializer
   has_many :user_fields, embed: :objects, serializer: UserFieldSerializer
   has_many :auth_providers, embed: :objects, serializer: AuthProviderSerializer
@@ -40,31 +43,51 @@ class SiteSerializer < ApplicationSerializer
       Theme.where('id = :default OR user_selectable',
                     default: SiteSetting.default_theme_id)
         .order(:name)
-        .pluck(:id, :name)
-        .map { |id, n| { theme_id: id, name: n, default: id == SiteSetting.default_theme_id } }
+        .pluck(:id, :name, :color_scheme_id)
+        .map { |id, n, cs| { theme_id: id, name: n, default: id == SiteSetting.default_theme_id, color_scheme_id: cs } }
         .as_json
     end
   end
 
+  def user_color_schemes
+    cache_fragment("user_color_schemes") do
+      schemes = ColorScheme.includes(:color_scheme_colors).where('user_selectable').order(:name)
+      ActiveModel::ArraySerializer.new(schemes, each_serializer: ColorSchemeSelectableSerializer).as_json
+    end
+  end
+
+  def default_dark_color_scheme
+    ColorScheme.find_by_id(SiteSetting.default_dark_mode_color_scheme_id).as_json
+  end
+
   def groups
     cache_anon_fragment("group_names") do
-      object.groups.order(:name).pluck(:id, :name).map { |id, name| { id: id, name: name } }.as_json
+      object.groups.order(:name)
+        .select(:id, :name, :flair_icon, :flair_upload_id, :flair_bg_color, :flair_color)
+        .map do |g|
+          {
+            id: g.id,
+            name: g.name,
+            flair_url: g.flair_url,
+            flair_bg_color: g.flair_bg_color,
+            flair_color: g.flair_color,
+          }
+        end.as_json
     end
   end
 
   def post_action_types
     cache_fragment("post_action_types_#{I18n.locale}") do
-      types = PostActionType.types.values.map { |id| PostActionType.new(id: id) }
+      types = ordered_flags(PostActionType.types.values)
       ActiveModel::ArraySerializer.new(types).as_json
     end
   end
 
   def topic_flag_types
     cache_fragment("post_action_flag_types_#{I18n.locale}") do
-      types = PostActionType.topic_flag_types.values.map { |id| PostActionType.new(id: id) }
+      types = ordered_flags(PostActionType.topic_flag_types.values)
       ActiveModel::ArraySerializer.new(types, each_serializer: TopicFlagTypeSerializer).as_json
     end
-
   end
 
   def default_archetype
@@ -93,14 +116,6 @@ class SiteSerializer < ApplicationSerializer
 
   def uncategorized_category_id
     SiteSetting.uncategorized_category_id
-  end
-
-  def is_readonly
-    Discourse.readonly_mode?
-  end
-
-  def disabled_plugins
-    Discourse.disabled_plugin_names
   end
 
   def user_field_max_length
@@ -155,12 +170,40 @@ class SiteSerializer < ApplicationSerializer
     WordWatcher.word_matcher_regexp(:censor)&.source
   end
 
+  def custom_emoji_translation
+    Plugin::CustomEmoji.translations
+  end
+
   def shared_drafts_category_id
     SiteSetting.shared_drafts_category.to_i
   end
 
   def include_shared_drafts_category_id?
-    scope.can_create_shared_draft?
+    scope.can_see_shared_draft? && SiteSetting.shared_drafts_enabled?
   end
 
+  def watched_words_replace
+    WordWatcher.word_matcher_regexps(:replace)
+  end
+
+  def watched_words_link
+    WordWatcher.word_matcher_regexps(:link)
+  end
+
+  def categories
+    object.categories.map { |c| c.to_h }
+  end
+
+  private
+
+  def ordered_flags(flags)
+    notify_moderators_type = PostActionType.flag_types[:notify_moderators]
+    types = flags
+
+    if notify_moderators_flag = types.index(notify_moderators_type)
+      types.insert(types.length, types.delete_at(notify_moderators_flag))
+    end
+
+    types.map { |id| PostActionType.new(id: id) }
+  end
 end

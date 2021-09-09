@@ -1,12 +1,12 @@
 **Set up Discourse in the cloud in under 30 minutes** with zero knowledge of Rails or Linux shell. One example is [DigitalOcean][do], but these steps will work on any **Docker-compatible** cloud provider or local server.
 
->  🔔 Don't have 30 minutes to set this up? For a flat one-time fee of $99, the community can install Discourse in the cloud for you. [Click here to purchase a self-supported community install](https://www.literatecomputing.com/product/discourse-install/).
+>  🔔 Don't have 30 minutes to set this up? For a flat one-time fee of $150, the community can install Discourse in the cloud for you. [Click here to purchase a self-supported community install](https://www.literatecomputing.com/product/discourse-install/).
 
 ### Create New Cloud Server
 
 Create your new cloud server, for example [on DigitalOcean][do]:
 
-- The default of **Ubuntu 18.04 LTS x64** works fine. At minimum, a 64-bit Linux OS with a kernel version of 3.10+ is required.
+- The default of **the current supported LTS release of Ubuntu Server** works fine. At minimum, a 64-bit Linux OS with a modern kernel version is required.
 
 - The default of **1 GB** RAM works fine for small Discourse communities. We recommend 2 GB RAM for larger communities.
 
@@ -14,7 +14,7 @@ Create your new cloud server, for example [on DigitalOcean][do]:
 
 - Enter your domain `discourse.example.com` as the Droplet name.
 
-Create your new Droplet. You will receive an email with the root password. (However, if you know [how to use SSH keys](https://www.google.com/search?q=digitalocean+ssh+keys), you may not need a password to log in.)
+Create your new Droplet. You may receive an email with the root password, however, [you should set up SSH keys](https://www.google.com/search?q=digitalocean+ssh+keys), as they are more secure.
 
 ### Access Your Cloud Server
 
@@ -22,9 +22,7 @@ Connect to your server via its IP address using SSH, or [Putty][put] on Windows:
 
     ssh root@192.168.1.1
 
-Enter the root password from the email DigitalOcean sent you when the server was set up. You will be prompted to change the root password.
-
-<img src="https://www.discourse.org/images/install/15/ssh-login-terminal.png" width="600px">
+Either use the root password from the email DigitalOcean sent you when the server was set up, or have a valid SSH key configured on your local machine.
 
 ### Install Docker / Git (Optional)
 
@@ -58,7 +56,7 @@ You will need to be root through the rest of the setup and bootstrap process.
 
 - No domain name? We can [recommend NameCheap](https://www.namecheap.com/domains/domain-name-search/), or there are many other [great domain name registrars](https://www.google.com/search?q=best+domain+name+registrars) to choose from.
 
-- Your DNS controls should be accessible from the place where you purchased your domain name. Create a DNS A record for the `discourse.example.com` subdomain in your DNS control panel, pointing to the IP address of your cloud instance where you are installing Discourse.
+- Your DNS controls should be accessible from the place where you purchased your domain name. Create a DNS [`A` record](https://support.dnsimple.com/articles/a-record/) for the `discourse.example.com` hostname in your DNS control panel, pointing to the IP address of your cloud instance where you are installing Discourse.
 
 ### Edit Discourse Configuration
 
@@ -74,7 +72,9 @@ Answer the following questions when prompted:
     SMTP port? [587]: 
     SMTP user name? [user@example.com]: 
     SMTP password? [pa$$word]: 
-    Let's Encrypt account email? (ENTER to skip) [me@example.com]: 
+    notification email address? [noreply@x.y.com]: 
+    Optional email address for Let's Encrypt warnings? (ENTER to skip) [me@example.com]: 
+    Optional Maxmind License key (ENTER to continue without MAXMIND GeoLite2 geolocation database) [1234567890123456]: 
 
 This will generate an `app.yml` configuration file on your behalf, and then kicks off bootstrap. Bootstrapping takes between **2-8 minutes** to set up your Discourse. If you need to change these settings after bootstrapping, you can run `./discourse-setup` again (it will re-use your previous values from the file) or edit `/containers/app.yml` manually with `nano` and then `./launcher rebuild app`, otherwise your changes will not take effect.
 
@@ -154,7 +154,7 @@ Do you want...
 
 - A Content Delivery Network to speed up worldwide access? [Configure a CDN](https://meta.discourse.org/t/enable-a-cdn-for-your-discourse/14857). We recommend [Fastly](http://www.fastly.com/).
 
-- Import old content from vBulletin, PHPbb, Vanilla, Drupal, BBPress, etc? [See our open source importers](https://github.com/discourse/discourse/tree/master/script/import_scripts).
+- Import old content from vBulletin, PHPbb, Vanilla, Drupal, BBPress, etc? [See our open source importers](https://github.com/discourse/discourse/tree/main/script/import_scripts).
 
 - A user friendly [offline page when rebuilding or upgrading?](https://meta.discourse.org/t/adding-an-offline-page-when-rebuilding/45238)
 
@@ -167,4 +167,4 @@ Help us improve this guide! Feel free to ask about it on [meta.discourse.org][me
  [meta]: https://meta.discourse.org
    [do]: https://www.digitalocean.com/?refcode=5fa48ac82415
   [put]: http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html
-  [mailconfig]: https://github.com/discourse/discourse/blob/master/docs/INSTALL-email.md
+  [mailconfig]: https://github.com/discourse/discourse/blob/main/docs/INSTALL-email.md

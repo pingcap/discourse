@@ -35,7 +35,7 @@ RSpec.describe ReviewableScore, type: :model do
       expect(rs.reload).to be_disagreed
       expect(rs.reviewed_by).to eq(moderator)
       expect(rs.reviewed_at).to be_present
-      expect(reviewable.score).to eq(0.0)
+      expect(reviewable.score).to eq(4.0)
     end
 
     it "increases the score by the post action type's score bonus" do
@@ -94,6 +94,16 @@ RSpec.describe ReviewableScore, type: :model do
 
     it "returns 0 for a user with no flags" do
       expect(ReviewableScore.user_accuracy_bonus(user)).to eq(0.0)
+    end
+
+    it "returns 0 for a user with no flags" do
+      system_user = Discourse.system_user
+      stats = system_user.user_stat
+
+      stats.flags_agreed = 10
+      stats.flags_disagreed = 42
+
+      expect(ReviewableScore.user_accuracy_bonus(system_user)).to eq(0.0)
     end
 
     it "returns 0 until the user has made more than 5 flags" do

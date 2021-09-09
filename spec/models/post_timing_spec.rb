@@ -20,12 +20,11 @@ describe PostTiming do
       PostTiming.create!(topic_id: topic_id, user_id: user_id, post_number: post_number, msecs: 0)
     end
 
-    def topic_user(user_id, last_read_post_number, highest_seen_post_number)
+    def topic_user(user_id, last_read_post_number)
       TopicUser.create!(
                         topic_id: topic_id,
                         user_id: user_id,
                         last_read_post_number: last_read_post_number,
-                        highest_seen_post_number: highest_seen_post_number
                        )
     end
 
@@ -37,9 +36,9 @@ describe PostTiming do
       timing(3, 2)
       timing(3, 3)
 
-      _tu_one = topic_user(1, 1, 1)
-      _tu_two = topic_user(2, 2, 2)
-      _tu_three = topic_user(3, 3, 3)
+      _tu_one = topic_user(1, 1)
+      _tu_two = topic_user(2, 2)
+      _tu_three = topic_user(3, 3)
 
       PostTiming.pretend_read(topic_id, 2, 3)
 
@@ -49,15 +48,12 @@ describe PostTiming do
 
       tu = TopicUser.find_by(topic_id: topic_id, user_id: 1)
       expect(tu.last_read_post_number).to eq(1)
-      expect(tu.highest_seen_post_number).to eq(1)
 
       tu = TopicUser.find_by(topic_id: topic_id, user_id: 2)
       expect(tu.last_read_post_number).to eq(3)
-      expect(tu.highest_seen_post_number).to eq(3)
 
       tu = TopicUser.find_by(topic_id: topic_id, user_id: 3)
       expect(tu.last_read_post_number).to eq(3)
-      expect(tu.highest_seen_post_number).to eq(3)
 
     end
   end
@@ -148,6 +144,15 @@ describe PostTiming do
       }.to change(@post, :reads).by(1)
     end
 
+    it "doesn't update the posts read count if the topic is a PM" do
+      pm = Fabricate(:private_message_post).topic
+      @timing_attrs = @timing_attrs.merge(topic_id: pm.id)
+
+      PostTiming.record_timing(@timing_attrs)
+
+      expect(@coding_horror.user_stat.posts_read_count).to eq(0)
+    end
+
     describe 'multiple calls' do
       it 'correctly works' do
         PostTiming.record_timing(@timing_attrs)
@@ -182,6 +187,43 @@ describe PostTiming do
       PostTiming.destroy_for(post.user, [post.topic_id])
 
       expect(post.reload.reads).to eq initial_read_count
+    end
+  end
+
+  describe '.destroy_last_for' do
+    it 'updates first unread for a user correctly when topic is public' do
+      post = Fabricate(:post)
+      post.topic.update!(updated_at: 10.minutes.ago)
+      PostTiming.process_timings(post.user, post.topic_id, 1, [[post.post_number, 100]])
+
+      PostTiming.destroy_last_for(post.user, post.topic_id)
+
+      expect(post.user.user_stat.reload.first_unread_at).to eq_time(post.topic.updated_at)
+    end
+
+    it 'updates first unread for a user correctly when topic is a pm' do
+      post = Fabricate(:private_message_post)
+      post.topic.update!(updated_at: 10.minutes.ago)
+      PostTiming.process_timings(post.user, post.topic_id, 1, [[post.post_number, 100]])
+
+      PostTiming.destroy_last_for(post.user, post.topic_id)
+
+      expect(post.user.user_stat.reload.first_unread_pm_at).to eq_time(post.topic.updated_at)
+    end
+
+    it 'updates first unread for a user correctly when topic is a group pm' do
+      topic = Fabricate(:private_message_topic, updated_at: 10.minutes.ago)
+      post = Fabricate(:post, topic: topic)
+      user = Fabricate(:user)
+      group = Fabricate(:group)
+      group.add(user)
+      topic.allowed_groups << group
+      PostTiming.process_timings(user, topic.id, 1, [[post.post_number, 100]])
+
+      PostTiming.destroy_last_for(user, topic.id)
+
+      expect(GroupUser.find_by(user: user, group: group).first_unread_pm_at)
+        .to eq_time(post.topic.updated_at)
     end
   end
 end

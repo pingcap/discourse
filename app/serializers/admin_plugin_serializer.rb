@@ -3,20 +3,25 @@
 class AdminPluginSerializer < ApplicationSerializer
   attributes :id,
              :name,
+             :about,
              :version,
              :url,
              :admin_route,
              :enabled,
              :enabled_setting,
-             :is_official,
-             :enabled_setting_filter
+             :has_settings,
+             :is_official
 
   def id
-    object.metadata.name
+    object.directory_name
   end
 
   def name
     object.metadata.name
+  end
+
+  def about
+    object.metadata.about
   end
 
   def version
@@ -39,12 +44,8 @@ class AdminPluginSerializer < ApplicationSerializer
     object.enabled_site_setting
   end
 
-  def include_enabled_setting_filter?
-    object.enabled_site_setting_filter.present?
-  end
-
-  def enabled_setting_filter
-    object.enabled_site_setting_filter
+  def has_settings
+    SiteSetting.plugins.values.include?(id)
   end
 
   def include_url?

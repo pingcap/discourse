@@ -13,7 +13,8 @@ class TopicsBulkAction
   def self.operations
     @operations ||= %w(change_category close archive change_notification_level
                        reset_read dismiss_posts delete unlist archive_messages
-                       move_messages_to_inbox change_tags append_tags relist)
+                       move_messages_to_inbox change_tags append_tags remove_tags
+                       relist dismiss_topics)
   end
 
   def self.register_operation(name, &block)
@@ -25,7 +26,7 @@ class TopicsBulkAction
     raise Discourse::InvalidParameters.new(:operation) unless TopicsBulkAction.operations.include?(@operation[:type])
     # careful these are private methods, we need send
     send(@operation[:type])
-    @changed_ids
+    @changed_ids.sort
   end
 
   private
@@ -71,7 +72,7 @@ class TopicsBulkAction
     highest_number_source_column = @user.staff? ? 'highest_staff_post_number' : 'highest_post_number'
     sql = <<~SQL
       UPDATE topic_users tu
-      SET highest_seen_post_number = t.#{highest_number_source_column} , last_read_post_number = t.#{highest_number_source_column}
+      SET last_read_post_number = t.#{highest_number_source_column}
       FROM topics t
       WHERE t.id = tu.topic_id AND tu.user_id = :user_id AND t.id IN (:topic_ids)
     SQL
@@ -80,14 +81,48 @@ class TopicsBulkAction
     @changed_ids.concat @topic_ids
   end
 
+  def dismiss_topics
+    rows = Topic.where(id: @topic_ids)
+      .joins("LEFT JOIN topic_users ON topic_users.topic_id = topics.id AND topic_users.user_id = #{@user.id}")
+      .where("topics.created_at >= ?", dismiss_topics_since_date)
+      .where("topic_users.last_read_post_number IS NULL")
+      .order("topics.created_at DESC")
+      .limit(SiteSetting.max_new_topics).map do |topic|
+      {
+        topic_id: topic.id,
+        user_id: @user.id,
+        created_at: Time.zone.now
+      }
+    end
+    DismissedTopicUser.insert_all(rows) if rows.present?
+    @changed_ids = rows.map { |row| row[:topic_id] }
+  end
+
   def reset_read
     PostTiming.destroy_for(@user.id, @topic_ids)
   end
 
   def change_category
-    topics.each do |t|
-      if guardian.can_edit?(t)
-        @changed_ids << t.id if t.change_category_to_id(@operation[:category_id])
+    updatable_topics = topics.where.not(category_id: @operation[:category_id])
+
+    if SiteSetting.create_revision_on_bulk_topic_moves
+      opts = {
+        bypass_bump: true,
+        validate_post: false,
+        bypass_rate_limiter: true
+      }
+
+      updatable_topics.each do |t|
+        if guardian.can_edit?(t)
+          changes = { category_id: @operation[:category_id] }
+          @changed_ids << t.id if t.first_post.revise(@user, changes, opts)
+        end
+      end
+    else
+      updatable_topics.each do |t|
+        if guardian.can_edit?(t)
+          @changed_ids << t.id if t.change_category_to_id(@operation[:category_id])
+        end
       end
     end
   end
@@ -176,12 +211,35 @@ class TopicsBulkAction
     end
   end
 
+  def remove_tags
+    topics.each do |t|
+      if guardian.can_edit?(t)
+        TopicTag.where(topic_id: t.id).delete_all
+        @changed_ids << t.id
+      end
+    end
+  end
+
   def guardian
     @guardian ||= Guardian.new(@user)
   end
 
   def topics
     @topics ||= Topic.where(id: @topic_ids)
+  end
+
+  def dismiss_topics_since_date
+    new_topic_duration_minutes = @user.user_option&.new_topic_duration_minutes || SiteSetting.default_other_new_topic_duration_minutes
+    setting_date =
+      case new_topic_duration_minutes
+      when User::NewTopicDuration::LAST_VISIT
+        @user.previous_visit_at || @user.created_at
+      when User::NewTopicDuration::ALWAYS
+        @user.created_at
+      else
+        new_topic_duration_minutes.minutes.ago
+      end
+    [setting_date, @user.created_at, Time.at(SiteSetting.min_new_topics_time).to_datetime].max
   end
 
 end

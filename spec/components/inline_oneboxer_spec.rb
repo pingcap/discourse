@@ -26,25 +26,30 @@ describe InlineOneboxer do
     fab!(:topic) { Fabricate(:topic) }
 
     before do
-      InlineOneboxer.purge(topic.url)
+      InlineOneboxer.invalidate(topic.url)
     end
 
     it "puts an entry in the cache" do
-      expect(InlineOneboxer.cache_lookup(topic.url)).to be_blank
+      SiteSetting.enable_inline_onebox_on_all_domains = true
+      url = "https://example.com/random-url"
+      stub_request(:get, url).to_return(status: 200, body: "<html><head><title>a blog</title></head></html>")
 
-      result = InlineOneboxer.lookup(topic.url)
+      InlineOneboxer.invalidate(url)
+      expect(InlineOneboxer.cache_lookup(url)).to be_blank
+
+      result = InlineOneboxer.lookup(url)
       expect(result).to be_present
 
-      cached = InlineOneboxer.cache_lookup(topic.url)
-      expect(cached[:url]).to eq(topic.url)
-      expect(cached[:title]).to eq(topic.title)
+      cached = InlineOneboxer.cache_lookup(url)
+      expect(cached[:url]).to eq(url)
+      expect(cached[:title]).to eq('a blog')
     end
 
     it "puts an entry in the cache for failed onebox" do
       SiteSetting.enable_inline_onebox_on_all_domains = true
       url = "https://example.com/random-url"
 
-      InlineOneboxer.purge(url)
+      InlineOneboxer.invalidate(url)
       expect(InlineOneboxer.cache_lookup(url)).to be_blank
 
       result = InlineOneboxer.lookup(url)
@@ -57,6 +62,39 @@ describe InlineOneboxer do
   end
 
   context ".lookup" do
+    let(:category) { Fabricate(:private_category, group: Group[:staff]) }
+    let(:category2) { Fabricate(:private_category, group: Group[:staff]) }
+
+    let(:admin) { Fabricate(:admin) }
+
+    it "can lookup private topics if in same category" do
+      topic = Fabricate(:topic, category: category)
+      topic1 = Fabricate(:topic, category: category)
+      topic2 = Fabricate(:topic, category: category2)
+
+      # Link to `topic` from new topic (same category)
+      onebox = InlineOneboxer.lookup(topic.url, user_id: admin.id, category_id: category.id, skip_cache: true)
+      expect(onebox).to be_present
+      expect(onebox[:url]).to eq(topic.url)
+      expect(onebox[:title]).to eq(topic.title)
+
+      # Link to `topic` from `topic`
+      onebox = InlineOneboxer.lookup(topic.url, user_id: admin.id, category_id: topic.category_id, topic_id: topic.id, skip_cache: true)
+      expect(onebox).to be_present
+      expect(onebox[:url]).to eq(topic.url)
+      expect(onebox[:title]).to eq(topic.title)
+
+      # Link to `topic` from `topic1` (same category)
+      onebox = InlineOneboxer.lookup(topic.url, user_id: admin.id, category_id: topic1.category_id, topic_id: topic1.id, skip_cache: true)
+      expect(onebox).to be_present
+      expect(onebox[:url]).to eq(topic.url)
+      expect(onebox[:title]).to eq(topic.title)
+
+      # Link to `topic` from `topic2` (different category)
+      onebox = InlineOneboxer.lookup(topic.url, user_id: admin.id, category_id: topic2.category_id, topic_id: topic2.id, skip_cache: true)
+      expect(onebox).to be_blank
+    end
+
     it "can lookup one link at a time" do
       topic = Fabricate(:topic)
       onebox = InlineOneboxer.lookup(topic.url, skip_cache: true)
@@ -78,7 +116,45 @@ describe InlineOneboxer do
       expect(onebox[:title]).to eq("Hello 🍕 with an emoji")
     end
 
-    it "will not crawl domains that aren't whitelisted" do
+    it "will append the post number post author's username to the title" do
+      topic = Fabricate(:topic, title: "Inline oneboxer")
+      Fabricate(:post, topic: topic) # OP
+      Fabricate(:post, topic: topic)
+      lookup = -> (number) do
+        InlineOneboxer.lookup(
+          "#{topic.url}/#{number}",
+          skip_cache: true
+        )[:title]
+      end
+      posts = topic.reload.posts.order("post_number ASC")
+
+      expect(lookup.call(0)).to eq("Inline oneboxer")
+      expect(lookup.call(1)).to eq("Inline oneboxer")
+      expect(lookup.call(2)).to eq("Inline oneboxer - #2 by #{posts[1].user.username}")
+
+      Fabricate(:post, topic: topic, post_type: Post.types[:whisper])
+      posts = topic.reload.posts.order("post_number ASC")
+      # because the last post in the topic is a whisper, the onebox title
+      # will be the first regular post directly before our whisper
+      expect(lookup.call(3)).to eq("Inline oneboxer - #2 by #{posts[1].user.username}")
+      expect(lookup.call(99)).to eq("Inline oneboxer - #2 by #{posts[1].user.username}")
+
+      Fabricate(:post, topic: topic)
+      posts = topic.reload.posts.order("post_number ASC")
+      # username not appended to whisper posts
+      expect(lookup.call(3)).to eq("Inline oneboxer - #3")
+      expect(lookup.call(4)).to eq("Inline oneboxer - #4 by #{posts[3].user.username}")
+      expect(lookup.call(99)).to eq("Inline oneboxer - #4 by #{posts[3].user.username}")
+    end
+
+    it "will not crawl domains that aren't allowlisted" do
+      SiteSetting.enable_inline_onebox_on_all_domains = false
+      onebox = InlineOneboxer.lookup("https://eviltrout.com", skip_cache: true)
+      expect(onebox).to be_blank
+    end
+
+    it "will not crawl domains that are blocked" do
+      SiteSetting.blocked_onebox_domains = "eviltrout.com"
       onebox = InlineOneboxer.lookup("https://eviltrout.com", skip_cache: true)
       expect(onebox).to be_blank
     end
@@ -115,8 +191,8 @@ describe InlineOneboxer do
       expect(onebox[:title]).to eq(nil)
     end
 
-    it "will lookup whitelisted domains" do
-      SiteSetting.inline_onebox_domains_whitelist = "eviltrout.com"
+    it "will lookup allowlisted domains" do
+      SiteSetting.allowed_inline_onebox_domains = "eviltrout.com"
       RetrieveTitle.stubs(:crawl).returns("Evil Trout's Blog")
 
       onebox = InlineOneboxer.lookup(

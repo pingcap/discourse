@@ -29,13 +29,14 @@ class TopicTimestampChanger
         end
       end
 
+      @topic.reset_bumped_at
       update_topic(last_posted_at)
 
       yield(@topic) if block_given?
     end
 
     # Burst the cache for stats
-    [AdminDashboardData, About].each { |klass| $redis.del klass.stats_cache_key }
+    [AdminDashboardData, About].each { |klass| Discourse.redis.del klass.stats_cache_key }
   end
 
   private
@@ -48,7 +49,6 @@ class TopicTimestampChanger
     @topic.update(
       created_at: @timestamp,
       updated_at: @timestamp,
-      bumped_at: @timestamp,
       last_posted_at: last_posted_at
     )
   end

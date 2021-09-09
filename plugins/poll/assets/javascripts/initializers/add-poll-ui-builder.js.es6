@@ -1,9 +1,10 @@
-import { withPluginApi } from "discourse/lib/plugin-api";
 import discourseComputed from "discourse-common/utils/decorators";
 import showModal from "discourse/lib/show-modal";
+import { withPluginApi } from "discourse/lib/plugin-api";
 
 function initializePollUIBuilder(api) {
   api.modifyClass("controller:composer", {
+    pluginId: "discourse-poll-ui-builder",
     @discourseComputed(
       "siteSettings.poll_enabled",
       "siteSettings.poll_minimum_trust_level_to_create",
@@ -22,8 +23,8 @@ function initializePollUIBuilder(api) {
     actions: {
       showPollBuilder() {
         showModal("poll-ui-builder").set("toolbarEvent", this.toolbarEvent);
-      }
-    }
+      },
+    },
   });
 
   api.addToolbarPopupMenuOptionsCallback(() => {
@@ -31,7 +32,7 @@ function initializePollUIBuilder(api) {
       action: "showPollBuilder",
       icon: "chart-bar",
       label: "poll.ui_builder.title",
-      condition: "canBuildPoll"
+      condition: "canBuildPoll",
     };
   });
 }
@@ -41,5 +42,5 @@ export default {
 
   initialize() {
     withPluginApi("0.8.7", initializePollUIBuilder);
-  }
+  },
 };

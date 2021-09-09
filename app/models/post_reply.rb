@@ -2,9 +2,9 @@
 
 class PostReply < ActiveRecord::Base
   belongs_to :post
-  belongs_to :reply, class_name: 'Post'
+  belongs_to :reply, foreign_key: :reply_post_id, class_name: 'Post'
 
-  validates_uniqueness_of :reply_id, scope: :post_id
+  validates_uniqueness_of :reply_post_id, scope: :post_id
   validate :ensure_same_topic
 
   private
@@ -23,13 +23,13 @@ end
 #
 # Table name: post_replies
 #
-#  post_id    :integer
-#  reply_id   :integer
-#  created_at :datetime         not null
-#  updated_at :datetime         not null
+#  post_id       :integer
+#  created_at    :datetime         not null
+#  updated_at    :datetime         not null
+#  reply_post_id :integer
 #
 # Indexes
 #
-#  index_post_replies_on_post_id_and_reply_id  (post_id,reply_id) UNIQUE
-#  index_post_replies_on_reply_id              (reply_id)
+#  index_post_replies_on_post_id_and_reply_post_id  (post_id,reply_post_id) UNIQUE
+#  index_post_replies_on_reply_post_id              (reply_post_id)
 #

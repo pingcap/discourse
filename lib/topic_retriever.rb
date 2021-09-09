@@ -4,8 +4,8 @@ class TopicRetriever
 
   def initialize(embed_url, opts = nil)
     @embed_url = embed_url
-    @author_username = opts[:author_username]
     @opts = opts || {}
+    @author_username = @opts[:author_username]
   end
 
   def retrieve
@@ -15,7 +15,7 @@ class TopicRetriever
   private
 
   def invalid_url?
-    !EmbeddableHost.url_allowed?(@embed_url)
+    !EmbeddableHost.url_allowed?(@embed_url.strip)
   end
 
   def retrieved_recently?
@@ -24,8 +24,8 @@ class TopicRetriever
 
     # Throttle other users to once every 60 seconds
     retrieved_key = "retrieved_topic"
-    if $redis.setnx(retrieved_key, "1")
-      $redis.expire(retrieved_key, 60)
+    if Discourse.redis.setnx(retrieved_key, "1")
+      Discourse.redis.expire(retrieved_key, 60)
       return false
     end
 
@@ -41,7 +41,7 @@ class TopicRetriever
 
   def fetch_http
     if @author_username.nil?
-      username = SiteSetting.embed_by_username.downcase
+      username = SiteSetting.embed_by_username.presence || SiteSetting.site_contact_username.presence || Discourse.system_user.username
     else
       username = @author_username
     end

@@ -1,20 +1,24 @@
 .discourse-local-date {
+  > * {
+    pointer-events: none;
+  }
+
   &.cooked-date {
-    color: $primary;
+    color: var(--primary);
     cursor: pointer;
-    border-bottom: 1px dashed $primary-medium;
+    border-bottom: 1px dashed var(--primary-medium);
     white-space: nowrap;
 
     .d-icon {
-      color: $primary;
+      color: var(--primary);
     }
 
     &.past {
-      border-bottom-color: $primary-low-mid;
+      border-bottom-color: var(--primary-low-mid);
     }
 
     &.past[data-countdown] {
-      color: $primary-medium;
+      color: var(--primary-medium);
     }
   }
 }
@@ -32,7 +36,7 @@
       }
 
       &.current {
-        background: $tertiary-low;
+        background: var(--tertiary-low);
       }
     }
   }
@@ -62,6 +66,7 @@
 }
 
 .discourse-local-dates-create-modal {
+  box-sizing: border-box;
   min-height: 320px;
   display: flex;
   flex-direction: row;
@@ -69,7 +74,7 @@
 
   .picker-panel {
     padding: 5px;
-    border: 1px solid $primary-low;
+    border: 1px solid var(--primary-low);
   }
 
   .date-picker {
@@ -105,13 +110,13 @@
 
         &.is-expanded {
           .select-kit-header {
-            border: 1px solid $primary-medium;
+            border: 1px solid var(--primary-medium);
           }
         }
 
         .select-kit-header {
           padding: 0.5em 0.5em;
-          border: 1px solid $primary-low;
+          border: 1px solid var(--primary-low);
 
           .d-icon {
             margin-right: 1em;
@@ -126,17 +131,17 @@
       .date-time-control {
         position: relative;
         display: flex;
-        border: 1px solid $primary-low;
+        border: 1px solid var(--primary-low);
 
         &.is-filled,
         &.is-selected {
           .date-time {
-            color: $primary;
-            background: $secondary;
+            color: var(--primary);
+            background: var(--secondary);
           }
 
           .d-icon {
-            color: $primary-high;
+            color: var(--primary-high);
           }
         }
 
@@ -148,7 +153,7 @@
           }
 
           &.is-selected {
-            border-color: $tertiary;
+            border-color: var(--tertiary);
           }
         }
 
@@ -162,13 +167,13 @@
           }
 
           &.is-selected {
-            border-color: $tertiary;
+            border-color: var(--tertiary);
           }
         }
 
         .date-time {
-          color: $primary-medium;
-          background: $primary-very-low;
+          color: var(--primary-medium);
+          background: var(--primary-very-low);
         }
 
         .d-icon {
@@ -178,7 +183,7 @@
           left: 0.5em;
           top: 0;
           bottom: 0;
-          color: $primary-medium;
+          color: var(--primary-medium);
         }
 
         .delete-to-date {
@@ -189,7 +194,7 @@
           width: 30px;
           top: 0;
           bottom: 0;
-          color: $primary-high;
+          color: var(--primary-high);
           border-radius: 0 0 5px 0;
         }
 
@@ -200,7 +205,7 @@
           flex: 1;
           @include ellipsis;
           width: 100%;
-          text-align: left;
+          justify-content: flex-start;
         }
       }
 
@@ -210,7 +215,7 @@
 
       .picker-panel {
         z-index: 1;
-        background: $secondary;
+        background: var(--secondary);
         width: 200px;
         box-sizing: border-box;
         margin-left: 1em;
@@ -223,20 +228,19 @@
         margin-top: 1em;
         align-items: center;
         padding: 0.25em;
-        border-top: 1px solid $primary-low-mid;
+        border-top: 1px solid var(--primary-low-mid);
         box-sizing: border-box;
 
         .d-icon {
-          color: $primary-medium;
+          color: var(--primary-medium);
+          margin-right: 0.5em;
         }
 
         .time-picker {
-          outline: none;
           box-shadow: none;
           margin: 0;
           box-sizing: border-box;
           width: 100%;
-          border: 0;
         }
       }
     }
@@ -283,7 +287,7 @@
     margin: 0;
     .format {
       .previewed-format {
-        color: $primary-medium;
+        color: var(--primary-medium);
       }
     }
   }

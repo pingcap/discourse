@@ -4,10 +4,10 @@ require 'rails_helper'
 
 describe WordWatcher do
 
-  let(:raw) { "Do you like liquorice?\n\nI really like them. One could even say that I am *addicted* to liquorice. Anf if\nyou can mix it up with some anise, then I'm in heaven ;)" }
+  let(:raw) { "Do you like liquorice?\n\nI really like them. One could even say that I am *addicted* to liquorice. And if\nyou can mix it up with some anise, then I'm in heaven ;)" }
 
   after do
-    $redis.flushall
+    Discourse.redis.flushdb
   end
 
   describe '.word_matcher_regexp' do

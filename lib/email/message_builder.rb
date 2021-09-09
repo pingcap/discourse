@@ -6,7 +6,7 @@ module Email
   class MessageBuilder
     attr_reader :template_args
 
-    ALLOW_REPLY_BY_EMAIL_HEADER = 'X-Discourse-Allow-Reply-By-Email'.freeze
+    ALLOW_REPLY_BY_EMAIL_HEADER = 'X-Discourse-Allow-Reply-By-Email'
 
     def initialize(to, opts = nil)
       @to = to
@@ -51,7 +51,18 @@ module Email
     end
 
     def subject
-      if @opts[:use_site_subject]
+      if @opts[:template] &&
+          TranslationOverride.exists?(locale: I18n.locale, translation_key: "#{@opts[:template]}.subject_template")
+        augmented_template_args = @template_args.merge({
+          site_name: @template_args[:email_prefix],
+          optional_re: @opts[:add_re_to_subject] ? I18n.t('subject_re') : '',
+          optional_pm: @opts[:private_reply] ? @template_args[:subject_pm] : '',
+          optional_cat: @template_args[:show_category_in_subject] ? "[#{@template_args[:show_category_in_subject]}] " : '',
+          optional_tags: @template_args[:show_tags_in_subject] ? "#{@template_args[:show_tags_in_subject]} " : '',
+          topic_title: @template_args[:topic_title] ? @template_args[:topic_title] : '',
+        })
+        subject = I18n.t("#{@opts[:template]}.subject_template", augmented_template_args)
+      elsif @opts[:use_site_subject]
         subject = String.new(SiteSetting.email_subject)
         subject.gsub!("%{site_name}", @template_args[:email_prefix])
         subject.gsub!("%{optional_re}", @opts[:add_re_to_subject] ? I18n.t('subject_re') : '')
@@ -124,13 +135,18 @@ module Email
     end
 
     def build_args
-      {
+      args = {
         to: @to,
         subject: subject,
         body: body,
         charset: 'UTF-8',
-        from: from_value
+        from: from_value,
+        cc: @opts[:cc]
       }
+
+      args[:delivery_method_options] = @opts[:delivery_method_options] if @opts[:delivery_method_options]
+
+      args
     end
 
     def header_args
@@ -146,11 +162,24 @@ module Email
       # please, don't send us automatic responses...
       result['X-Auto-Response-Suppress'] = 'All'
 
-      if allow_reply_by_email?
-        result[ALLOW_REPLY_BY_EMAIL_HEADER] = true
-        result['Reply-To'] = reply_by_email_address
-      else
+      if !allow_reply_by_email?
+        # This will end up being the notification_email, which is a
+        # noreply address.
         result['Reply-To'] = from_value
+      else
+
+        # The only reason we use from address for reply to is for group
+        # SMTP emails, where the person will be replying to the group's
+        # email_username.
+        if !@opts[:use_from_address_for_reply_to]
+          result[ALLOW_REPLY_BY_EMAIL_HEADER] = true
+          result['Reply-To'] = reply_by_email_address
+        else
+          # No point in adding a reply-to header if it is going to be identical
+          # to the from address/alias. If the from option is not present, then
+          # the default reply-to address is used.
+          result['Reply-To'] = from_value if from_value != alias_email(@opts[:from])
+        end
       end
 
       result.merge(MessageBuilder.custom_headers(SiteSetting.email_custom_headers))

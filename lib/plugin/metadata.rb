@@ -13,14 +13,15 @@ class Plugin::Metadata
     "discourse-adplugin",
     "discourse-affiliate",
     "discourse-akismet",
+    "discourse-algolia",
     "discourse-assign",
     "discourse-auto-deactivate",
-    "discourse-backup-uploads-to-s3",
     "discourse-bbcode",
     "discourse-bbcode-color",
     "discourse-cakeday",
     "discourse-canned-replies",
     "discourse-calendar",
+    "discourse-categories-suppressed",
     "discourse-characters-required",
     "discourse-chat-integration",
     "discourse-checklist",
@@ -28,6 +29,7 @@ class Plugin::Metadata
     "discourse-crowd",
     "discourse-data-explorer",
     "discourse-details",
+    "discourse-docs",
     "discourse-encrypt",
     "discourse-footnote",
     "discourse-github",
@@ -44,7 +46,7 @@ class Plugin::Metadata
     "discourse-no-bump",
     "discourse-oauth2-basic",
     "discourse-patreon",
-    "discourse-perspective",
+    "discourse-perspective-api",
     "discourse-plugin-discord-auth",
     "discourse-plugin-linkedin-auth",
     "discourse-plugin-office365-auth",
@@ -60,8 +62,10 @@ class Plugin::Metadata
     "discourse-sitemap",
     "discourse-solved",
     "discourse-spoiler-alert",
+    "discourse-subscriptions",
     "discourse-user-notes",
-    "discourse-styleguide",
+    "styleguide",
+    "discourse-teambuild",
     "discourse-tooltips",
     "discourse-translator",
     "discourse-user-card-badges",
@@ -69,12 +73,16 @@ class Plugin::Metadata
     "discourse-yearly-review",
     "discourse-openid-connect",
     "discourse-restricted-replies",
+    "discourse-rss-polling",
+    "discourse-zendesk-plugin",
     "docker_manager",
     "lazy-yt",
-    "poll"
+    "poll",
+    "discourse-fontawesome-pro",
+    "discourse-staff-alias",
   ])
 
-  FIELDS ||= [:name, :about, :version, :authors, :url, :required_version]
+  FIELDS ||= [:name, :about, :version, :authors, :contact_emails, :url, :required_version, :transpile_js]
   attr_accessor(*FIELDS)
 
   def self.parse(text)

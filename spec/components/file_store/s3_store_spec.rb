@@ -5,47 +5,30 @@ require 'file_store/s3_store'
 require 'file_store/local_store'
 
 describe FileStore::S3Store do
-
   let(:store) { FileStore::S3Store.new }
-  let(:s3_helper) { store.instance_variable_get(:@s3_helper) }
-  fab!(:upload) { Fabricate(:upload) }
-  let(:uploaded_file) { file_from_fixtures("logo.png") }
+  let(:s3_helper) { store.s3_helper }
+  let(:client) { Aws::S3::Client.new(stub_responses: true) }
+  let(:resource) { Aws::S3::Resource.new(client: client) }
+  let(:s3_bucket) { resource.bucket("s3-upload-bucket") }
+  let(:s3_object) { stub }
 
   fab!(:optimized_image) { Fabricate(:optimized_image) }
   let(:optimized_image_file) { file_from_fixtures("logo.png") }
-
-  before(:each) do
-    SiteSetting.s3_upload_bucket = "s3-upload-bucket"
-    SiteSetting.s3_access_key_id = "s3-access-key-id"
-    SiteSetting.s3_secret_access_key = "s3-secret-access-key"
-    SiteSetting.enable_s3_uploads = true
+  let(:uploaded_file) { file_from_fixtures("logo.png") }
+  fab!(:upload) do
+    Fabricate(:upload, sha1: Digest::SHA1.hexdigest('secret image string'))
   end
 
-  shared_context 's3 helpers' do
-    fab!(:upload) do
-      Fabricate(:upload, sha1: Digest::SHA1.hexdigest('secreet image string'))
-    end
-
-    let(:store) { FileStore::S3Store.new }
-    let(:client) { Aws::S3::Client.new(stub_responses: true) }
-    let(:resource) { Aws::S3::Resource.new(client: client) }
-    let(:s3_bucket) { resource.bucket("s3-upload-bucket") }
-    let(:s3_helper) { store.instance_variable_get(:@s3_helper) }
-
-    before do
-      SiteSetting.s3_region = 'us-west-1'
-    end
+  before do
+    setup_s3
+    SiteSetting.s3_region = 'us-west-1'
   end
 
   context 'uploading to s3' do
-    include_context "s3 helpers"
-
-    let(:s3_object) { stub }
     let(:etag) { "etag" }
 
     describe "#store_upload" do
       it "returns an absolute schemaless url" do
-        store.expects(:get_depth_for).with(upload.id).returns(0)
         s3_helper.expects(:s3_bucket).returns(s3_bucket).at_least_once
         s3_bucket.expects(:object).with("original/1X/#{upload.sha1}.png").returns(s3_object)
         s3_object.expects(:put).with(
@@ -67,7 +50,6 @@ describe FileStore::S3Store do
         end
 
         it "returns an absolute schemaless url" do
-          store.expects(:get_depth_for).with(upload.id).returns(0)
           s3_helper.expects(:s3_bucket).returns(s3_bucket)
 
           s3_bucket.expects(:object).with("discourse-uploads/original/1X/#{upload.sha1}.png").returns(s3_object)
@@ -83,7 +65,7 @@ describe FileStore::S3Store do
         it "saves secure attachment using private ACL" do
           SiteSetting.prevent_anons_from_downloading_files = true
           SiteSetting.authorized_extensions = "pdf|png|jpg|gif"
-          upload.update!(original_filename: "small.pdf", extension: "pdf", secure: true)
+          upload = Fabricate(:upload, original_filename: "small.pdf", extension: "pdf", secure: true)
 
           s3_helper.expects(:s3_bucket).returns(s3_bucket)
           s3_bucket.expects(:object).with("original/1X/#{upload.sha1}.pdf").returns(s3_object)
@@ -91,7 +73,7 @@ describe FileStore::S3Store do
             acl: "private",
             cache_control: "max-age=31556952, public, immutable",
             content_type: "application/pdf",
-            content_disposition: "attachment; filename=\"#{upload.original_filename}\"",
+            content_disposition: "attachment; filename=\"#{upload.original_filename}\"; filename*=UTF-8''#{upload.original_filename}",
             body: uploaded_file).returns(Aws::S3::Types::PutObjectOutput.new(etag: "\"#{etag}\""))
 
           expect(store.store_upload(uploaded_file, upload)).to eq(
@@ -125,7 +107,6 @@ describe FileStore::S3Store do
       end
 
       it "returns an absolute schemaless url" do
-        store.expects(:get_depth_for).with(optimized_image.upload.id).returns(0)
         s3_helper.expects(:s3_bucket).returns(s3_bucket)
         path = "optimized/1X/#{optimized_image.upload.sha1}_#{OptimizedImage::VERSION}_100x200.png"
 
@@ -143,7 +124,6 @@ describe FileStore::S3Store do
         end
 
         it "returns an absolute schemaless url" do
-          store.expects(:get_depth_for).with(optimized_image.upload.id).returns(0)
           s3_helper.expects(:s3_bucket).returns(s3_bucket)
           path = "discourse-uploads/optimized/1X/#{optimized_image.upload.sha1}_#{OptimizedImage::VERSION}_100x200.png"
 
@@ -159,8 +139,6 @@ describe FileStore::S3Store do
   end
 
   context 'copying files in S3' do
-    include_context "s3 helpers"
-
     describe '#copy_file' do
       it "copies the from in S3 with the right paths" do
         s3_helper.expects(:s3_bucket).returns(s3_bucket)
@@ -176,9 +154,7 @@ describe FileStore::S3Store do
 
         s3_bucket.expects(:object).with(destination).returns(s3_object)
 
-        s3_object.expects(:copy_from).with(
-          copy_source: "s3-upload-bucket/#{source}"
-        )
+        expect_copy_from(s3_object, "s3-upload-bucket/#{source}")
 
         store.copy_file(upload.url, source, destination)
       end
@@ -186,17 +162,14 @@ describe FileStore::S3Store do
   end
 
   context 'removal from s3' do
-    include_context "s3 helpers"
-
     describe "#remove_upload" do
       it "removes the file from s3 with the right paths" do
-        store.expects(:get_depth_for).with(upload.id).returns(0)
         s3_helper.expects(:s3_bucket).returns(s3_bucket).at_least_once
         upload.update!(url: "//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com/original/1X/#{upload.sha1}.png")
         s3_object = stub
 
         s3_bucket.expects(:object).with("tombstone/original/1X/#{upload.sha1}.png").returns(s3_object)
-        s3_object.expects(:copy_from).with(copy_source: "s3-upload-bucket/original/1X/#{upload.sha1}.png")
+        expect_copy_from(s3_object, "s3-upload-bucket/original/1X/#{upload.sha1}.png")
         s3_bucket.expects(:object).with("original/1X/#{upload.sha1}.png").returns(s3_object)
         s3_object.expects(:delete)
 
@@ -208,13 +181,12 @@ describe FileStore::S3Store do
         upload = optimized.upload
         path = "optimized/1X/#{upload.sha1}_#{optimized.version}_#{optimized.width}x#{optimized.height}.png"
 
-        store.expects(:get_depth_for).with(upload.id).returns(0)
         s3_helper.expects(:s3_bucket).returns(s3_bucket).at_least_once
         optimized.update!(url: "//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com/#{path}")
         s3_object = stub
 
         s3_bucket.expects(:object).with("tombstone/#{path}").returns(s3_object)
-        s3_object.expects(:copy_from).with(copy_source: "s3-upload-bucket/#{path}")
+        expect_copy_from(s3_object, "s3-upload-bucket/#{path}")
         s3_bucket.expects(:object).with(path).returns(s3_object)
         s3_object.expects(:delete)
 
@@ -227,13 +199,12 @@ describe FileStore::S3Store do
         end
 
         it "removes the file from s3 with the right paths" do
-          store.expects(:get_depth_for).with(upload.id).returns(0)
           s3_helper.expects(:s3_bucket).returns(s3_bucket).at_least_once
           upload.update!(url: "//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com/discourse-uploads/original/1X/#{upload.sha1}.png")
           s3_object = stub
 
           s3_bucket.expects(:object).with("discourse-uploads/tombstone/original/1X/#{upload.sha1}.png").returns(s3_object)
-          s3_object.expects(:copy_from).with(copy_source: "s3-upload-bucket/discourse-uploads/original/1X/#{upload.sha1}.png")
+          expect_copy_from(s3_object, "s3-upload-bucket/discourse-uploads/original/1X/#{upload.sha1}.png")
           s3_bucket.expects(:object).with("discourse-uploads/original/1X/#{upload.sha1}.png").returns(s3_object)
           s3_object.expects(:delete)
 
@@ -243,15 +214,13 @@ describe FileStore::S3Store do
     end
 
     describe "#remove_optimized_image" do
-      fab!(:optimized_image) { Fabricate(:optimized_image, upload: upload) }
-
       let(:image_path) do
         FileStore::BaseStore.new.get_path_for_optimized_image(optimized_image)
       end
 
       before do
         optimized_image.update!(
-          url: "//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com#{image_path}"
+          url: "//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com/#{image_path}"
         )
       end
 
@@ -260,7 +229,7 @@ describe FileStore::S3Store do
         s3_object = stub
 
         s3_bucket.expects(:object).with("tombstone/#{image_path}").returns(s3_object)
-        s3_object.expects(:copy_from).with(copy_source: "s3-upload-bucket/#{image_path}")
+        expect_copy_from(s3_object, "s3-upload-bucket/#{image_path}")
         s3_bucket.expects(:object).with("#{image_path}").returns(s3_object)
         s3_object.expects(:delete)
 
@@ -272,6 +241,12 @@ describe FileStore::S3Store do
           SiteSetting.s3_upload_bucket = "s3-upload-bucket/discourse-uploads"
         end
 
+        before do
+          optimized_image.update!(
+            url: "//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com/discourse-uploads/#{image_path}"
+          )
+        end
+
         it "removes the file from s3 with the right paths" do
           s3_helper.expects(:s3_bucket).returns(s3_bucket).at_least_once
           s3_object = stub
@@ -280,9 +255,7 @@ describe FileStore::S3Store do
             .with("discourse-uploads/tombstone/#{image_path}")
             .returns(s3_object)
 
-          s3_object.expects(:copy_from).with(
-            copy_source: "s3-upload-bucket/discourse-uploads/#{image_path}"
-          )
+          expect_copy_from(s3_object, "s3-upload-bucket/discourse-uploads/#{image_path}")
 
           s3_bucket.expects(:object).with(
             "discourse-uploads/#{image_path}"
@@ -297,14 +270,22 @@ describe FileStore::S3Store do
   end
 
   describe ".has_been_uploaded?" do
+    it "doesn't crash for invalid URLs" do
+      expect(store.has_been_uploaded?("https://site.discourse.com/#bad#6")).to eq(false)
+    end
+
+    it "doesn't crash if URL contains non-ascii characters" do
+      expect(store.has_been_uploaded?("//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com/漢1337.png")).to eq(true)
+      expect(store.has_been_uploaded?("//s3-upload-bucket.s3.amazonaws.com/漢1337.png")).to eq(false)
+    end
 
     it "identifies S3 uploads" do
-      expect(store.has_been_uploaded?("//s3-upload-bucket.s3.dualstack.us-east-1.amazonaws.com/1337.png")).to eq(true)
+      expect(store.has_been_uploaded?("//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com/1337.png")).to eq(true)
     end
 
     it "does not match other s3 urls" do
       expect(store.has_been_uploaded?("//s3-upload-bucket.s3.amazonaws.com/1337.png")).to eq(false)
-      expect(store.has_been_uploaded?("//s3-upload-bucket.s3-us-east-1.amazonaws.com/1337.png")).to eq(false)
+      expect(store.has_been_uploaded?("//s3-upload-bucket.s3-us-west-1.amazonaws.com/1337.png")).to eq(false)
       expect(store.has_been_uploaded?("//s3.amazonaws.com/s3-upload-bucket/1337.png")).to eq(false)
       expect(store.has_been_uploaded?("//s4_upload_bucket.s3.amazonaws.com/1337.png")).to eq(false)
     end
@@ -313,7 +294,7 @@ describe FileStore::S3Store do
 
   describe ".absolute_base_url" do
     it "returns a lowercase schemaless absolute url" do
-      expect(store.absolute_base_url).to eq("//s3-upload-bucket.s3.dualstack.us-east-1.amazonaws.com")
+      expect(store.absolute_base_url).to eq("//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com")
     end
 
     it "uses the proper endpoint" do
@@ -338,12 +319,10 @@ describe FileStore::S3Store do
   end
 
   describe ".purge_tombstone" do
-
     it "updates tombstone lifecycle" do
       s3_helper.expects(:update_tombstone_lifecycle)
       store.purge_tombstone(1.day)
     end
-
   end
 
   describe ".path_for" do
@@ -365,16 +344,14 @@ describe FileStore::S3Store do
   end
 
   context 'update ACL' do
-    include_context "s3 helpers"
-    let(:s3_object) { stub }
-
     before do
       SiteSetting.authorized_extensions = "pdf|png"
     end
 
     describe ".update_upload_ACL" do
+      let(:upload) { Fabricate(:upload, original_filename: "small.pdf", extension: "pdf") }
+
       it "sets acl to public by default" do
-        upload.update!(original_filename: "small.pdf", extension: "pdf")
         s3_helper.expects(:s3_bucket).returns(s3_bucket)
         s3_bucket.expects(:object).with("original/1X/#{upload.sha1}.pdf").returns(s3_object)
         s3_object.expects(:acl).returns(s3_object)
@@ -384,7 +361,7 @@ describe FileStore::S3Store do
       end
 
       it "sets acl to private when upload is marked secure" do
-        upload.update!(original_filename: "small.pdf", extension: "pdf", secure: true)
+        upload.update!(secure: true)
         s3_helper.expects(:s3_bucket).returns(s3_bucket)
         s3_bucket.expects(:object).with("original/1X/#{upload.sha1}.pdf").returns(s3_object)
         s3_object.expects(:acl).returns(s3_object)
@@ -396,7 +373,6 @@ describe FileStore::S3Store do
   end
 
   describe '.cdn_url' do
-
     it 'supports subfolder' do
       SiteSetting.s3_upload_bucket = 's3-upload-bucket/livechat'
       SiteSetting.s3_cdn_url = 'https://rainbow.com'
@@ -405,25 +381,19 @@ describe FileStore::S3Store do
       # subfolder should not leak into uploads
       set_subfolder "/community"
 
-      url = "//s3-upload-bucket.s3.dualstack.us-east-1.amazonaws.com/livechat/original/gif.png"
+      url = "//s3-upload-bucket.s3.dualstack.us-west-1.amazonaws.com/livechat/original/gif.png"
 
       expect(store.cdn_url(url)).to eq("https://rainbow.com/original/gif.png")
     end
   end
 
   describe ".download_url" do
-    include_context "s3 helpers"
-    let(:s3_object) { stub }
-
     it "returns correct short URL with dl=1 param" do
       expect(store.download_url(upload)).to eq("#{upload.short_path}?dl=1")
     end
   end
 
   describe ".url_for" do
-    include_context "s3 helpers"
-    let(:s3_object) { stub }
-
     it "returns signed URL with content disposition when requesting to download image" do
       s3_helper.expects(:s3_bucket).returns(s3_bucket).at_least_once
       s3_bucket.expects(:object).with("original/1X/#{upload.sha1}.png").returns(s3_object)
@@ -439,9 +409,6 @@ describe FileStore::S3Store do
   end
 
   describe ".signed_url_for_path" do
-    include_context "s3 helpers"
-    let(:s3_object) { stub }
-
     it "returns signed URL for a given path" do
       s3_helper.expects(:s3_bucket).returns(s3_bucket).at_least_once
       s3_bucket.expects(:object).with("special/optimized/file.png").returns(s3_object)
@@ -453,6 +420,25 @@ describe FileStore::S3Store do
 
       expect(store.signed_url_for_path("special/optimized/file.png")).not_to eq(upload.url)
     end
+
+    it "does not prefix the s3_bucket_folder_path onto temporary upload prefixed keys" do
+      SiteSetting.s3_upload_bucket = "s3-upload-bucket/folder_path"
+      uri = URI.parse(store.signed_url_for_path("#{FileStore::BaseStore::TEMPORARY_UPLOAD_PREFIX}folder_path/uploads/default/blah/def.xyz"))
+      expect(uri.path).to eq(
+        "/#{FileStore::BaseStore::TEMPORARY_UPLOAD_PREFIX}folder_path/uploads/default/blah/def.xyz"
+      )
+      uri = URI.parse(store.signed_url_for_path("uploads/default/blah/def.xyz"))
+      expect(uri.path).to eq(
+        "/folder_path/uploads/default/blah/def.xyz"
+      )
+    end
   end
 
+  def expect_copy_from(s3_object, source)
+    s3_object.expects(:copy_from).with(
+      copy_source: source
+    ).returns(
+      stub(copy_object_result: stub(etag: '"etagtest"'))
+    )
+  end
 end

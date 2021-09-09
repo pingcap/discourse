@@ -4,7 +4,7 @@
 require "thor"
 
 class DiscourseCLI < Thor
-  desc "remap [--global,--regex] FROM TO", "Remap a string sequence accross all tables"
+  desc "remap [--global,--regex] FROM TO", "Remap a string sequence across all tables"
   long_desc <<-LONGDESC
     Replace a string sequence FROM with TO across all tables.
 
@@ -34,16 +34,16 @@ class DiscourseCLI < Thor
     require 'db_helper'
 
     if options[:regex]
-      puts "Rewriting all occurences of #{from} to #{to} using regexp_replace"
+      puts "Rewriting all occurrences of #{from} to #{to} using regexp_replace"
     else
-      puts "Rewriting all occurences of #{from} to #{to}"
+      puts "Rewriting all occurrences of #{from} to #{to}"
     end
     puts "THIS TASK WILL REWRITE DATA, ARE YOU SURE (type YES)"
     puts "WILL RUN ON ALL #{RailsMultisite::ConnectionManagement.all_dbs.length} DBS" if options[:global]
     text = STDIN.gets
     if text.strip != "YES"
       puts "aborting."
-      exit
+      exit 1
     end
 
     if options[:global]
@@ -108,6 +108,7 @@ class DiscourseCLI < Thor
 
   desc "restore", "Restore a Discourse backup"
   option :disable_emails, type: :boolean, default: true
+  option :location, type: :string, enum: ["local", "s3"], desc: "Override the backup location"
   def restore(filename = nil)
 
     if File.exist?('/usr/local/bin/discourse')
@@ -124,7 +125,7 @@ class DiscourseCLI < Thor
     if !filename
       puts "You must provide a filename to restore. Did you mean one of the following?\n\n"
 
-      store = BackupRestore::BackupStore.create
+      store = BackupRestore::BackupStore.create(location: options[:location])
       store.files.each do |file|
         puts "#{discourse} restore #{file.filename}"
       end
@@ -135,9 +136,11 @@ class DiscourseCLI < Thor
     begin
       puts "Starting restore: #{filename}"
       restorer = BackupRestore::Restorer.new(
-        Discourse.system_user.id,
+        user_id: Discourse.system_user.id,
         filename: filename,
-        disable_emails: options[:disable_emails]
+        disable_emails: options[:disable_emails],
+        location: options[:location],
+        factory: BackupRestore::Factory.new(user_id: Discourse.system_user.id)
       )
       restorer.run
       puts 'Restore done.'

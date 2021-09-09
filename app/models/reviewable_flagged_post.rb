@@ -57,16 +57,6 @@ class ReviewableFlaggedPost < Reviewable
       build_action(actions, :agree_and_silence, icon: 'microphone-slash', bundle: agree, client_action: 'silence')
     end
 
-    if can_delete_spammer = potential_spam? && guardian.can_delete_all_posts?(target_created_by)
-      build_action(
-        actions,
-        :delete_spammer,
-        icon: 'exclamation-triangle',
-        bundle: agree,
-        confirm: true
-      )
-    end
-
     if post.user_deleted?
       build_action(actions, :agree_and_restore, icon: 'far-eye', bundle: agree)
     end
@@ -78,6 +68,10 @@ class ReviewableFlaggedPost < Reviewable
     end
 
     build_action(actions, :ignore, icon: 'external-link-alt')
+
+    if potential_spam? && guardian.can_delete_all_posts?(target_created_by)
+      delete_user_actions(actions)
+    end
 
     if guardian.can_delete_post_or_topic?(post)
       delete = actions.add_bundle("#{id}-delete", icon: "far-trash-alt", label: "reviewables.actions.delete.title")
@@ -120,13 +114,13 @@ class ReviewableFlaggedPost < Reviewable
     end
 
     if actions.first.present?
+      unassign_topic performed_by, post
       DiscourseEvent.trigger(:flag_reviewed, post)
       DiscourseEvent.trigger(:flag_deferred, actions.first)
     end
 
     create_result(:success, :ignored) do |result|
       result.update_flag_stats = { status: :ignored, user_ids: actions.map(&:user_id) }
-      result.recalculate_score = true
     end
   end
 
@@ -134,17 +128,22 @@ class ReviewableFlaggedPost < Reviewable
     agree(performed_by, args)
   end
 
-  def perform_delete_spammer(performed_by, args)
-    UserDestroyer.new(performed_by).destroy(
-      post.user,
-      delete_posts: true,
-      prepare_for_destroy: true,
-      block_email: true,
-      block_urls: true,
-      block_ip: true,
-      delete_as_spammer: true,
-      context: "review"
-    )
+  def perform_delete_user(performed_by, args)
+    delete_options = delete_opts
+
+    UserDestroyer.new(performed_by).destroy(post.user, delete_options)
+
+    agree(performed_by, args)
+  end
+
+  def perform_delete_user_block(performed_by, args)
+    delete_options = delete_opts
+
+    if Rails.env.production?
+      delete_options.merge!(block_email: true, block_ip: true)
+    end
+
+    UserDestroyer.new(performed_by).destroy(post.user, delete_options)
 
     agree(performed_by, args)
   end
@@ -190,6 +189,7 @@ class ReviewableFlaggedPost < Reviewable
     Post.with_deleted.where(id: target_id).update_all(cached)
 
     if actions.first.present?
+      unassign_topic performed_by, post
       DiscourseEvent.trigger(:flag_reviewed, post)
       DiscourseEvent.trigger(:flag_disagreed, actions.first)
     end
@@ -203,7 +203,6 @@ class ReviewableFlaggedPost < Reviewable
 
     create_result(:success, :rejected) do |result|
       result.update_flag_stats = { status: :disagreed, user_ids: actions.map(&:user_id) }
-      result.recalculate_score = true
     end
   end
 
@@ -228,7 +227,7 @@ class ReviewableFlaggedPost < Reviewable
 
   def perform_delete_and_agree_replies(performed_by, args)
     result = agree(performed_by, args)
-    PostDestroyer.delete_with_replies(performed_by, post, self, defer_reply_flags: false)
+    PostDestroyer.delete_with_replies(performed_by, post, self)
     result
   end
 
@@ -256,6 +255,7 @@ protected
     DiscourseEvent.trigger(:confirmed_spam_post, post) if trigger_spam
 
     if actions.first.present?
+      unassign_topic performed_by, post
       DiscourseEvent.trigger(:flag_reviewed, post)
       DiscourseEvent.trigger(:flag_agreed, actions.first)
       yield(actions.first) if block_given?
@@ -279,7 +279,37 @@ protected
     end
   end
 
+  def unassign_topic(performed_by, post)
+    topic = post.topic
+    return unless topic && performed_by && SiteSetting.reviewable_claiming != 'disabled'
+    ReviewableClaimedTopic.where(topic_id: topic.id).delete_all
+    topic.reviewables.find_each do |reviewable|
+      reviewable.log_history(:unclaimed, performed_by)
+    end
+
+    user_ids = User.staff.pluck(:id)
+
+    if SiteSetting.enable_category_group_moderation? && group_id = topic.category&.reviewable_by_group_id.presence
+      user_ids.concat(GroupUser.where(group_id: group_id).pluck(:user_id))
+      user_ids.uniq!
+    end
+
+    data = { topic_id: topic.id }
+
+    MessageBus.publish("/reviewable_claimed", data, user_ids: user_ids)
+  end
+
 private
+
+  def delete_opts
+    {
+      delete_posts: true,
+      prepare_for_destroy: true,
+      block_urls: true,
+      delete_as_spammer: true,
+      context: "review"
+    }
+  end
 
   def destroyer(performed_by, post)
     PostDestroyer.new(performed_by, post, reviewable: self)
@@ -322,6 +352,8 @@ end
 #  latest_score            :datetime
 #  created_at              :datetime         not null
 #  updated_at              :datetime         not null
+#  force_review            :boolean          default(FALSE), not null
+#  reject_reason           :text
 #
 # Indexes
 #
@@ -329,6 +361,7 @@ end
 #  index_reviewables_on_status_and_created_at                  (status,created_at)
 #  index_reviewables_on_status_and_score                       (status,score)
 #  index_reviewables_on_status_and_type                        (status,type)
+#  index_reviewables_on_target_id_where_post_type_eq_post      (target_id) WHERE ((target_type)::text = 'Post'::text)
 #  index_reviewables_on_topic_id_and_status_and_created_by_id  (topic_id,status,created_by_id)
 #  index_reviewables_on_type_and_target_id                     (type,target_id) UNIQUE
 #

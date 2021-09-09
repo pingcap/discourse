@@ -1,19 +1,3 @@
-# encoding: utf-8
-# This file contains content for the server portion of the poll plugin used by Ruby
-#
-# To work with us on translations, see:
-# https://www.transifex.com/projects/p/discourse-org/
-#
-# This is a "source" file, which is used by Transifex to get translations for other languages.
-# After this file is changed, it needs to be pushed by a maintainer to Transifex:
-#
-#   tx push -s
-#
-# Read more here: https://meta.discourse.org/t/contribute-a-translation-to-discourse/14882
-#
-# To validate this YAML file after you change it, please paste it into
-# http://yamllint.com/
-
 en:
   site_settings:
     poll_enabled: "Allow polls?"
@@ -30,8 +14,8 @@ en:
     multiple_polls_without_name: "There are multiple polls without a name. Use the '<code>name</code>' attribute to uniquely identify your polls."
     multiple_polls_with_same_name: "There are multiple polls with the same name: <strong>%{name}</strong>. Use the '<code>name</code>' attribute to uniquely identify your polls."
 
-    default_poll_must_have_at_least_2_options: "Poll must have at least 2 options."
-    named_poll_must_have_at_least_2_options: "Poll named <strong>%{name}</strong> must have at least 2 options."
+    default_poll_must_have_at_least_1_option: "Poll must have at least 1 option."
+    named_poll_must_have_at_least_1_option: "Poll named <strong>%{name}</strong> must have at least 1 option."
 
     default_poll_must_have_less_options:
       one: "Poll must have less than %{count} option."
@@ -42,6 +26,9 @@ en:
 
     default_poll_must_have_different_options: "Poll must have different options."
     named_poll_must_have_different_options: "Poll named <strong>%{name}</strong> must have different options."
+
+    default_poll_must_not_have_any_empty_options: "Poll must not have any empty options."
+    named_poll_must_not_have_any_empty_options: "Poll named <strong>%{name}</strong> must not have any empty options."
 
     default_poll_with_multiple_choices_has_invalid_parameters: "Poll with multiple choices has invalid parameters."
     named_poll_with_multiple_choices_has_invalid_parameters: "Poll named <strong>%{name}</strong> with multiple choice has invalid parameters."

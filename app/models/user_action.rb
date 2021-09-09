@@ -1,11 +1,6 @@
 # frozen_string_literal: true
 
 class UserAction < ActiveRecord::Base
-
-  self.ignored_columns = %w{
-    queued_post_id
-  }
-
   belongs_to :user
   belongs_to :target_post, class_name: "Post"
   belongs_to :target_topic, class_name: "Topic"
@@ -42,6 +37,23 @@ class UserAction < ActiveRecord::Base
     SOLVED,
     ASSIGNED,
   ].each_with_index.to_a.flatten]
+
+  def self.types
+    @types ||= Enum.new(
+      like: 1,
+      was_liked: 2,
+      bookmark: 3,
+      new_topic: 4,
+      reply: 5,
+      response: 6,
+      mention: 7,
+      quote: 9,
+      edit: 11,
+      new_private_message: 12,
+      got_private_message: 13,
+      solved: 15,
+      assigned: 16)
+  end
 
   def self.last_action_in_topic(user_id, topic_id)
     UserAction.where(user_id: user_id,
@@ -172,7 +184,7 @@ class UserAction < ActiveRecord::Base
       'u.name AS acting_name'
     ]
 
-    AvatarLookup.lookup_columns.each do |c|
+    UserLookup.lookup_columns.each do |c|
       next if c == :id || c['.']
       acting_cols << "u.#{c} AS acting_#{c}"
     end
@@ -271,14 +283,14 @@ class UserAction < ActiveRecord::Base
           update_like_count(user_id, hash[:action_type], 1)
         end
 
-        # move into Topic perhaps
         group_ids = nil
         if topic && topic.category && topic.category.read_restricted
-          group_ids = topic.category.groups.pluck("groups.id")
+          group_ids = [Group::AUTO_GROUPS[:admins]]
+          group_ids.concat(topic.category.groups.pluck("groups.id"))
         end
 
         if action.user
-          MessageBus.publish("/u/#{action.user.username.downcase}", action.id, user_ids: [user_id], group_ids: group_ids)
+          MessageBus.publish("/u/#{action.user.username_lower}", action.id, user_ids: [user_id], group_ids: group_ids)
         end
 
         action

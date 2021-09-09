@@ -1,7 +1,7 @@
 /**
  * @license
  * Lodash (Custom Build) <https://lodash.com/>
- * Build: `lodash include="each,filter,map,range,first,isEmpty,chain,extend,every,omit,merge,union,sortBy,uniq,intersection,reject,compact,reduce,debounce,throttle,values,pick,keys,flatten,min,max,isArray,delay,isString,isEqual,without,invoke,clone,findIndex,find,groupBy" minus="template" -d -o node_modules/lodash.js`
+ * Build: `lodash include="escapeRegExp,each,filter,map,range,first,isEmpty,chain,extend,every,omit,merge,union,sortBy,uniq,intersection,reject,compact,reduce,debounce,throttle,values,pick,keys,flatten,min,max,isArray,delay,isString,isEqual,without,invoke,clone,findIndex,find,groupBy" minus="template" -d -o node_modules/lodash.js`
  * Copyright OpenJS Foundation and other contributors <https://openjsf.org/>
  * Released under MIT license <https://lodash.com/license>
  * Based on Underscore.js 1.8.3 <http://underscorejs.org/LICENSE>
@@ -13,7 +13,7 @@
   var undefined;
 
   /** Used as the semantic version number. */
-  var VERSION = '4.17.15';
+  var VERSION = '4.17.21';
 
   /** Used as the size to enable large array optimizations. */
   var LARGE_ARRAY_SIZE = 200;
@@ -125,10 +125,14 @@
    * Used to match `RegExp`
    * [syntax characters](http://ecma-international.org/ecma-262/7.0/#sec-patterns).
    */
-  var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
+  var reRegExpChar = /[\\^$.*+?()[\]{}|]/g,
+      reHasRegExpChar = RegExp(reRegExpChar.source);
 
-  /** Used to match leading and trailing whitespace. */
-  var reTrim = /^\s+|\s+$/g;
+  /** Used to match leading whitespace. */
+  var reTrimStart = /^\s+/;
+
+  /** Used to match a single whitespace character. */
+  var reWhitespace = /\s/;
 
   /** Used to match wrap detail comments. */
   var reWrapComment = /\{(?:\n\/\* \[wrapped with .+\] \*\/)?\n?/,
@@ -629,6 +633,19 @@
   }
 
   /**
+   * The base implementation of `_.trim`.
+   *
+   * @private
+   * @param {string} string The string to trim.
+   * @returns {string} Returns the trimmed string.
+   */
+  function baseTrim(string) {
+    return string
+      ? string.slice(0, trimmedEndIndex(string) + 1).replace(reTrimStart, '')
+      : string;
+  }
+
+  /**
    * The base implementation of `_.unary` without support for storing metadata.
    *
    * @private
@@ -835,6 +852,21 @@
     return hasUnicode(string)
       ? unicodeToArray(string)
       : asciiToArray(string);
+  }
+
+  /**
+   * Used by `_.trim` and `_.trimEnd` to get the index of the last non-whitespace
+   * character of `string`.
+   *
+   * @private
+   * @param {string} string The string to inspect.
+   * @returns {number} Returns the index of the last non-whitespace character.
+   */
+  function trimmedEndIndex(string) {
+    var index = string.length;
+
+    while (index-- && reWhitespace.test(string.charAt(index))) {}
+    return index;
   }
 
   /**
@@ -2824,8 +2856,21 @@
    * @returns {Array} Returns the new sorted array.
    */
   function baseOrderBy(collection, iteratees, orders) {
+    if (iteratees.length) {
+      iteratees = arrayMap(iteratees, function(iteratee) {
+        if (isArray(iteratee)) {
+          return function(value) {
+            return baseGet(value, iteratee.length === 1 ? iteratee[0] : iteratee);
+          }
+        }
+        return iteratee;
+      });
+    } else {
+      iteratees = [identity];
+    }
+
     var index = -1;
-    iteratees = arrayMap(iteratees.length ? iteratees : [identity], baseUnary(getIteratee()));
+    iteratees = arrayMap(iteratees, baseUnary(getIteratee()));
 
     var result = baseMap(collection, function(value, key, collection) {
       var criteria = arrayMap(iteratees, function(iteratee) {
@@ -2951,6 +2996,10 @@
     while (nested != null && ++index < length) {
       var key = toKey(path[index]),
           newValue = value;
+
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        return object;
+      }
 
       if (index != lastIndex) {
         var objValue = nested[key];
@@ -3826,10 +3875,11 @@
     if (arrLength != othLength && !(isPartial && othLength > arrLength)) {
       return false;
     }
-    // Assume cyclic values are equal.
-    var stacked = stack.get(array);
-    if (stacked && stack.get(other)) {
-      return stacked == other;
+    // Check that cyclic values are equal.
+    var arrStacked = stack.get(array);
+    var othStacked = stack.get(other);
+    if (arrStacked && othStacked) {
+      return arrStacked == other && othStacked == array;
     }
     var index = -1,
         result = true,
@@ -3991,10 +4041,11 @@
         return false;
       }
     }
-    // Assume cyclic values are equal.
-    var stacked = stack.get(object);
-    if (stacked && stack.get(other)) {
-      return stacked == other;
+    // Check that cyclic values are equal.
+    var objStacked = stack.get(object);
+    var othStacked = stack.get(other);
+    if (objStacked && othStacked) {
+      return objStacked == other && othStacked == object;
     }
     var result = true;
     stack.set(object, other);
@@ -5596,6 +5647,10 @@
    * // The `_.property` iteratee shorthand.
    * _.filter(users, 'active');
    * // => objects for ['barney']
+   *
+   * // Combining several predicates using `_.overEvery` or `_.overSome`.
+   * _.filter(users, _.overSome([{ 'age': 36 }, ['age', 40]]));
+   * // => objects for ['fred', 'barney']
    */
   function filter(collection, predicate) {
     var func = isArray(collection) ? arrayFilter : baseFilter;
@@ -5855,15 +5910,15 @@
    * var users = [
    *   { 'user': 'fred',   'age': 48 },
    *   { 'user': 'barney', 'age': 36 },
-   *   { 'user': 'fred',   'age': 40 },
+   *   { 'user': 'fred',   'age': 30 },
    *   { 'user': 'barney', 'age': 34 }
    * ];
    *
    * _.sortBy(users, [function(o) { return o.user; }]);
-   * // => objects for [['barney', 36], ['barney', 34], ['fred', 48], ['fred', 40]]
+   * // => objects for [['barney', 36], ['barney', 34], ['fred', 48], ['fred', 30]]
    *
    * _.sortBy(users, ['user', 'age']);
-   * // => objects for [['barney', 34], ['barney', 36], ['fred', 40], ['fred', 48]]
+   * // => objects for [['barney', 34], ['barney', 36], ['fred', 30], ['fred', 48]]
    */
   var sortBy = baseRest(function(collection, iteratees) {
     if (collection == null) {
@@ -6953,7 +7008,7 @@
     if (typeof value != 'string') {
       return value === 0 ? value : +value;
     }
-    value = value.replace(reTrim, '');
+    value = baseTrim(value);
     var isBinary = reIsBinary.test(value);
     return (isBinary || reIsOctal.test(value))
       ? freeParseInt(value.slice(2), isBinary ? 2 : 8)
@@ -7315,6 +7370,30 @@
    */
   function values(object) {
     return object == null ? [] : baseValues(object, keys(object));
+  }
+
+  /*------------------------------------------------------------------------*/
+
+  /**
+   * Escapes the `RegExp` special characters "^", "$", "\", ".", "*", "+",
+   * "?", "(", ")", "[", "]", "{", "}", and "|" in `string`.
+   *
+   * @static
+   * @memberOf _
+   * @since 3.0.0
+   * @category String
+   * @param {string} [string=''] The string to escape.
+   * @returns {string} Returns the escaped string.
+   * @example
+   *
+   * _.escapeRegExp('[lodash](https://lodash.com/)');
+   * // => '\[lodash\]\(https://lodash\.com/\)'
+   */
+  function escapeRegExp(string) {
+    string = toString(string);
+    return (string && reHasRegExpChar.test(string))
+      ? string.replace(reRegExpChar, '\\$&')
+      : string;
   }
 
   /*------------------------------------------------------------------------*/
@@ -7705,6 +7784,7 @@
   // Add methods that return unwrapped values in chain sequences.
   lodash.clone = clone;
   lodash.eq = eq;
+  lodash.escapeRegExp = escapeRegExp;
   lodash.every = every;
   lodash.find = find;
   lodash.findIndex = findIndex;

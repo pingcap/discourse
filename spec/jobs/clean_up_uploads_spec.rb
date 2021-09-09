@@ -126,59 +126,17 @@ describe Jobs::CleanUpUploads do
     end
   end
 
-  it "does not clean up uploads with URLs used in site settings" do
-    logo_upload = fabricate_upload
-    logo_small_upload = fabricate_upload
-    digest_logo_upload = fabricate_upload
-    mobile_logo_upload = fabricate_upload
-    large_icon_upload = fabricate_upload
-    default_opengraph_image_upload = fabricate_upload
-    twitter_summary_large_image_upload = fabricate_upload
-    favicon_upload = fabricate_upload
-    apple_touch_icon_upload = fabricate_upload
+  it "does not clean up selectable avatars" do
     avatar1_upload = fabricate_upload
     avatar2_upload = fabricate_upload
 
-    SiteSetting.logo_url = logo_upload.url
-    SiteSetting.logo_small_url = logo_small_upload.url
-    SiteSetting.digest_logo_url = digest_logo_upload.url
-    SiteSetting.mobile_logo_url = mobile_logo_upload.url
-    SiteSetting.large_icon_url = large_icon_upload.url
-    SiteSetting.default_opengraph_image_url = default_opengraph_image_upload.url
-
-    SiteSetting.twitter_summary_large_image_url =
-      twitter_summary_large_image_upload.url
-
-    SiteSetting.favicon_url = favicon_upload.url
-    SiteSetting.apple_touch_icon_url = apple_touch_icon_upload.url
-    SiteSetting.selectable_avatars = [avatar1_upload.url, avatar2_upload.url].join("\n")
+    SiteSetting.selectable_avatars = [avatar1_upload, avatar2_upload]
 
     Jobs::CleanUpUploads.new.execute(nil)
 
     expect(Upload.exists?(id: expired_upload.id)).to eq(false)
-    expect(Upload.exists?(id: logo_upload.id)).to eq(true)
-    expect(Upload.exists?(id: logo_small_upload.id)).to eq(true)
-    expect(Upload.exists?(id: digest_logo_upload.id)).to eq(true)
-    expect(Upload.exists?(id: mobile_logo_upload.id)).to eq(true)
-    expect(Upload.exists?(id: large_icon_upload.id)).to eq(true)
-    expect(Upload.exists?(id: default_opengraph_image_upload.id)).to eq(true)
-    expect(Upload.exists?(id: twitter_summary_large_image_upload.id)).to eq(true)
-    expect(Upload.exists?(id: favicon_upload.id)).to eq(true)
-    expect(Upload.exists?(id: apple_touch_icon_upload.id)).to eq(true)
     expect(Upload.exists?(id: avatar1_upload.id)).to eq(true)
     expect(Upload.exists?(id: avatar2_upload.id)).to eq(true)
-  end
-
-  it "does not clean up uploads in site settings when they use the CDN" do
-    Discourse.stubs(:asset_host).returns("//my.awesome.cdn")
-
-    logo_small_upload = fabricate_upload
-    SiteSetting.logo_small_url = "#{Discourse.asset_host}#{logo_small_upload.url}"
-
-    Jobs::CleanUpUploads.new.execute(nil)
-
-    expect(Upload.exists?(id: expired_upload.id)).to eq(false)
-    expect(Upload.exists?(id: logo_small_upload.id)).to eq(true)
   end
 
   it "does not delete profile background uploads" do
@@ -298,6 +256,15 @@ describe Jobs::CleanUpUploads do
     expect(Upload.exists?(id: upload2.id)).to eq(true)
   end
 
+  it "does not delete uploads with an access control post ID (secure uploads)" do
+    upload = fabricate_upload(access_control_post_id: Fabricate(:post).id, secure: true)
+
+    Jobs::CleanUpUploads.new.execute(nil)
+
+    expect(Upload.exists?(id: expired_upload.id)).to eq(false)
+    expect(Upload.exists?(id: upload.id)).to eq(true)
+  end
+
   it "does not delete custom emojis" do
     upload = fabricate_upload
     CustomEmoji.create!(name: 'test', upload: upload)
@@ -316,5 +283,35 @@ describe Jobs::CleanUpUploads do
 
     expect(Upload.exists?(id: expired_upload.id)).to eq(false)
     expect(Upload.exists?(id: csv_file.id)).to eq(true)
+  end
+
+  it "does not delete theme setting uploads" do
+    theme = Fabricate(:theme)
+    theme_upload = fabricate_upload
+    ThemeSetting.create!(theme: theme, data_type: ThemeSetting.types[:upload], value: theme_upload.url, name: "my_setting_name")
+
+    Jobs::CleanUpUploads.new.execute(nil)
+
+    expect(Upload.exists?(id: expired_upload.id)).to eq(false)
+    expect(Upload.exists?(id: theme_upload.id)).to eq(true)
+  end
+
+  it "does not delete badges uploads" do
+    badge_image = fabricate_upload
+    badge = Fabricate(:badge, image_upload_id: badge_image.id)
+
+    Jobs::CleanUpUploads.new.execute(nil)
+
+    expect(Upload.exists?(id: expired_upload.id)).to eq(false)
+    expect(Upload.exists?(id: badge_image.id)).to eq(true)
+  end
+
+  it "deletes external upload stubs that have expired" do
+    external_stub1 = Fabricate(:external_upload_stub, status: ExternalUploadStub.statuses[:created], created_at: 10.minutes.ago)
+    external_stub2 = Fabricate(:external_upload_stub, status: ExternalUploadStub.statuses[:created], created_at: (ExternalUploadStub::CREATED_EXPIRY_HOURS.hours + 10.minutes).ago)
+    external_stub3 = Fabricate(:external_upload_stub, status: ExternalUploadStub.statuses[:uploaded], created_at: 10.minutes.ago)
+    external_stub4 = Fabricate(:external_upload_stub, status: ExternalUploadStub.statuses[:uploaded], created_at: (ExternalUploadStub::UPLOADED_EXPIRY_HOURS.hours + 10.minutes).ago)
+    Jobs::CleanUpUploads.new.execute(nil)
+    expect(ExternalUploadStub.pluck(:id)).to contain_exactly(external_stub1.id, external_stub3.id)
   end
 end

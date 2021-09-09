@@ -72,7 +72,7 @@ class Admin::BackupsController < Admin::AdminController
   def show
     if !EmailBackupToken.compare(current_user.id, params.fetch(:token))
       @error = I18n.t('download_backup_mailer.no_token')
-      return render template: 'admin/backups/show.html.erb', layout: 'no_ember', status: 422
+      return render layout: 'no_ember', status: 422, formats: [:html]
     end
 
     store = BackupRestore::BackupStore.create
@@ -204,7 +204,7 @@ class Admin::BackupsController < Admin::AdminController
     begin
       upload_url = store.generate_upload_url(filename)
     rescue BackupRestore::BackupStore::BackupFileExists
-      return render_json_error(I18n("backup.file_exists"))
+      return render_json_error(I18n.t("backup.file_exists"))
     rescue BackupRestore::BackupStore::StorageError => e
       return render_json_error(e)
     end
@@ -215,7 +215,7 @@ class Admin::BackupsController < Admin::AdminController
   private
 
   def has_enough_space_on_disk?(size)
-    `df -Pk #{Rails.root}/public/backups | awk 'NR==2 {print $4 * 1024;}'`.to_i > size
+    DiskSpace.free("#{Rails.root}/public/backups") > size
   end
 
   def ensure_backups_enabled

@@ -1,9 +1,8 @@
-# encoding: utf-8
-#
-# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+# WARNING: Never edit this file.
+# It will be overwritten when translations are pulled from Crowdin.
 #
 # To work with us on translations, join this project:
-# https://www.transifex.com/projects/p/discourse-org/
+# https://translate.discourse.org/
 
 id:
   js:
@@ -13,15 +12,17 @@ id:
       total_votes:
         other: "jumlah suara"
       average_rating: "Rata-rata rating: <strong>%{average}</strong>."
+      results:
+        groups:
+          title: "Anda harus menjadi anggota %{groups} untuk memberikan suara dalam poll ini."
+        closed:
+          title: "Hasil akan ditampilkan setelah <strong>ditutup</strong>."
+        staff:
+          title: "Hasil hanya ditampilkan kepada anggota <strong>staf</strong>."
       multiple:
         help:
           at_least_min_options:
-            other: "Pilih setidaknya <strong>%{count}</strong> pilihan"
-          up_to_max_options:
-            other: "Pilih sampai <strong<%{count}</strong> pilihan"
-          x_options:
-            other: "Pilih <strong>%{count}</strong> pilihan"
-          between_min_and_max_options: "Pilih antara <strong>%{min}</strong> dan <strong>%{max}</strong> pilihan"
+            other: "Pilih setidaknya <strong>%{count}</strong> opsi."
       cast-votes:
         title: "Gunakan suaramu"
         label: "Pilih sekarang!"
@@ -30,7 +31,10 @@ id:
         label: "Lihat hasil"
       hide-results:
         title: "Kembali ke suaramu"
-        label: "Sembunyikan hasil"
+      group-results:
+        label: "Tampilkan rincian"
+      export-results:
+        label: "Ekspor"
       open:
         title: "Buka Polling"
         label: "Buka"
@@ -39,4 +43,27 @@ id:
         title: "Tutup polling"
         label: "Tutup"
         confirm: "Apakah Anda yakin ingin menutup akun ini?"
+      automatic_close:
+        closes_in: "Ditutup dalam <strong>%{timeLeft}</strong>"
+        age: "Ditutup <strong>%{age}</strong>"
+      breakdown:
+        title: "Hasil poll"
+        votes: "%{count} suara"
+        percentage: "Persentase"
+        count: "Jumlah"
       error_while_toggling_status: "Maaf, telah terjadi kesalahan pengalihan status dari pemilihan ini."
+      ui_builder:
+        insert: Masukkan Poll
+        help:
+          options_min_count: Masukkan setidaknya 1 pilihan.
+        poll_type:
+          label: Tipe
+        poll_result:
+          always: Selalu terlihat
+          staff: Hanya staf
+        poll_public:
+          label: Tunjukkan siapa yang memilih
+        poll_title:
+          label: Judul (opsional)
+        automatic_close:
+          label: Tutup poll secara otomatis

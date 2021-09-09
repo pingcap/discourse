@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-#mixin for all guardian methods dealing with post permissions
+# mixin for all guardian methods dealing with post permissions
 module PostGuardian
 
   def unrestricted_link_posting?
@@ -10,7 +10,7 @@ module PostGuardian
   def link_posting_access
     if unrestricted_link_posting?
       'full'
-    elsif SiteSetting.whitelisted_link_domains.present?
+    elsif SiteSetting.allowed_link_domains.present?
       'limited'
     else
       'none'
@@ -21,7 +21,7 @@ module PostGuardian
     return false if host.blank?
 
     unrestricted_link_posting? ||
-      SiteSetting.whitelisted_link_domains.split('|').include?(host)
+      SiteSetting.allowed_link_domains.split('|').include?(host)
   end
 
   # Can the user act on the post in a particular way.
@@ -30,10 +30,10 @@ module PostGuardian
     return false unless (can_see_post.nil? && can_see_post?(post)) || can_see_post
 
     # no warnings except for staff
-    return false if (action_key == :notify_user && !is_staff? && opts[:is_warning].present? && opts[:is_warning] == 'true')
+    return false if action_key == :notify_user && (post.user.blank? || (!is_staff? && opts[:is_warning].present? && opts[:is_warning] == 'true'))
 
     taken = opts[:taken_actions].try(:keys).to_a
-    is_flag = PostActionType.notify_flag_types[action_key]
+    is_flag = PostActionType.notify_flag_types[action_key] || PostActionType.custom_types[action_key]
     already_taken_this_action = taken.any? && taken.include?(PostActionType.types[action_key])
     already_did_flagging      = taken.any? && (taken & PostActionType.notify_flag_types.values).any?
 
@@ -71,7 +71,7 @@ module PostGuardian
       not(post.trashed?) &&
 
       # don't like your own stuff
-      not(action_key == :like && is_my_own?(post))
+      not(action_key == :like && (post.user.blank? || is_my_own?(post)))
     end
 
     !!result
@@ -100,11 +100,11 @@ module PostGuardian
     is_staff? &&
     user &&
     !user.admin? &&
-    (user.first_post_created_at.nil? || user.first_post_created_at >= SiteSetting.delete_user_max_post_age.days.ago) &&
-    user.post_count <= SiteSetting.delete_all_posts_max.to_i
+    (is_admin? ||
+      ((user.first_post_created_at.nil? || user.first_post_created_at >= SiteSetting.delete_user_max_post_age.days.ago) &&
+      user.post_count <= SiteSetting.delete_all_posts_max.to_i))
   end
 
-  # Creating Method
   def can_create_post?(parent)
     return false if !SiteSetting.enable_system_message_replies? && parent.try(:subtype) == "system_message"
 
@@ -115,7 +115,6 @@ module PostGuardian
     )
   end
 
-  # Editing Method
   def can_edit_post?(post)
     if Discourse.static_doc_topic_ids.include?(post.topic_id) && !is_admin?
       return false
@@ -131,12 +130,22 @@ module PostGuardian
       (
         SiteSetting.trusted_users_can_edit_others? &&
         @user.has_trust_level?(TrustLevel[4])
-      )
+      ) ||
+      is_category_group_moderator?(post.topic&.category)
     )
 
     if post.topic&.archived? || post.user_deleted || post.deleted_at
       return false
     end
+
+    # Editing a shared draft.
+    return true if (
+      can_see_post?(post) &&
+      can_create_post?(post.topic) &&
+      post.topic.category_id == SiteSetting.shared_drafts_category.to_i &&
+      can_see_category?(post.topic.category) &&
+      can_see_shared_draft?
+    )
 
     if post.wiki && (@user.trust_level >= SiteSetting.min_trust_to_edit_wiki_post.to_i)
       return can_create_post?(post.topic)
@@ -158,7 +167,15 @@ module PostGuardian
         return true
       end
 
+      if post.is_first_post? && post.topic.category_allows_unlimited_owner_edits_on_first_post?
+        return true
+      end
+
       return !post.edit_time_limit_expired?(@user)
+    end
+
+    if post.is_category_description?
+      return true if can_edit_category_description?(post.topic.category)
     end
 
     false
@@ -168,29 +185,39 @@ module PostGuardian
     post.is_first_post? ? post.topic && can_delete_topic?(post.topic) : can_delete_post?(post)
   end
 
-  # Deleting Methods
   def can_delete_post?(post)
     return false if !can_see_post?(post)
 
     # Can't delete the first post
     return false if post.is_first_post?
 
+    return true if is_staff? || is_category_group_moderator?(post.topic&.category)
+
     # Can't delete posts in archived topics unless you are staff
-    return false if !is_staff? && post.topic.archived?
+    return false if post.topic&.archived?
 
     # You can delete your own posts
-    return !post.user_deleted? if is_my_own?(post)
+    if is_my_own?(post)
+      return false if (SiteSetting.max_post_deletions_per_minute < 1 || SiteSetting.max_post_deletions_per_day < 1)
+      return true if !post.user_deleted?
+    end
 
-    is_staff?
+    false
   end
 
-  # Recovery Method
   def can_recover_post?(post)
-    if is_staff?
-      post.deleted_at && post.user
-    else
-      is_my_own?(post) && post.user_deleted && !post.deleted_at
+    return false unless post
+
+    # PERF, vast majority of the time topic will not be deleted
+    topic = (post.topic || Topic.with_deleted.find(post.topic_id)) if post.topic_id
+    return true if can_moderate_topic?(topic) && !!post.deleted_at
+
+    if is_my_own?(post)
+      return false if (SiteSetting.max_post_deletions_per_minute < 1 || SiteSetting.max_post_deletions_per_day < 1)
+      return true if post.user_deleted && !post.deleted_at
     end
+
+    false
   end
 
   def can_delete_post_action?(post_action)
@@ -207,9 +234,9 @@ module PostGuardian
     return true if is_admin?
     return false unless can_see_topic?(post.topic)
     return false unless post.user == @user || Topic.visible_post_types(@user).include?(post.post_type)
-    return false if !is_moderator? && post.deleted_at.present?
-
-    true
+    return true if is_moderator? || is_category_group_moderator?(post.topic.category)
+    return true if post.deleted_at.blank? || (post.deleted_by_id == @user.id && @user.has_trust_level?(TrustLevel[4]))
+    false
   end
 
   def can_view_edit_history?(post)
@@ -220,12 +247,14 @@ module PostGuardian
     end
 
     authenticated? &&
-    (is_staff? || @user.has_trust_level?(TrustLevel[4]) || @user.id == post.user_id) &&
+    (is_staff? || @user.id == post.user_id) &&
     can_see_post?(post)
   end
 
   def can_change_post_owner?
-    is_admin?
+    return true if is_admin?
+
+    SiteSetting.moderators_change_post_ownership && is_staff?
   end
 
   def can_change_post_timestamps?
@@ -256,8 +285,8 @@ module PostGuardian
     is_staff?
   end
 
-  def can_see_deleted_posts?
-    is_staff?
+  def can_see_deleted_posts?(category = nil)
+    is_staff? || is_category_group_moderator?(category)
   end
 
   def can_view_raw_email?(post)

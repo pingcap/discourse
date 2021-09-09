@@ -23,7 +23,7 @@ class PostOwnerChanger
 
       post.topic = @topic
       post.set_owner(@new_owner, @acting_user, @skip_revision)
-      PostActionDestroyer.destroy(@new_owner, post, :like)
+      PostActionDestroyer.destroy(@new_owner, post, :like, skip_delete_check: true)
 
       level = post.is_first_post? ? :watching : :tracking
       TopicUser.change(@new_owner.id, @topic.id, notification_level: NotificationLevels.topic_levels[level])
@@ -37,6 +37,9 @@ class PostOwnerChanger
       @new_owner.user_stat.update(
         first_post_created_at: @new_owner.reload.posts.order('created_at ASC').first&.created_at
       )
+
+      Post.where(topic_id: @topic.id, reply_to_post_number: post.post_number)
+        .update_all(reply_to_user_id: @new_owner.id)
 
       @topic.save!(validate: false)
     end

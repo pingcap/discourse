@@ -251,7 +251,8 @@ describe UserMerger do
   end
 
   it "updates invites" do
-    invite1 = Fabricate(:invite, invited_by: walter, user: source_user)
+    invite1 = Fabricate(:invite, invited_by: walter)
+    Fabricate(:invited_user, invite: invite1, user: source_user)
     invite2 = Fabricate(:invite, invited_by: source_user)
     invite3 = Fabricate(:invite, invited_by: source_user)
     invite3.trash!(source_user)
@@ -260,7 +261,7 @@ describe UserMerger do
 
     [invite1, invite2, invite3].each { |x| x.reload }
 
-    expect(invite1.user).to eq(target_user)
+    expect(invite1.invited_users.first.user).to eq(target_user)
     expect(invite2.invited_by).to eq(target_user)
     expect(invite3.invited_by).to eq(target_user)
     expect(invite3.deleted_by).to eq(target_user)
@@ -298,13 +299,13 @@ describe UserMerger do
     ignored3 = Fabricate(:user)
     coding_horror = Fabricate(:coding_horror)
 
-    IgnoredUser.create!(user_id: source_user.id, ignored_user_id: ignored1.id)
-    IgnoredUser.create!(user_id: source_user.id, ignored_user_id: ignored2.id)
-    IgnoredUser.create!(user_id: target_user.id, ignored_user_id: ignored2.id)
-    IgnoredUser.create!(user_id: target_user.id, ignored_user_id: ignored3.id)
-    IgnoredUser.create!(user_id: walter.id, ignored_user_id: source_user.id)
-    IgnoredUser.create!(user_id: coding_horror.id, ignored_user_id: source_user.id)
-    IgnoredUser.create!(user_id: coding_horror.id, ignored_user_id: target_user.id)
+    Fabricate(:ignored_user, user: source_user, ignored_user: ignored1)
+    Fabricate(:ignored_user, user: source_user, ignored_user: ignored2)
+    Fabricate(:ignored_user, user: target_user, ignored_user: ignored2)
+    Fabricate(:ignored_user, user: target_user, ignored_user: ignored3)
+    Fabricate(:ignored_user, user: walter, ignored_user: source_user)
+    Fabricate(:ignored_user, user: coding_horror, ignored_user: source_user)
+    Fabricate(:ignored_user, user: coding_horror, ignored_user: target_user)
 
     merge_users!
 
@@ -836,7 +837,7 @@ describe UserMerger do
     expect(UserEmail.where(user_id: source_user.id).count).to eq(0)
   end
 
-  it "skips merging email adresses when a secondary email address exists" do
+  it "skips merging email addresses when a secondary email address exists" do
     merge_users!(source_user, target_user)
 
     alice2 = Fabricate(:user, username: 'alice2', email: 'alice@foo.com')
@@ -845,6 +846,15 @@ describe UserMerger do
     emails = UserEmail.where(user_id: target_user.id).pluck(:email, :primary)
     expect(emails).to contain_exactly(['alice@example.com', true], ['alice@work.com', false])
     expect(UserEmail.where(user_id: source_user.id).count).to eq(0)
+  end
+
+  it "skips merging email addresses when target user is not human" do
+    target_user = Discourse.system_user
+    merge_users!(source_user, target_user)
+
+    emails = UserEmail.where(user_id: target_user.id).pluck(:email, :primary)
+    expect(emails).to contain_exactly([target_user.email, true])
+    expect(UserEmail.exists?(user_id: source_user.id)).to eq(false)
   end
 
   it "updates exports" do
@@ -989,20 +999,25 @@ describe UserMerger do
     expect(User.find_by_username(source_user.username)).to be_nil
   end
 
+  it "works even when email domains are restricted" do
+    SiteSetting.allowed_email_domains = "example.com|work.com"
+    source_user.update_attribute(:admin, true)
+
+    expect(User.find_by_username(source_user.username)).to be_present
+    merge_users!
+    expect(User.find_by_username(source_user.username)).to be_nil
+  end
+
   it "deletes external auth infos of source user" do
     UserAssociatedAccount.create(user_id: source_user.id, provider_name: "facebook", provider_uid: "1234")
-    GithubUserInfo.create(user_id: source_user.id, screen_name: "example", github_user_id: "examplel123123")
     Oauth2UserInfo.create(user_id: source_user.id, uid: "example", provider: "example")
     SingleSignOnRecord.create(user_id: source_user.id, external_id: "example", last_payload: "looks good")
-    UserOpenId.create(user_id: source_user.id, email: source_user.email, url: "http://example.com/openid", active: true)
 
     merge_users!
 
     expect(UserAssociatedAccount.where(user_id: source_user.id).count).to eq(0)
-    expect(GithubUserInfo.where(user_id: source_user.id).count).to eq(0)
     expect(Oauth2UserInfo.where(user_id: source_user.id).count).to eq(0)
     expect(SingleSignOnRecord.where(user_id: source_user.id).count).to eq(0)
-    expect(UserOpenId.where(user_id: source_user.id).count).to eq(0)
   end
 
   it "deletes auth tokens" do

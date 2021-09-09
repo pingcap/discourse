@@ -11,6 +11,11 @@ class UploadSerializer < ApplicationSerializer
              :thumbnail_height,
              :extension,
              :short_url,
+             :short_path,
              :retain_hours,
              :human_filesize
+
+  def url
+    object.for_site_setting ? object.url : UrlHelper.cook_url(object.url, secure: SiteSetting.secure_media? && object.secure)
+  end
 end

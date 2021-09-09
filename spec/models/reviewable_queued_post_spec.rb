@@ -61,7 +61,7 @@ RSpec.describe ReviewableQueuedPost, type: :model do
           expect(result.created_post.custom_fields['hello']).to eq('world')
           expect(result.created_post_topic).to eq(topic)
           expect(result.created_post.user).to eq(reviewable.created_by)
-          expect(reviewable.payload['created_post_id']).to eq(result.created_post.id)
+          expect(reviewable.target_id).to eq(result.created_post.id)
 
           expect(Topic.count).to eq(topic_count)
           expect(Post.count).to eq(post_count + 1)
@@ -118,12 +118,6 @@ RSpec.describe ReviewableQueuedPost, type: :model do
       end
 
       context "delete_user" do
-        it "has the correct button class" do
-          expect(reviewable.actions_for(Guardian.new(moderator)).to_a.
-            find { |a| a.id == :delete_user }.button_class).
-            to eq("btn-danger")
-        end
-
         it "deletes the user and rejects the post" do
           other_reviewable = Fabricate(:reviewable_queued_post, created_by: reviewable.created_by)
 
@@ -142,6 +136,12 @@ RSpec.describe ReviewableQueuedPost, type: :model do
 
   context "creating a topic" do
     let(:reviewable) { Fabricate(:reviewable_queued_post_topic, category: category) }
+
+    before do
+      SiteSetting.tagging_enabled = true
+      SiteSetting.min_trust_to_create_tag = 0
+      SiteSetting.min_trust_level_to_tag_topics = 0
+    end
 
     context "editing" do
 
@@ -177,8 +177,8 @@ RSpec.describe ReviewableQueuedPost, type: :model do
       expect(result.created_post).to be_valid
       expect(result.created_post_topic).to be_present
       expect(result.created_post_topic).to be_valid
-      expect(reviewable.payload['created_post_id']).to eq(result.created_post.id)
-      expect(reviewable.payload['created_topic_id']).to eq(result.created_post_topic.id)
+      expect(reviewable.target_id).to eq(result.created_post.id)
+      expect(reviewable.topic_id).to eq(result.created_post_topic.id)
 
       expect(Topic.count).to eq(topic_count + 1)
       expect(Post.count).to eq(post_count + 1)

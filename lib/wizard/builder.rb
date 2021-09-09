@@ -39,7 +39,7 @@ class Wizard
 
       @wizard.append_step('forum-title') do |step|
         step.add_field(id: 'title', type: 'text', required: true, value: SiteSetting.title)
-        step.add_field(id: 'site_description', type: 'text', required: true, value: SiteSetting.site_description)
+        step.add_field(id: 'site_description', type: 'text', required: false, value: SiteSetting.site_description)
         step.add_field(id: 'short_site_description', type: 'text', required: false, value: SiteSetting.short_site_description)
 
         step.on_update do |updater|
@@ -58,8 +58,7 @@ class Wizard
           step.disabled = true
           step.description_vars = { topic_title: I18n.t("discourse_welcome_topic.title") }
         else
-          step.add_field(id: 'welcome', type: 'textarea', required: true, value: introduction.get_summary)
-
+          step.add_field(id: 'welcome', type: 'textarea', required: false, value: introduction.get_summary)
           step.on_update do |updater|
             value = updater.fields[:welcome].strip
 
@@ -142,7 +141,7 @@ class Wizard
         end
       end
 
-      @wizard.append_step('colors') do |step|
+      @wizard.append_step('styling') do |step|
         default_theme = Theme.find_by(id: SiteSetting.default_theme_id)
         default_theme_override = SiteSetting.exists?(name: "default_theme_id")
 
@@ -152,29 +151,68 @@ class Wizard
         scheme_id = default_theme_override ? (base_scheme || color_scheme_name) : ColorScheme::LIGHT_THEME_ID
 
         themes = step.add_field(
-          id: 'theme_previews',
-          type: 'component',
+          id: 'color_scheme',
+          type: 'dropdown',
           required: !default_theme_override,
-          value: scheme_id
+          value: scheme_id || ColorScheme::LIGHT_THEME_ID,
+          show_in_sidebar: true
         )
 
         # fix for the case when base_scheme is nil
         if scheme_id && default_theme_override && base_scheme.nil?
           scheme = default_theme.color_scheme
-          default_colors = scheme.colors.select(:name, :hex)
-          choice_hash = default_colors.reduce({}) { |choice, color| choice[color.name] = "##{color.hex}"; choice }
-          themes.add_choice(scheme_id, data: { colors: choice_hash })
+          themes.add_choice(scheme_id, data: { colors: scheme.colors_hashes })
         end
 
         ColorScheme.base_color_scheme_colors.each do |t|
-          with_hash = t[:colors].dup
-          with_hash.map { |k, v| with_hash[k] = "##{v}" }
-          themes.add_choice(t[:id], data: { colors: with_hash })
+          themes.add_choice(t[:id], data: { colors: t[:colors] })
         end
 
+        body_font = step.add_field(
+          id: 'body_font',
+          type: 'dropdown',
+          value: SiteSetting.base_font,
+          show_in_sidebar: true
+        )
+
+        heading_font = step.add_field(
+          id: 'heading_font',
+          type: 'dropdown',
+          value: SiteSetting.heading_font,
+          show_in_sidebar: true
+        )
+
+        DiscourseFonts.fonts.each do |font|
+          body_font.add_choice(font[:key], label: font[:name])
+          heading_font.add_choice(font[:key], label: font[:name])
+        end
+
+        current = SiteSetting.top_menu.starts_with?("categories") ? SiteSetting.desktop_category_page_style : "latest"
+        style = step.add_field(id: 'homepage_style', type: 'dropdown', required: true, value: current, show_in_sidebar: true)
+        style.add_choice('latest')
+        CategoryPageStyle.values.each do |page|
+          style.add_choice(page[:value])
+        end
+
+        step.add_field(
+          id: 'styling_preview',
+          type: 'component'
+        )
+
         step.on_update do |updater|
+          updater.update_setting(:base_font, updater.fields[:body_font])
+          updater.update_setting(:heading_font, updater.fields[:heading_font])
+
+          if updater.fields[:homepage_style] == 'latest'
+            top_menu = "latest|new|unread|top|categories"
+          else
+            top_menu = "categories|latest|new|unread|top"
+            updater.update_setting(:desktop_category_page_style, updater.fields[:homepage_style])
+          end
+          updater.update_setting(:top_menu, top_menu)
+
           scheme_name = (
-            (updater.fields[:theme_previews] || "") ||
+            (updater.fields[:color_scheme] || "") ||
             ColorScheme::LIGHT_THEME_ID
           )
 
@@ -182,26 +220,26 @@ class Wizard
 
           name = I18n.t("color_schemes.#{scheme_name.downcase.gsub(' ', '_')}_theme_name")
 
-          theme = nil
           scheme = ColorScheme.find_by(base_scheme_id: scheme_name, via_wizard: true)
           scheme ||= ColorScheme.create_from_base(name: name, via_wizard: true, base_scheme_id: scheme_name)
-          themes = Theme.where(color_scheme_id: scheme.id).order(:id).to_a
-          theme = themes.find(&:default?)
-          theme ||= themes.first
 
-          theme ||= Theme.create!(
-            name: name,
-            user_id: @wizard.user.id,
-            color_scheme_id: scheme.id
-          )
+          if default_theme
+            default_theme.color_scheme_id = scheme.id
+            default_theme.save!
+          else
+            theme = Theme.create!(
+              name: I18n.t("color_schemes.default_theme_name"),
+              user_id: @wizard.user.id,
+              color_scheme_id: scheme.id
+            )
 
-          theme.set_default!
+            theme.set_default!
+          end
+
+          if scheme.is_dark?
+            updater.update_setting(:default_dark_mode_color_scheme_id, -1)
+          end
         end
-      end
-
-      @wizard.append_step('themes-further-reading') do |step|
-        step.banner = "further-reading.png"
-        step.add_field(id: 'popular-themes', type: 'component')
       end
 
       @wizard.append_step('logos') do |step|
@@ -227,52 +265,6 @@ class Wizard
         end
       end
 
-      @wizard.append_step('homepage') do |step|
-
-        current = SiteSetting.top_menu.starts_with?("categories") ? SiteSetting.desktop_category_page_style : "latest"
-
-        style = step.add_field(id: 'homepage_style', type: 'dropdown', required: true, value: current)
-        style.add_choice('latest')
-        CategoryPageStyle.values.each do |page|
-          style.add_choice(page[:value])
-        end
-
-        step.add_field(id: 'homepage_preview', type: 'component')
-
-        step.on_update do |updater|
-          if updater.fields[:homepage_style] == 'latest'
-            top_menu = "latest|new|unread|top|categories"
-          else
-            top_menu = "categories|latest|new|unread|top"
-            updater.update_setting(:desktop_category_page_style, updater.fields[:homepage_style])
-          end
-          updater.update_setting(:top_menu, top_menu)
-        end
-      end
-
-      @wizard.append_step('emoji') do |step|
-        sets = step.add_field(id: 'emoji_set',
-                              type: 'radio',
-                              required: true,
-                              value: SiteSetting.emoji_set)
-
-        emoji = ["smile", "+1", "tada", "poop"]
-
-        EmojiSetSiteSetting.values.each do |set|
-          imgs = emoji.map do |e|
-            "<img src='#{Discourse.base_uri}/images/emoji/#{set[:value]}/#{e}.png'>"
-          end
-
-          sets.add_choice(set[:value],
-                          label: I18n.t("js.#{set[:name]}"),
-                          extra_label: "<span class='emoji-preview'>#{imgs.join}</span>")
-
-          step.on_update do |updater|
-            updater.apply_settings(:emoji_set)
-          end
-        end
-      end
-
       @wizard.append_step('invites') do |step|
         if SiteSetting.enable_local_logins
           staff_count = User.staff.human_users.where('username_lower not in (?)', reserved_usernames).count
@@ -284,10 +276,10 @@ class Wizard
             users = JSON.parse(updater.fields[:invite_list])
 
             users.each do |u|
-              args = {}
+              args = { email: u['email'] }
               args[:moderator] = true if u['role'] == 'moderator'
               begin
-                Invite.create_invite_by_email(u['email'], @wizard.user, args)
+                Invite.generate(@wizard.user, args)
               rescue => e
                 updater.errors.add(:invite_list, e.message.concat("<br>"))
               end

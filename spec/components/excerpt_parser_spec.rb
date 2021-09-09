@@ -18,7 +18,7 @@ describe ExcerptParser do
       </details>
     HTML
 
-    expect(ExcerptParser.get_excerpt(html, 50, {})).to match_html(<<~HTML)
+    expect(ExcerptParser.get_excerpt(html, 50, {})).to match_html <<~HTML
       <details><summary>FOO</summary>BAR
       Lorem ipsum dolor sit amet, consectetur adi&hellip;</details>
     HTML
@@ -79,6 +79,19 @@ describe ExcerptParser do
 
         The first paragraph of this pinned topic will be &hellip;
       HTML
+    end
+  end
+
+  describe "keep_quotes parameter" do
+    it "should keep the quoted content in html" do
+      html = <<~HTML.strip
+        <aside class="quote">
+          <blockquote>
+            This is a quoted text.
+          </blockquote>
+        </aside>
+      HTML
+      expect(ExcerptParser.get_excerpt(html, 100, keep_quotes: true)).to eq("This is a quoted text.")
     end
   end
 end

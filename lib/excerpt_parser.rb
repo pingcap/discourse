@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
 class ExcerptParser < Nokogiri::XML::SAX::Document
-
   attr_reader :excerpt
 
-  SPAN_REGEX = /<\s*span[^>]*class\s*=\s*['|"]excerpt['|"][^>]*>/
+  CUSTOM_EXCERPT_REGEX = /<\s*(span|div)[^>]*class\s*=\s*['"]excerpt['"][^>]*>/
 
   def initialize(length, options = nil)
     @length = length
@@ -19,6 +18,7 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
     @keep_emoji_images = options[:keep_emoji_images] == true
     @keep_onebox_source = options[:keep_onebox_source] == true
     @keep_onebox_body = options[:keep_onebox_body] == true
+    @keep_quotes = options[:keep_quotes] == true
     @remap_emoji = options[:remap_emoji] == true
     @start_excerpt = false
     @in_details_depth = 0
@@ -28,7 +28,7 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
 
   def self.get_excerpt(html, length, options)
     html ||= ''
-    length = html.length if html.include?('excerpt') && SPAN_REGEX === html
+    length = html.length if html.include?('excerpt') && CUSTOM_EXCERPT_REGEX === html
     me = self.new(length, options)
     parser = Nokogiri::HTML::SAX::Parser.new(me)
     catch(:done) do
@@ -96,12 +96,14 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
 
     when "aside"
       attributes = Hash[*attributes.flatten]
-      unless (@keep_onebox_source || @keep_onebox_body) && attributes['class'].include?('onebox')
+      unless (@keep_onebox_source || @keep_onebox_body) && attributes['class']&.include?('onebox')
         @in_quote = true
       end
 
-      if @keep_onebox_body && attributes['class'].include?('quote') && attributes['data-topic'].present?
-        @in_quote = false
+      if attributes['class']&.include?('quote')
+        if @keep_quotes || (@keep_onebox_body && attributes['data-topic'].present?)
+          @in_quote = false
+        end
       end
 
     when 'article'
@@ -119,11 +121,6 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
         @excerpt = +""
         @current_length = 0
         @start_excerpt = true
-      end
-      # Preserve spoilers
-      if attributes.include?(["class", "spoiler"])
-        include_tag("span", attributes)
-        @in_spoiler = true
       end
 
     when "details"
@@ -181,8 +178,6 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
       @in_summary = false if @in_details_depth == 1
     when "div", "span"
       throw :done if @start_excerpt
-      characters("</span>", truncate: false, count_it: false, encode: false) if @in_spoiler
-      @in_spoiler = false
     end
   end
 
@@ -209,7 +204,7 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
     encode = encode ? lambda { |s| ERB::Util.html_escape(s) } : lambda { |s| s }
     if count_it && @current_length + string.length > @length
       length = [0, @length - @current_length - 1].max
-      @excerpt << encode.call(string[0..length]) if truncate
+      @excerpt << encode.call(string[0..length]) if truncate && !emoji?(string)
       @excerpt << (@text_entities ? "..." : "&hellip;")
       @excerpt << "</a>" if @in_a
       @excerpt << after_string if after_string
@@ -219,5 +214,9 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
     @excerpt << encode.call(string)
     @excerpt << after_string if after_string
     @current_length += string.length if count_it
+  end
+
+  def emoji?(string)
+    string.match?(/\A:\w+:\Z/)
   end
 end

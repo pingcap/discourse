@@ -12,11 +12,13 @@ module Jobs
     sidekiq_options retry: RETRY_TIMES.size
 
     sidekiq_retry_in do |count, exception|
+      # returning nil/0 will trigger the default sidekiq
+      # retry formula
+      #
+      # See https://github.com/mperham/sidekiq/blob/3330df0ee37cfd3e0cd3ef01e3e66b584b99d488/lib/sidekiq/job_retry.rb#L216-L234
       case exception.wrapped
       when SocketError
-        RETRY_TIMES[count]
-      else
-        ::Jobs::UserEmail.seconds_to_delay(count)
+        return RETRY_TIMES[count]
       end
     end
 
@@ -26,7 +28,8 @@ module Jobs
       post_id = args[:post_id]
       post = post_id ? Post.with_deleted.find_by(id: post_id) : nil
 
-      return if !post || post.trashed? || post.user_deleted? || !post.topic
+      return if !post || post.trashed? || post.user_deleted? ||
+                  !post.topic || post.raw.blank? || post.topic.private_message?
 
       users =
           User.activated.not_silenced.not_suspended.real
@@ -53,8 +56,20 @@ module Jobs
                      WHERE cu.category_id = ? AND cu.user_id = users.id AND cu.notification_level = ?
                   )', post.topic.category_id, CategoryUser.notification_levels[:muted])
 
+      if SiteSetting.tagging_enabled?
+        users = users.where('NOT EXISTS (
+           SELECT 1
+           FROM tag_users tu
+           WHERE tu.tag_id in (:tag_ids) AND tu.user_id = users.id AND tu.notification_level = :muted
+        )', tag_ids: post.topic.tag_ids, muted: TagUser.notification_levels[:muted])
+      end
+
       if SiteSetting.must_approve_users
         users = users.where(approved: true)
+      end
+
+      if SiteSetting.mute_all_categories_by_default
+        users = users.watching_topic_when_mute_categories_by_default(post.topic)
       end
 
       DiscourseEvent.trigger(:notify_mailing_list_subscribers, users, post)

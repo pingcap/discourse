@@ -3,10 +3,19 @@
 class WebHookPostSerializer < PostSerializer
 
   attributes :topic_posts_count,
+             :topic_filtered_posts_count,
              :topic_archetype,
              :category_slug
 
   def include_topic_title?
+    true
+  end
+
+  def include_raw?
+    true
+  end
+
+  def include_category_id?
     true
   end
 
@@ -19,11 +28,10 @@ class WebHookPostSerializer < PostSerializer
     actions_summary
     can_view_edit_history
     yours
-    primary_group_flair_url
-    primary_group_flair_bg_color
-    primary_group_flair_color
-    notice_args
-    notice_type
+    flair_url
+    flair_bg_color
+    flair_color
+    notice
   }.each do |attr|
     define_method("include_#{attr}?") do
       false
@@ -32,6 +40,10 @@ class WebHookPostSerializer < PostSerializer
 
   def topic_posts_count
     object.topic ? object.topic.posts_count : 0
+  end
+
+  def topic_filtered_posts_count
+    object.topic ? object.topic.posts.where(post_type: Post.types[:regular]).count : 0
   end
 
   def topic_archetype

@@ -69,6 +69,12 @@ describe ApplicationHelper do
 
         expect(link).to eq(preload_link("https://s3cdn.com/assets/application.js"))
       end
+
+      it "gives s3 cdn but without brotli/gzip extensions for theme tests assets" do
+        helper.request.env["HTTP_ACCEPT_ENCODING"] = 'gzip, br'
+        link = helper.preload_script('discourse/tests/theme_qunit_ember_jquery')
+        expect(link).to eq(preload_link("https://s3cdn.com/assets/discourse/tests/theme_qunit_ember_jquery.js"))
+      end
     end
   end
 
@@ -78,6 +84,55 @@ describe ApplicationHelper do
     end
     it "survives junk text" do
       expect(helper.escape_unicode("hello \xc3\x28 world")).to match(/hello.*world/)
+    end
+  end
+
+  describe "application_logo_url" do
+    context "when a dark color scheme is active" do
+      before do
+        dark_theme = Theme.create(
+          name: "Dark",
+          user_id: -1,
+          color_scheme_id: ColorScheme.find_by(base_scheme_id: "Dark").id
+        )
+        helper.request.env[:resolved_theme_id] = dark_theme.id
+      end
+      context "on desktop" do
+        before do
+          session[:mobile_view] = '0'
+        end
+        context "when logo_dark is not set" do
+          it "will return site_logo_url instead" do
+            expect(helper.application_logo_url).to eq(SiteSetting.site_logo_url)
+          end
+        end
+        context "when logo_dark is set" do
+          before do
+            SiteSetting.logo_dark = Fabricate(:upload, url: '/images/logo-dark.png')
+          end
+          it "will return site_logo_dark_url" do
+            expect(helper.application_logo_url).to eq(SiteSetting.site_logo_dark_url)
+          end
+        end
+      end
+      context "on mobile" do
+        before do
+          session[:mobile_view] = '1'
+        end
+        context "when mobile_logo_dark is not set" do
+          it "will return site_mobile_logo_url instead" do
+            expect(helper.application_logo_url).to eq(SiteSetting.site_mobile_logo_url)
+          end
+        end
+        context "when mobile_logo_dark is set" do
+          before do
+            SiteSetting.mobile_logo_dark = Fabricate(:upload, url: '/images/mobile-logo-dark.png')
+          end
+          it "will return site_mobile_logo_dark_url" do
+            expect(helper.application_logo_url).to eq(SiteSetting.site_mobile_logo_dark_url)
+          end
+        end
+      end
     end
   end
 
@@ -265,6 +320,36 @@ describe ApplicationHelper do
     end
   end
 
+  describe "client_side_setup_data" do
+    context "when Rails.env.development? is true" do
+      before do
+        Rails.env.stubs(:development?).returns(true)
+      end
+
+      it "returns the correct service worker url" do
+        expect(helper.client_side_setup_data[:service_worker_url]).to eq("service-worker.js")
+      end
+
+      it "returns the svg_icon_list in the setup data" do
+        expect(helper.client_side_setup_data[:svg_icon_list]).not_to eq(nil)
+      end
+
+      it "does not return debug_preloaded_app_data without the env var" do
+        expect(helper.client_side_setup_data.key?(:debug_preloaded_app_data)).to eq(false)
+      end
+
+      context "if the DEBUG_PRELOADED_APP_DATA env var is provided" do
+        before do
+          ENV['DEBUG_PRELOADED_APP_DATA'] = 'true'
+        end
+
+        it "returns that key as true" do
+          expect(helper.client_side_setup_data[:debug_preloaded_app_data]).to eq(true)
+        end
+      end
+    end
+  end
+
   describe 'crawlable_meta_data' do
     context "opengraph image" do
       it 'returns the correct image' do
@@ -312,10 +397,146 @@ describe ApplicationHelper do
         expect(helper.crawlable_meta_data).to include(SiteSetting.site_logo_url)
 
         SiteSetting.logo = nil
-        SiteSetting.logo_url = nil
 
         expect(helper.crawlable_meta_data).to include(Upload.find(SiteIconManager::SKETCH_LOGO_ID).url)
       end
+    end
+  end
+
+  describe 'discourse_color_scheme_stylesheets' do
+    fab!(:user) { Fabricate(:user) }
+
+    it 'returns a stylesheet link tag by default' do
+      cs_stylesheets = helper.discourse_color_scheme_stylesheets
+      expect(cs_stylesheets).to include("stylesheets/color_definitions")
+    end
+
+    it 'returns two color scheme link tags when dark mode is enabled' do
+      SiteSetting.default_dark_mode_color_scheme_id = ColorScheme.where(name: "Dark").pluck_first(:id)
+      cs_stylesheets = helper.discourse_color_scheme_stylesheets
+
+      expect(cs_stylesheets).to include("(prefers-color-scheme: dark)")
+      expect(cs_stylesheets.scan("stylesheets/color_definitions").size).to eq(2)
+    end
+
+    it 'handles a missing dark color scheme gracefully' do
+      scheme = ColorScheme.create!(name: "pyramid")
+      SiteSetting.default_dark_mode_color_scheme_id = scheme.id
+      scheme.destroy!
+      cs_stylesheets = helper.discourse_color_scheme_stylesheets
+
+      expect(cs_stylesheets).to include("stylesheets/color_definitions")
+      expect(cs_stylesheets).not_to include("(prefers-color-scheme: dark)")
+    end
+
+    context "custom light scheme" do
+      before do
+        @new_cs = Fabricate(:color_scheme, name: 'Flamboyant')
+        user.user_option.color_scheme_id = @new_cs.id
+        user.user_option.save!
+        helper.request.env[Auth::DefaultCurrentUserProvider::CURRENT_USER_KEY] = user
+      end
+
+      it "returns color scheme from user option value" do
+        color_stylesheets = helper.discourse_color_scheme_stylesheets
+        expect(color_stylesheets).to include("color_definitions_flamboyant")
+      end
+
+      it "returns color scheme from cookie value" do
+        cs = ColorScheme.where(name: "Dark").first
+        helper.request.cookies["color_scheme_id"] = cs.id
+
+        color_stylesheets = helper.discourse_color_scheme_stylesheets
+
+        expect(color_stylesheets).to include("color_definitions_dark")
+        expect(color_stylesheets).not_to include("color_definitions_flamboyant")
+      end
+
+      it "falls back to base scheme with invalid cookie value" do
+        helper.request.cookies["color_scheme_id"] = -50
+
+        color_stylesheets = helper.discourse_color_scheme_stylesheets
+        expect(color_stylesheets).not_to include("color_definitions_flamboyant")
+        expect(color_stylesheets).to include("color_definitions_base")
+      end
+    end
+
+    context "dark scheme with user option and/or cookies" do
+      before do
+        user.user_option.dark_scheme_id = -1
+        user.user_option.save!
+        helper.request.env[Auth::DefaultCurrentUserProvider::CURRENT_USER_KEY] = user
+        @new_cs = Fabricate(:color_scheme, name: 'Custom Color Scheme')
+
+        SiteSetting.default_dark_mode_color_scheme_id = ColorScheme.where(name: "Dark").pluck_first(:id)
+      end
+
+      it "returns no dark scheme stylesheet when user has disabled that option" do
+        color_stylesheets = helper.discourse_color_scheme_stylesheets
+
+        expect(color_stylesheets).to include("stylesheets/color_definitions")
+        expect(color_stylesheets).not_to include("(prefers-color-scheme: dark)")
+      end
+
+      it "returns user-selected dark color scheme stylesheet" do
+        user.user_option.update!(dark_scheme_id: @new_cs.id)
+
+        color_stylesheets = helper.discourse_color_scheme_stylesheets
+        expect(color_stylesheets).to include("(prefers-color-scheme: dark)")
+        expect(color_stylesheets).to include("custom-color-scheme")
+      end
+
+      it "respects cookie value over user option for dark color scheme" do
+        helper.request.cookies["dark_scheme_id"] = @new_cs.id
+
+        color_stylesheets = helper.discourse_color_scheme_stylesheets
+        expect(color_stylesheets).to include("(prefers-color-scheme: dark)")
+        expect(color_stylesheets).to include("custom-color-scheme")
+      end
+
+      it "returns no dark scheme with invalid cookie value" do
+        helper.request.cookies["dark_scheme_id"] = -10
+
+        color_stylesheets = helper.discourse_color_scheme_stylesheets
+        expect(color_stylesheets).not_to include("(prefers-color-scheme: dark)")
+      end
+
+    end
+  end
+
+  describe "dark_color_scheme?" do
+    it 'returns false for the base color scheme' do
+      expect(helper.dark_color_scheme?).to eq(false)
+    end
+
+    it 'works correctly for a dark scheme' do
+      dark_theme = Theme.create(
+        name: "Dark",
+        user_id: -1,
+        color_scheme_id: ColorScheme.find_by(base_scheme_id: "Dark").id
+      )
+      helper.request.env[:resolved_theme_id] = dark_theme.id
+
+      expect(helper.dark_color_scheme?).to eq(true)
+    end
+  end
+
+  describe 'html_lang' do
+    fab!(:user) { Fabricate(:user) }
+
+    before do
+      I18n.locale = :de
+      SiteSetting.default_locale = :fr
+    end
+
+    it 'returns default locale if no request' do
+      helper.request = nil
+      expect(helper.html_lang).to eq(SiteSetting.default_locale)
+    end
+
+    it 'returns current user locale if request' do
+      helper.request.env[Auth::DefaultCurrentUserProvider::CURRENT_USER_KEY] = user
+      expect(helper.html_lang).to eq(I18n.locale.to_s)
     end
   end
 end

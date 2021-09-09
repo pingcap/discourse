@@ -3,12 +3,12 @@
 module BackupRestore
   # @abstract
   class BackupStore
-    class BackupFileExists < RuntimeError; end
-    class StorageError < RuntimeError; end
+    BackupFileExists = Class.new(RuntimeError)
+    StorageError = Class.new(RuntimeError)
 
     # @return [BackupStore]
     def self.create(opts = {})
-      case SiteSetting.backup_location
+      case opts[:location] || SiteSetting.backup_location
       when BackupLocationSiteSetting::LOCAL
         require_dependency "backup_restore/local_backup_store"
         BackupRestore::LocalBackupStore.new(opts)

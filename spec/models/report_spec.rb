@@ -3,9 +3,10 @@
 require 'rails_helper'
 
 describe Report do
-  let(:c0) { Fabricate(:category) }  # id: 3
-  let(:c1) { Fabricate(:category, parent_category: c0) }  # id: 2
-  let(:c2) { Fabricate(:category) }  # id: 4
+  let(:user) { Fabricate(:user) }
+  let(:c0) { Fabricate(:category, user: user) }
+  let(:c1) { Fabricate(:category, parent_category: c0, user: user) }  # id: 2
+  let(:c2) { Fabricate(:category, user: user) }
 
   shared_examples 'no data' do
     context "with no data" do
@@ -51,15 +52,17 @@ describe Report do
         freeze_time DateTime.parse('2017-03-01 12:00')
 
         # today, an incomplete day:
-        ApplicationRequest.create(date: 0.days.ago.to_time, req_type: ApplicationRequest.req_types['http_total'], count: 1)
+        application_requests = [{ date: 0.days.ago.to_time, req_type: ApplicationRequest.req_types['http_total'], count: 1 }]
 
         # 60 complete days:
-        30.times do |i|
-          ApplicationRequest.create(date: (i + 1).days.ago.to_time, req_type: ApplicationRequest.req_types['http_total'], count: 10)
+        30.times.each_with_object(application_requests) do |i|
+          application_requests.concat([{ date: (i + 1).days.ago.to_time, req_type: ApplicationRequest.req_types['http_total'], count: 10  }])
         end
-        30.times do |i|
-          ApplicationRequest.create(date: (31 + i).days.ago.to_time, req_type: ApplicationRequest.req_types['http_total'], count: 100)
+        30.times.each_with_object(application_requests) do |i|
+          application_requests.concat([{ date: (31 + i).days.ago.to_time, req_type: ApplicationRequest.req_types['http_total'], count: 100 }])
         end
+
+        ApplicationRequest.insert_all(application_requests)
       end
 
       subject(:json) { Report.find("http_total_reqs").as_json }
@@ -75,10 +78,20 @@ describe Report do
       before do
         Report.clear_cache
         freeze_time DateTime.parse('2017-03-01 12:00')
-
-        ((0..32).to_a + [60, 61, 62, 63]).each do |i|
-          Fabricate(:topic, created_at: i.days.ago)
+        user = Fabricate(:user)
+        topics = ((0..32).to_a + [60, 61, 62, 63]).map do |i|
+          date = i.days.ago
+          {
+            user_id: user.id,
+            last_post_user_id: user.id,
+            title: "topic #{i}",
+            category_id: SiteSetting.uncategorized_category_id,
+            bumped_at: date,
+            created_at: date,
+            updated_at: date
+          }
         end
+        Topic.insert_all(topics)
       end
 
       it "counts the correct records" do
@@ -121,7 +134,6 @@ describe Report do
         expect(report.data.select { |v| v[:x].today? }).to be_present
         expect(report.prev30Days).to eq(2)
       end
-
     end
   end
 
@@ -166,24 +178,22 @@ describe Report do
 
           if arg == :flag
             user = Fabricate(:user)
-            builder = -> (dt) { PostActionCreator.create(user, Fabricate(:post), :spam, created_at: dt) }
+            topic = Fabricate(:topic, user: user)
+            builder = -> (dt) { PostActionCreator.create(user, Fabricate(:post, topic: topic, user: user), :spam, created_at: dt) }
+          elsif arg == :signup
+            builder = -> (dt) { Fabricate(:user, created_at: dt) }
           else
-            factories = { signup: :user, email: :email_log }
-            builder = -> (dt) { Fabricate(factories[arg] || arg, created_at: dt) }
+            user = Fabricate(:user)
+            factories = { email: :email_log }
+            builder = -> (dt) { Fabricate(factories[arg] || arg, created_at: dt, user: user) }
           end
 
           [DateTime.now, 1.hour.ago, 1.hour.ago, 1.day.ago, 2.days.ago, 30.days.ago, 35.days.ago].each(&builder)
         end
 
-        it "returns today's data" do
+        it "returns today's, total and previous 30 day's data" do
           expect(report.data.select { |v| v[:x].today? }).to be_present
-        end
-
-        it 'returns total data' do
           expect(report.total).to eq 7
-        end
-
-        it "returns previous 30 day's data" do
           expect(report.prev30Days).to be_present
         end
       end
@@ -203,36 +213,34 @@ describe Report do
       context "with #{request_type}" do
         before(:each) do
           freeze_time DateTime.parse('2017-03-01 12:00')
-          ApplicationRequest.create(date: 35.days.ago.to_time, req_type: ApplicationRequest.req_types[request_type.to_s], count: 35)
-          ApplicationRequest.create(date: 7.days.ago.to_time, req_type: ApplicationRequest.req_types[request_type.to_s], count: 8)
-          ApplicationRequest.create(date: Time.now, req_type: ApplicationRequest.req_types[request_type.to_s], count: 1)
-          ApplicationRequest.create(date: 1.day.ago.to_time, req_type: ApplicationRequest.req_types[request_type.to_s], count: 2)
-          ApplicationRequest.create(date: 2.days.ago.to_time, req_type: ApplicationRequest.req_types[request_type.to_s], count: 3)
+          application_requests = [
+            { date: 35.days.ago.to_time, req_type: ApplicationRequest.req_types[request_type.to_s], count: 35 },
+            { date: 7.days.ago.to_time, req_type: ApplicationRequest.req_types[request_type.to_s], count: 8 },
+            { date: Time.now, req_type: ApplicationRequest.req_types[request_type.to_s], count: 1 },
+            { date: 1.day.ago.to_time, req_type: ApplicationRequest.req_types[request_type.to_s], count: 2 },
+            { date: 2.days.ago.to_time, req_type: ApplicationRequest.req_types[request_type.to_s], count: 3 }
+          ]
+          ApplicationRequest.insert_all(application_requests)
         end
 
-        context 'returns a report with data' do
-          it "returns expected number of recoords" do
-            expect(report.data.count).to eq 4
-          end
+        it 'returns a report with data' do
+          # expected number of records
+          expect(report.data.count).to eq 4
 
-          it 'sorts the data from oldest to latest dates' do
-            expect(report.data[0][:y]).to eq(8) # 7 days ago
-            expect(report.data[1][:y]).to eq(3) # 2 days ago
-            expect(report.data[2][:y]).to eq(2) # 1 day ago
-            expect(report.data[3][:y]).to eq(1) # today
-          end
+          # sorts the data from oldest to latest dates
+          expect(report.data[0][:y]).to eq(8) # 7 days ago
+          expect(report.data[1][:y]).to eq(3) # 2 days ago
+          expect(report.data[2][:y]).to eq(2) # 1 day ago
+          expect(report.data[3][:y]).to eq(1) # today
 
-          it "returns today's data" do
-            expect(report.data.select { |value| value[:x] == Date.today }).to be_present
-          end
+          # today's data
+          expect(report.data.find { |value| value[:x] == Date.today }).to be_present
 
-          it 'returns total data' do
-            expect(report.total).to eq 49
-          end
+          # total data
+          expect(report.total).to eq 49
 
-          it 'returns previous 30 days of data' do
-            expect(report.prev30Days).to eq 35
-          end
+          #previous 30 days of data
+          expect(report.prev30Days).to eq 35
         end
       end
     end
@@ -240,10 +248,12 @@ describe Report do
 
   describe 'user to user private messages with replies' do
     let(:report) { Report.find('user_to_user_private_messages_with_replies') }
+    let(:user) { Fabricate(:user) }
+    let(:topic) { Fabricate(:topic, created_at: 1.hour.ago, user: user) }
 
     it 'topic report).to not include private messages' do
-      Fabricate(:private_message_topic, created_at: 1.hour.ago)
-      Fabricate(:topic, created_at: 1.hour.ago)
+      Fabricate(:private_message_topic, created_at: 1.hour.ago, user: user)
+      topic
       report = Report.find('topics')
       expect(report.data[0][:y]).to eq(1)
       expect(report.total).to eq(1)
@@ -264,7 +274,7 @@ describe Report do
 
       context 'some public posts' do
         it 'returns an empty report' do
-          Fabricate(:post); Fabricate(:post)
+          Fabricate(:post, topic: topic, user: user); Fabricate(:post, topic: topic, user: user)
           expect(report.data).to be_blank
           expect(report.total).to eq 0
         end
@@ -273,9 +283,9 @@ describe Report do
 
     context 'some private messages' do
       before do
-        Fabricate(:private_message_post, created_at: 25.hours.ago)
-        Fabricate(:private_message_post, created_at: 1.hour.ago)
-        Fabricate(:private_message_post, created_at: 1.hour.ago)
+        Fabricate(:private_message_post, created_at: 25.hours.ago, user: user)
+        Fabricate(:private_message_post, created_at: 1.hour.ago, user: user)
+        Fabricate(:private_message_post, created_at: 1.hour.ago, user: user)
       end
 
       it 'returns correct data' do
@@ -286,7 +296,8 @@ describe Report do
 
       context 'and some public posts' do
         before do
-          Fabricate(:post); Fabricate(:post)
+          Fabricate(:post, user: user, topic: topic)
+          Fabricate(:post, user: user, topic: topic)
         end
 
         it 'returns correct data' do
@@ -341,6 +352,8 @@ describe Report do
         expect(report.data.find { |d| d[:x] == TrustLevel[0] }[:y]).to eq 3
         expect(report.data.find { |d| d[:x] == TrustLevel[2] }[:y]).to eq 2
         expect(report.data.find { |d| d[:x] == TrustLevel[4] }[:y]).to eq 1
+
+        expect(report.data.find { |d| d[:x] == TrustLevel[0] }[:url]).to eq '/admin/users/list/newuser'
       end
     end
   end
@@ -505,7 +518,7 @@ describe Report do
 
     context "with flags" do
       let(:flagger) { Fabricate(:user) }
-      let(:post) { Fabricate(:post) }
+      let(:post) { Fabricate(:post, user: flagger) }
 
       before do
         freeze_time
@@ -563,6 +576,37 @@ describe Report do
         expect(row[:post_raw]).to eq("updated body")
         expect(row[:post_number]).to eq(post.post_number)
         expect(row[:topic_id]).to eq(post.topic.id)
+      end
+    end
+
+    context "with editor filter" do
+      fab!(:posts) { Fabricate.times(3, :post) }
+
+      fab!(:editor_with_two_edits) do
+        Fabricate(:user).tap do |user|
+          2.times do |i|
+            posts[i].revise(user, { raw: "edit #{i + 1}" })
+          end
+        end
+      end
+
+      fab!(:editor_with_one_edit) do
+        Fabricate(:user).tap do |user|
+          posts.last.revise(user, { raw: "edit 3" })
+        end
+      end
+
+      let(:report_with_one_edit) do
+        Report.find('post_edits', { filters: { 'editor' => editor_with_one_edit.username } })
+      end
+
+      let(:report_with_two_edits) do
+        Report.find('post_edits', { filters: { 'editor' => editor_with_two_edits.username } })
+      end
+
+      it "returns a report for a given editor" do
+        expect(report_with_one_edit.data.count).to be(1)
+        expect(report_with_two_edits.data.count).to be(2)
       end
     end
   end
@@ -683,7 +727,6 @@ describe Report do
       context "private messages" do
         before do
           Fabricate(:post, user: sam)
-          Fabricate(:topic, user: sam)
           Fabricate(:post, user: jeff)
           Fabricate(:private_message_post, user: jeff)
         end
@@ -714,7 +757,7 @@ describe Report do
             post.revise(sam, raw: 'updated body')
           end
 
-          it "doesn't count a revison on your own post" do
+          it "doesn't count a revision on your own post" do
             expect(report.data[0][:revision_count]).to eq(1)
             expect(report.data[0][:username]).to eq('sam')
           end
@@ -744,10 +787,11 @@ describe Report do
 
       before(:each) do
         user = Fabricate(:user)
-        post0 = Fabricate(:post)
-        post1 = Fabricate(:post, topic: Fabricate(:topic, category: c1))
-        post2 = Fabricate(:post)
-        post3 = Fabricate(:post)
+        topic = Fabricate(:topic, user: user)
+        post0 = Fabricate(:post, topic: topic, user: user)
+        post1 = Fabricate(:post, topic: Fabricate(:topic, category: c1, user: user), user: user)
+        post2 = Fabricate(:post, topic: topic, user: user)
+        post3 = Fabricate(:post, topic: topic, user: user)
         PostActionCreator.off_topic(user, post0)
         PostActionCreator.off_topic(user, post1)
         PostActionCreator.off_topic(user, post2)
@@ -760,7 +804,7 @@ describe Report do
         include_examples 'category filtering'
 
         context "on subcategories" do
-          let(:report) { Report.find('flags', filters: { category: c0.id }) }
+          let(:report) { Report.find('flags', filters: { category: c0.id, 'include_subcategories': true }) }
 
           include_examples 'category filtering on subcategories'
         end
@@ -777,10 +821,11 @@ describe Report do
       include_examples 'with data x/y'
 
       before(:each) do
-        Fabricate(:topic)
-        Fabricate(:topic, category: c1)
-        Fabricate(:topic)
-        Fabricate(:topic, created_at: 45.days.ago)
+        user = Fabricate(:user)
+        Fabricate(:topic, user: user)
+        Fabricate(:topic, category: c1, user: user)
+        Fabricate(:topic, user: user)
+        Fabricate(:topic, created_at: 45.days.ago, user: user)
       end
 
       context "with category filtering" do
@@ -789,7 +834,7 @@ describe Report do
         include_examples 'category filtering'
 
         context "on subcategories" do
-          let(:report) { Report.find('topics', filters: { category: c0.id }) }
+          let(:report) { Report.find('topics', filters: { category: c0.id, 'include_subcategories': true }) }
 
           include_examples 'category filtering on subcategories'
         end
@@ -865,12 +910,13 @@ describe Report do
       include_examples 'with data x/y'
 
       before(:each) do
-        topic = Fabricate(:topic)
-        topic_with_category_id = Fabricate(:topic, category: c1)
-        Fabricate(:post, topic: topic)
-        Fabricate(:post, topic: topic_with_category_id)
-        Fabricate(:post, topic: topic)
-        Fabricate(:post, created_at: 45.days.ago, topic: topic)
+        user = Fabricate(:user)
+        topic = Fabricate(:topic, user: user)
+        topic_with_category_id = Fabricate(:topic, category: c1, user: user)
+        Fabricate(:post, topic: topic, user: user)
+        Fabricate(:post, topic: topic_with_category_id, user: user)
+        Fabricate(:post, topic: topic, user: user)
+        Fabricate(:post, created_at: 45.days.ago, topic: topic, user: user)
       end
 
       context "with category filtering" do
@@ -879,7 +925,7 @@ describe Report do
         include_examples 'category filtering'
 
         context "on subcategories" do
-          let(:report) { Report.find('posts', filters: { category: c0.id }) }
+          let(:report) { Report.find('posts', filters: { category: c0.id, 'include_subcategories': true }) }
 
           include_examples 'category filtering on subcategories'
         end
@@ -898,10 +944,11 @@ describe Report do
       include_examples 'with data x/y'
 
       before(:each) do
-        Fabricate(:topic, category: c1)
-        Fabricate(:post, topic: Fabricate(:topic))
-        Fabricate(:topic)
-        Fabricate(:topic, created_at: 45.days.ago)
+        user = Fabricate(:user)
+        Fabricate(:topic, category: c1, user: user)
+        Fabricate(:post, topic: Fabricate(:topic, user: user), user: user)
+        Fabricate(:topic, user: user)
+        Fabricate(:topic, created_at: 45.days.ago, user: user)
       end
 
       context "with category filtering" do
@@ -910,7 +957,7 @@ describe Report do
         include_examples 'category filtering'
 
         context "on subcategories" do
-          let(:report) { Report.find('topics_with_no_response', filters: { category: c0.id }) }
+          let(:report) { Report.find('topics_with_no_response', filters: { category: c0.id, 'include_subcategories': true }) }
 
           include_examples 'category filtering on subcategories'
         end
@@ -946,7 +993,7 @@ describe Report do
         include_examples 'category filtering'
 
         context "on subcategories" do
-          let(:report) { Report.find('likes', filters: { category: c0.id }) }
+          let(:report) { Report.find('likes', filters: { category: c0.id, 'include_subcategories': true }) }
 
           include_examples 'category filtering on subcategories'
         end
@@ -958,21 +1005,23 @@ describe Report do
     let(:joffrey) { Fabricate(:user, username: "joffrey") }
     let(:robin) { Fabricate(:user, username: "robin") }
     let(:moderator) { Fabricate(:moderator) }
+    let(:user) { Fabricate(:user) }
 
     context 'with data' do
       it "it works" do
-        10.times do
-          post_disagreed = Fabricate(:post)
+        topic = Fabricate(:topic, user: user)
+        2.times do
+          post_disagreed = Fabricate(:post, topic: topic, user: user)
           result = PostActionCreator.spam(joffrey, post_disagreed)
           result.reviewable.perform(moderator, :disagree)
         end
 
         3.times do
-          post_disagreed = Fabricate(:post)
+          post_disagreed = Fabricate(:post, topic: topic, user: user)
           result = PostActionCreator.spam(robin, post_disagreed)
           result.reviewable.perform(moderator, :disagree)
         end
-        post_agreed = Fabricate(:post)
+        post_agreed = Fabricate(:post, user: user, topic: topic)
         result = PostActionCreator.off_topic(robin, post_agreed)
         result.reviewable.perform(moderator, :agree_and_keep)
 
@@ -980,9 +1029,9 @@ describe Report do
 
         first = report.data[0]
         expect(first[:username]).to eq("joffrey")
-        expect(first[:score]).to eq(10)
+        expect(first[:score]).to eq(2)
         expect(first[:agreed_flags]).to eq(0)
-        expect(first[:disagreed_flags]).to eq(10)
+        expect(first[:disagreed_flags]).to eq(2)
 
         second = report.data[1]
         expect(second[:username]).to eq("robin")
@@ -1157,6 +1206,7 @@ describe Report do
 
     context "with data" do
       it "works" do
+        ApplicationRequest.enable
         3.times { ApplicationRequest.increment!(:page_view_crawler) }
         2.times { ApplicationRequest.increment!(:page_view_logged_in) }
         ApplicationRequest.increment!(:page_view_anon)
@@ -1174,6 +1224,104 @@ describe Report do
 
         expect(page_view_anon_report[:color]).to eql("#40c8ff")
         expect(page_view_anon_report[:data][0][:y]).to eql(1)
+      ensure
+        ApplicationRequest.disable
+        ApplicationRequest.clear_cache!
+      end
+    end
+  end
+
+  describe "trust_level_growth" do
+    before do
+      freeze_time(Time.now.at_midnight)
+      Theme.clear_default!
+    end
+
+    let(:reports) { Report.find('trust_level_growth') }
+
+    context "with no data" do
+      it "works" do
+        reports.data.each do |report|
+          expect(report[:data]).to be_empty
+        end
+      end
+    end
+
+    context "with data" do
+      fab!(:gwen) { Fabricate(:user) }
+      fab!(:martin) { Fabricate(:user) }
+
+      before do
+        UserHistory.create(action: UserHistory.actions[:auto_trust_level_change], target_user_id: gwen.id, new_value: TrustLevel[2], previous_value: 1)
+        UserHistory.create(action: UserHistory.actions[:change_trust_level], target_user_id: martin.id, new_value: TrustLevel[4], previous_value: 0)
+      end
+
+      it "works" do
+        tl1_reached = reports.data.find { |r| r[:req] == "tl1_reached" }
+        tl2_reached = reports.data.find { |r| r[:req] == "tl2_reached" }
+        tl3_reached = reports.data.find { |r| r[:req] == "tl3_reached" }
+        tl4_reached = reports.data.find { |r| r[:req] == "tl4_reached" }
+
+        expect(tl1_reached[:data][0][:y]).to eql(0)
+        expect(tl2_reached[:data][0][:y]).to eql(1)
+        expect(tl3_reached[:data][0][:y]).to eql(0)
+        expect(tl4_reached[:data][0][:y]).to eql(1)
+      end
+    end
+  end
+
+  describe ".cache" do
+    let(:exception_report) { Report.find("exception_test", wrap_exceptions_in_test: true) }
+    let(:valid_report) { Report.find("valid_test", wrap_exceptions_in_test: true) }
+
+    before(:each) do
+      class Report
+        def self.report_exception_test(report)
+          report.data = x
+        end
+
+        def self.report_valid_test(report)
+          report.data = "success!"
+        end
+      end
+    end
+
+    it "caches exception reports for 1 minute" do
+      Discourse.cache.expects(:write).with(Report.cache_key(exception_report), exception_report.as_json, { expires_in: 1.minute })
+      Report.cache(exception_report)
+    end
+
+    it "caches valid reports for 35 minutes" do
+      Discourse.cache.expects(:write).with(Report.cache_key(valid_report), valid_report.as_json, { expires_in: 35.minutes })
+      Report.cache(valid_report)
+    end
+  end
+
+  describe "top_uploads" do
+    context "with no data" do
+      it "works" do
+        report = Report.find("top_uploads")
+
+        expect(report.data).to be_empty
+      end
+    end
+
+    context "with data" do
+      fab!(:jpg_upload) { Fabricate(:upload, extension: :jpg) }
+      fab!(:png_upload) { Fabricate(:upload, extension: :png) }
+
+      it "works" do
+        report = Report.find("top_uploads")
+
+        expect(report.data.length).to eq(2)
+        expect(report.data.map { |row| row[:extension] }).to contain_exactly("jpg", "png")
+      end
+
+      it "works with filters" do
+        report = Report.find("top_uploads", filters: { file_extension: "jpg" })
+
+        expect(report.data.length).to eq(1)
+        expect(report.data[0][:extension]).to eq("jpg")
       end
     end
   end

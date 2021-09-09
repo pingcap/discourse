@@ -3,11 +3,13 @@
 require 'rails_helper'
 
 RSpec.describe DiscourseNarrativeBot::AdvancedUserNarrative do
-  let(:discobot_user) { ::DiscourseNarrativeBot::Base.new.discobot_user }
-  let(:first_post) { Fabricate(:post, user: discobot_user) }
-  let(:user) { Fabricate(:user) }
+  fab!(:narrative_bot) { ::DiscourseNarrativeBot::Base.new }
+  fab!(:discobot_user) { narrative_bot.discobot_user }
+  fab!(:discobot_username) { narrative_bot.discobot_username }
+  fab!(:first_post) { Fabricate(:post, user: discobot_user) }
+  fab!(:user) { Fabricate(:user) }
 
-  let(:topic) do
+  fab!(:topic) do
     Fabricate(:private_message_topic, first_post: first_post,
                                       topic_allowed_users: [
         Fabricate.build(:topic_allowed_user, user: discobot_user),
@@ -16,12 +18,12 @@ RSpec.describe DiscourseNarrativeBot::AdvancedUserNarrative do
     )
   end
 
-  let(:post) { Fabricate(:post, topic: topic, user: user) }
-  let(:narrative) { described_class.new }
-  let(:other_topic) { Fabricate(:topic) }
-  let(:other_post) { Fabricate(:post, topic: other_topic) }
-  let(:skip_trigger) { DiscourseNarrativeBot::TrackSelector.skip_trigger }
-  let(:reset_trigger) { DiscourseNarrativeBot::TrackSelector.reset_trigger }
+  fab!(:post) { Fabricate(:post, topic: topic, user: user) }
+  fab!(:narrative) { described_class.new }
+  fab!(:other_topic) { Fabricate(:topic) }
+  fab!(:other_post) { Fabricate(:post, topic: other_topic) }
+  fab!(:skip_trigger) { DiscourseNarrativeBot::TrackSelector.skip_trigger }
+  fab!(:reset_trigger) { DiscourseNarrativeBot::TrackSelector.reset_trigger }
 
   before do
     Jobs.run_immediately!
@@ -175,7 +177,7 @@ RSpec.describe DiscourseNarrativeBot::AdvancedUserNarrative do
 
         describe 'when reply contains the skip trigger' do
           it 'should create the right reply' do
-            post.update!(raw: "@#{discobot_user.username} #{skip_trigger.upcase}")
+            post.update!(raw: "@#{discobot_username} #{skip_trigger.upcase}")
             described_class.any_instance.expects(:enqueue_timeout_job).with(user)
 
             DiscourseNarrativeBot::TrackSelector.new(:reply, user, post_id: post.id).select
@@ -328,7 +330,7 @@ RSpec.describe DiscourseNarrativeBot::AdvancedUserNarrative do
 
           post = Post.last
 
-          expect(post.raw).to eq(I18n.t('js.post.deleted_by_author', count: 1))
+          expect(post.raw).to eq(I18n.t('js.post.deleted_by_author_simple'))
 
           PostDestroyer.destroy_stubs
 
@@ -556,12 +558,29 @@ RSpec.describe DiscourseNarrativeBot::AdvancedUserNarrative do
         end
       end
 
-      describe 'when poll is disabled' do
-        before do
+      describe 'when user cannot create polls' do
+        it 'should create the right reply (polls disabled)' do
           SiteSetting.poll_enabled = false
+
+          TopicUser.change(
+            user.id,
+            topic.id,
+            notification_level: TopicUser.notification_levels[:tracking]
+          )
+
+          expected_raw = <<~RAW
+            #{I18n.t('discourse_narrative_bot.advanced_user_narrative.change_topic_notification_level.reply', base_uri: '')}
+
+            #{I18n.t('discourse_narrative_bot.advanced_user_narrative.details.instructions', base_uri: '')}
+          RAW
+
+          expect(Post.last.raw).to eq(expected_raw.chomp)
+          expect(narrative.get_data(user)[:state].to_sym).to eq(:tutorial_details)
         end
 
-        it 'should create the right reply' do
+        it 'should create the right reply (insufficient trust level)' do
+          user.update(trust_level: 0)
+
           TopicUser.change(
             user.id,
             topic.id,
@@ -587,6 +606,19 @@ RSpec.describe DiscourseNarrativeBot::AdvancedUserNarrative do
           topic_id: topic.id,
           track: described_class.to_s
         )
+      end
+
+      it 'allows new users to create polls' do
+        user.update(trust_level: 0)
+
+        post = PostCreator.create(user, topic_id: topic.id, raw: <<~RAW)
+          [poll type=regular]
+          * foo
+          * bar
+          [/poll]
+        RAW
+
+        expect(post.errors[:base].size).to eq(0)
       end
 
       describe 'when post is not in the right topic' do
@@ -683,7 +715,7 @@ RSpec.describe DiscourseNarrativeBot::AdvancedUserNarrative do
         end
       end
 
-      it 'should create the right reply' do
+      it 'should create the right reply and issue the discobot certificate' do
         post.update!(raw: "[details=\"This is a test\"]\nwooohoo\n[/details]")
         narrative.input(:reply, user, post: post)
 
@@ -695,9 +727,50 @@ RSpec.describe DiscourseNarrativeBot::AdvancedUserNarrative do
                                                "topic_id" => topic.id,
                                                "track" => described_class.to_s)
 
-        expect(user.badges.where(name: DiscourseNarrativeBot::AdvancedUserNarrative::BADGE_NAME).exists?)
+        expect(user.badges.where(name: DiscourseNarrativeBot::AdvancedUserNarrative.badge_name).exists?)
           .to eq(true)
+
+        expect(topic.ordered_posts.last.cooked).to include("<iframe")
+        expect(Nokogiri::HTML5(topic.ordered_posts.last.cooked).at("iframe").text).not_to include(
+          "Bye for now"
+        )
+        expect(topic.ordered_posts.last.cooked).to include("</iframe>")
       end
     end
+  end
+
+  it 'invites to advanced training when user is promoted to TL2' do
+    recipient = Fabricate(:user)
+    expect {
+      DiscourseEvent.trigger(:system_message_sent, post: Post.last, message_type: 'tl2_promotion_message')
+    }.to change { Topic.count }
+    expect(Topic.last.title).to eq(I18n.t("discourse_narrative_bot.tl2_promotion_message.subject_template"))
+    expect(Topic.last.topic_users.map(&:user_id).sort).to eq([DiscourseNarrativeBot::Base.new.discobot_user.id, recipient.id])
+  end
+
+  it 'invites the site_contact_username to advanced training fine as well' do
+    recipient = Post.last.user
+    SiteSetting.site_contact_username = recipient.username
+    expect {
+      DiscourseEvent.trigger(:system_message_sent, post: Post.last, message_type: 'tl2_promotion_message')
+    }.to change { Topic.count }
+    expect(Topic.last.title).to eq(I18n.t("discourse_narrative_bot.tl2_promotion_message.subject_template"))
+    expect(Topic.last.topic_users.map(&:user_id).sort).to eq([DiscourseNarrativeBot::Base.new.discobot_user.id, recipient.id])
+  end
+
+  it "invites to advanced training using the user's effective locale" do
+    SiteSetting.allow_user_locale = true
+    recipient = Fabricate(:user, locale: "de")
+
+    TranslationOverride.upsert!("de", 'discourse_narrative_bot.tl2_promotion_message.subject_template', 'german title')
+    TranslationOverride.upsert!("de", 'discourse_narrative_bot.tl2_promotion_message.text_body_template', 'german body')
+
+    expect {
+      DiscourseEvent.trigger(:system_message_sent, post: Post.last, message_type: 'tl2_promotion_message')
+    }.to change { Topic.count }
+
+    topic = Topic.last
+    expect(topic.title).to eq("german title")
+    expect(topic.first_post.raw).to eq("german body")
   end
 end

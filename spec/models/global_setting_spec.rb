@@ -35,18 +35,18 @@ describe GlobalSetting do
       freeze_time Time.now
 
       token = GlobalSetting.safe_secret_key_base
-      $redis.without_namespace.del(GlobalSetting::REDIS_SECRET_KEY)
+      Discourse.redis.without_namespace.del(GlobalSetting::REDIS_SECRET_KEY)
       freeze_time Time.now + 20
 
       GlobalSetting.safe_secret_key_base
-      new_token = $redis.without_namespace.get(GlobalSetting::REDIS_SECRET_KEY)
+      new_token = Discourse.redis.without_namespace.get(GlobalSetting::REDIS_SECRET_KEY)
       expect(new_token).to eq(nil)
 
       freeze_time Time.now + 11
 
       GlobalSetting.safe_secret_key_base
 
-      new_token = $redis.without_namespace.get(GlobalSetting::REDIS_SECRET_KEY)
+      new_token = Discourse.redis.without_namespace.get(GlobalSetting::REDIS_SECRET_KEY)
       expect(new_token).to eq(token)
 
     end
@@ -54,7 +54,7 @@ describe GlobalSetting do
 
   describe '.add_default' do
     after do
-      class <<GlobalSetting; remove_method :foo_bar_foo; end
+      class << GlobalSetting; remove_method :foo_bar_foo; end
     end
 
     it "can correctly add defaults" do
@@ -67,13 +67,13 @@ describe GlobalSetting do
   end
 
   describe '.redis_config' do
-    describe 'when slave config is not present' do
+    describe 'when replica config is not present' do
       it "should not set any connector" do
         expect(GlobalSetting.redis_config[:connector]).to eq(nil)
       end
     end
 
-    describe 'when slave config is present' do
+    describe 'when replica config is present' do
       before do
         GlobalSetting.reset_redis_config!
       end
@@ -83,10 +83,10 @@ describe GlobalSetting do
       end
 
       it "should set the right connector" do
-        GlobalSetting.expects(:redis_slave_port).returns(6379).at_least_once
-        GlobalSetting.expects(:redis_slave_host).returns('0.0.0.0').at_least_once
+        GlobalSetting.expects(:redis_replica_port).returns(6379).at_least_once
+        GlobalSetting.expects(:redis_replica_host).returns('0.0.0.0').at_least_once
 
-        expect(GlobalSetting.redis_config[:connector]).to eq(DiscourseRedis::Connector)
+        expect(GlobalSetting.redis_config[:connector]).to eq(RailsFailover::Redis::Connector)
       end
     end
   end

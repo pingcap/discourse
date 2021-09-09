@@ -5,6 +5,78 @@ require 'rails_helper'
 describe TopicsBulkAction do
   fab!(:topic) { Fabricate(:topic) }
 
+  describe "#dismiss_topics" do
+    fab!(:user) { Fabricate(:user, created_at: 1.days.ago) }
+    fab!(:category) { Fabricate(:category) }
+    fab!(:topic2) { Fabricate(:topic, category: category, created_at: 60.minutes.ago) }
+    fab!(:topic3) { Fabricate(:topic, category: category, created_at: 120.minutes.ago) }
+
+    before do
+      topic.destroy!
+    end
+
+    it 'dismisses private messages' do
+      pm = Fabricate(:private_message_topic)
+
+      TopicsBulkAction.new(user, [pm.id], type: "dismiss_topics").perform!
+
+      expect(DismissedTopicUser.exists?(topic: pm)).to eq(true)
+    end
+
+    it 'dismisses two topics' do
+      expect { TopicsBulkAction.new(user, [Topic.all.pluck(:id)], type: "dismiss_topics").perform! }.to change { DismissedTopicUser.count }.by(2)
+    end
+
+    it 'returns dismissed topic ids' do
+      expect(TopicsBulkAction.new(user, [Topic.all.pluck(:id)], type: "dismiss_topics").perform!.sort).to match_array(
+        [topic2.id, topic3.id]
+      )
+    end
+
+    it 'respects max_new_topics limit' do
+      SiteSetting.max_new_topics = 1
+      expect do
+        TopicsBulkAction.new(user, [Topic.all.pluck(:id)], type: "dismiss_topics").perform!
+      end.to change { DismissedTopicUser.count }.by(1)
+
+      dismissed_topic_user = DismissedTopicUser.last
+
+      expect(dismissed_topic_user.user_id).to eq(user.id)
+      expect(dismissed_topic_user.topic_id).to eq(topic2.id)
+      expect(dismissed_topic_user.created_at).not_to be_nil
+    end
+
+    it 'respects seen topics' do
+      Fabricate(:topic_user, user: user, topic: topic2, last_read_post_number: 1)
+      Fabricate(:topic_user, user: user, topic: topic3, last_read_post_number: 1)
+      expect do
+        TopicsBulkAction.new(user, [Topic.all.pluck(:id)], type: "dismiss_topics").perform!
+      end.to change { DismissedTopicUser.count }.by(0)
+    end
+
+    it 'dismisses when topic user without last_read_post_number' do
+      Fabricate(:topic_user, user: user, topic: topic2, last_read_post_number: nil)
+      Fabricate(:topic_user, user: user, topic: topic3, last_read_post_number: nil)
+      expect do
+        TopicsBulkAction.new(user, [Topic.all.pluck(:id)], type: "dismiss_topics").perform!
+      end.to change { DismissedTopicUser.count }.by(2)
+    end
+
+    it 'respects new_topic_duration_minutes' do
+      user.user_option.update!(new_topic_duration_minutes: 70)
+
+      expect do
+        TopicsBulkAction.new(user, [Topic.all.pluck(:id)], type: "dismiss_topics").perform!
+      end.to change { DismissedTopicUser.count }.by(1)
+
+      dismissed_topic_user = DismissedTopicUser.last
+
+      expect(dismissed_topic_user.user_id).to eq(user.id)
+      expect(dismissed_topic_user.topic_id).to eq(topic2.id)
+      expect(dismissed_topic_user.created_at).not_to be_nil
+    end
+  end
+
   describe "dismiss_posts" do
     it "dismisses posts" do
       post1 = create_post
@@ -18,7 +90,6 @@ describe TopicsBulkAction do
       tu = TopicUser.find_by(user_id: post1.user_id, topic_id: post1.topic_id)
 
       expect(tu.last_read_post_number).to eq(3)
-      expect(tu.highest_seen_post_number).to eq(3)
     end
 
     context "when the user is staff" do
@@ -42,7 +113,6 @@ describe TopicsBulkAction do
           tu = TopicUser.find_by(user_id: user.id, topic_id: post1.topic_id)
 
           expect(tu.last_read_post_number).to eq(4)
-          expect(tu.highest_seen_post_number).to eq(4)
         end
       end
     end
@@ -59,14 +129,59 @@ describe TopicsBulkAction do
 
   describe "change_category" do
     fab!(:category) { Fabricate(:category) }
+    fab!(:fist_post) { Fabricate(:post, topic: topic) }
 
     context "when the user can edit the topic" do
-      it "changes the category and returns the topic_id" do
-        tba = TopicsBulkAction.new(topic.user, [topic.id], type: 'change_category', category_id: category.id)
-        topic_ids = tba.perform!
-        expect(topic_ids).to eq([topic.id])
-        topic.reload
-        expect(topic.category).to eq(category)
+      context "with 'create_revision_on_bulk_topic_moves' setting enabled" do
+        before do
+          SiteSetting.create_revision_on_bulk_topic_moves = true
+        end
+
+        it "changes the category, creates a post revision and returns the topic_id" do
+          old_category_id = topic.category_id
+          tba = TopicsBulkAction.new(topic.user, [topic.id], type: 'change_category', category_id: category.id)
+          topic_ids = tba.perform!
+          expect(topic_ids).to eq([topic.id])
+          topic.reload
+          expect(topic.category).to eq(category)
+
+          revision = topic.first_post.revisions.last
+          expect(revision).to be_present
+          expect(revision.modifications).to eq ({ "category_id" => [old_category_id, category.id] })
+        end
+
+        it "doesn't do anything when category stays the same" do
+          tba = TopicsBulkAction.new(topic.user, [topic.id], type: 'change_category', category_id: topic.category_id)
+          topic_ids = tba.perform!
+          expect(topic_ids).to be_empty
+
+          topic.reload
+          revision = topic.first_post.revisions.last
+          expect(revision).to be_nil
+        end
+      end
+
+      context "with 'create_revision_on_bulk_topic_moves' setting disabled" do
+        before do
+          SiteSetting.create_revision_on_bulk_topic_moves = false
+        end
+
+        it "changes the category, doesn't create a post revision and returns the topic_id" do
+          tba = TopicsBulkAction.new(topic.user, [topic.id], type: 'change_category', category_id: category.id)
+          topic_ids = tba.perform!
+          expect(topic_ids).to eq([topic.id])
+          topic.reload
+          expect(topic.category).to eq(category)
+
+          revision = topic.first_post.revisions.last
+          expect(revision).to be_nil
+        end
+
+        it "doesn't do anything when category stays the same" do
+          tba = TopicsBulkAction.new(topic.user, [topic.id], type: 'change_category', category_id: topic.category_id)
+          topic_ids = tba.perform!
+          expect(topic_ids).to be_empty
+        end
       end
     end
 
@@ -305,4 +420,38 @@ describe TopicsBulkAction do
       end
     end
   end
+
+  describe "remove_tags" do
+    fab!(:tag1)  { Fabricate(:tag) }
+    fab!(:tag2)  { Fabricate(:tag) }
+
+    before do
+      SiteSetting.tagging_enabled = true
+      SiteSetting.min_trust_level_to_tag_topics = 0
+      topic.tags = [tag1, tag2]
+    end
+
+    it "can remove all tags" do
+      tba = TopicsBulkAction.new(topic.user, [topic.id], type: 'remove_tags')
+      topic_ids = tba.perform!
+      expect(topic_ids).to eq([topic.id])
+      topic.reload
+      expect(topic.tags.size).to eq(0)
+    end
+
+    context "when user can't edit topic" do
+      before do
+        Guardian.any_instance.expects(:can_edit?).returns(false)
+      end
+
+      it "doesn't remove the tags" do
+        tba = TopicsBulkAction.new(topic.user, [topic.id], type: 'remove_tags')
+        topic_ids = tba.perform!
+        expect(topic_ids).to eq([])
+        topic.reload
+        expect(topic.tags.map(&:name)).to contain_exactly(tag1.name, tag2.name)
+      end
+    end
+  end
+
 end

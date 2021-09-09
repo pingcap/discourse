@@ -26,6 +26,7 @@ class ImportScripts::MyBB < ImportScripts::Base
   BATCH_SIZE = 1000
   BASE = ""
   QUIET = true
+  IMPORT_DELETED_POSTS = false
 
   def initialize
     super
@@ -115,6 +116,7 @@ class ImportScripts::MyBB < ImportScripts::Base
           FROM #{TABLE_PREFIX}posts p,
                #{TABLE_PREFIX}threads t
          WHERE p.tid = t.tid
+        #{'AND (p.visible = 1 AND t.visible = 1)' unless IMPORT_DELETED_POSTS}
       ORDER BY p.dateline
          LIMIT #{BATCH_SIZE}
         OFFSET #{offset};
@@ -190,14 +192,14 @@ class ImportScripts::MyBB < ImportScripts::Base
     if quoted_post_id_from_imported
       begin
         post = Post.find(quoted_post_id_from_imported)
-        return "post:#{post.post_number}, topic:#{post.topic_id}"
+        "post:#{post.post_number}, topic:#{post.topic_id}"
       rescue
         puts "Could not find migrated post #{quoted_post_id_from_imported} quoted by original post #{post_id} as #{quoted_post_id}"
-        return ""
+        ""
       end
     else
       puts "Original post #{post_id} quotes nonexistent post #{quoted_post_id}"
-      return ""
+      ""
     end
   end
 

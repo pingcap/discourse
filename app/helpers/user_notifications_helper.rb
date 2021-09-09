@@ -13,7 +13,7 @@ module UserNotificationsHelper
   end
 
   def correct_top_margin(html, desired)
-    fragment = Nokogiri::HTML.fragment(html)
+    fragment = Nokogiri::HTML5.fragment(html)
     if para = fragment.css("p:first").first
       para["style"] = "margin-top: #{desired};"
     end
@@ -27,12 +27,12 @@ module UserNotificationsHelper
     logo_url
   end
 
-  def html_site_link(color)
-    "<a href='#{Discourse.base_url}' style='color: ##{color}'>#{@site_name}</a>"
+  def html_site_link
+    "<a href='#{Discourse.base_url}'>#{@site_name}</a>"
   end
 
   def first_paragraphs_from(html)
-    doc = Nokogiri::HTML(html)
+    doc = Nokogiri::HTML5(html)
 
     result = +""
     length = 0
@@ -47,9 +47,9 @@ module UserNotificationsHelper
 
     return result unless result.blank?
 
-    # If there is no first paragaph with text, return the first paragraph with
+    # If there is no first paragraph with text, return the first paragraph with
     # something else (an image) or div (a onebox).
-    doc.css('body > p, body > div').first
+    doc.css('body > p:not(:empty), body > div:not(:empty), body > p > div.lightbox-wrapper img').first
   end
 
   def email_excerpt(html_arg, post = nil)
@@ -62,7 +62,6 @@ module UserNotificationsHelper
   end
 
   def show_username_on_post(post)
-    return true if SiteSetting.prioritize_username_in_ux
     return true unless SiteSetting.enable_names?
     return true unless SiteSetting.display_name_on_posts?
     return true unless post.user.name.present?
@@ -71,8 +70,6 @@ module UserNotificationsHelper
   end
 
   def show_name_on_post(post)
-    return true unless SiteSetting.prioritize_username_in_ux
-
     SiteSetting.enable_names? &&
       SiteSetting.display_name_on_posts? &&
       post.user.name.present? &&
@@ -101,11 +98,11 @@ module UserNotificationsHelper
   end
 
   def email_image_url(basename)
-    UrlHelper.absolute("#{Discourse.base_uri}/images/emails/#{basename}")
+    UrlHelper.absolute("#{Discourse.base_path}/images/emails/#{basename}")
   end
 
   def url_for_email(href)
-    URI(href).host.present? ? href : UrlHelper.absolute("#{Discourse.base_uri}#{href}")
+    URI(href).host.present? ? href : UrlHelper.absolute("#{Discourse.base_path}#{href}")
   rescue URI::Error
     href
   end

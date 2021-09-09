@@ -26,11 +26,18 @@ end
 end
 
 DiscourseEvent.on(:post_edited) do |post, topic_changed|
-  if post.topic
-    WebHook.enqueue_post_hooks(:post_edited, post)
+  unless post.topic&.trashed?
 
+    # if we are editing the OP and the topic is changed, do not send
+    # the post_edited event -- this event is sent separately because
+    # when we update the OP in the UI we send two API calls in this order:
+    #
+    # PUT /t/topic-name
+    # PUT /post/243552
     if post.is_first_post? && topic_changed
       WebHook.enqueue_topic_hooks(:topic_edited, post.topic)
+    else
+      WebHook.enqueue_post_hooks(:post_edited, post)
     end
   end
 end
@@ -41,6 +48,7 @@ end
   user_logged_in
   user_approved
   user_updated
+  user_confirmed_email
 ).each do |event|
   DiscourseEvent.on(event) do |user|
     WebHook.enqueue_object_hooks(:user, user, event)
@@ -74,8 +82,23 @@ end
   end
 end
 
-DiscourseEvent.on(:reviewable_created) do |reviewable|
-  WebHook.enqueue_object_hooks(:reviewable, reviewable, :reviewable_created, reviewable.serializer)
+%i(
+  user_badge_granted
+).each do |event|
+  # user_badge_revoked
+  DiscourseEvent.on(event) do |badge, user_id|
+    ub = UserBadge.find_by(badge: badge, user_id: user_id)
+    WebHook.enqueue_object_hooks(:user_badge, ub, event, UserBadgeSerializer)
+  end
+end
+
+%i(
+  reviewable_created
+  reviewable_score_updated
+).each do |event|
+  DiscourseEvent.on(event) do |reviewable|
+    WebHook.enqueue_object_hooks(:reviewable, reviewable, event, reviewable.serializer)
+  end
 end
 
 DiscourseEvent.on(:reviewable_transitioned_to) do |status, reviewable|
@@ -84,4 +107,15 @@ end
 
 DiscourseEvent.on(:notification_created) do |notification|
   WebHook.enqueue_object_hooks(:notification, notification, :notification_created, NotificationSerializer)
+end
+
+DiscourseEvent.on(:user_added_to_group) do |user, group, options|
+  group_user = GroupUser.find_by(user: user, group: group)
+  WebHook.enqueue_object_hooks(:group_user, group_user, :user_added_to_group, WebHookGroupUserSerializer)
+end
+
+DiscourseEvent.on(:like_created) do |post_action|
+  user = post_action.user
+  group_ids = user.groups.map(&:id)
+  WebHook.enqueue_object_hooks(:like, post_action, :post_liked, WebHookLikeSerializer, group_ids: group_ids)
 end

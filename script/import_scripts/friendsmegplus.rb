@@ -68,12 +68,12 @@ class ImportScripts::FMGP < ImportScripts::Base
     @usermap = {}
 
     # G+ user IDs to filter out (spam, abuse) — no topics or posts, silence and suspend when creating
-    # loaded from blacklist.json as array of google ids `[ 92310293874, 12378491235293 ]`
-    @blacklist = Set[]
+    # loaded from blocklist.json as array of google ids `[ 92310293874, 12378491235293 ]`
+    @blocklist = Set[]
 
     # G+ user IDs whose posts are useful; if this is set, include only
-    # posts (and non-blacklisted comments) authored by these IDs
-    @whitelist = nil
+    # posts (and non-blocklisted comments) authored by these IDs
+    @allowlist = nil
 
     # Tags to apply to every topic; empty Array to not have any tags applied everywhere
     @globaltags = [ "gplus" ]
@@ -117,10 +117,10 @@ class ImportScripts::FMGP < ImportScripts::Base
         @categories = load_fmgp_json(arg)
       elsif arg.end_with?("usermap.json")
         @usermap = load_fmgp_json(arg)
-      elsif arg.end_with?('blacklist.json')
-        @blacklist = load_fmgp_json(arg).map { |i| i.to_s }.to_set
-      elsif arg.end_with?('whitelist.json')
-        @whitelist = load_fmgp_json(arg).map { |i| i.to_s }.to_set
+      elsif arg.end_with?('blocklist.json')
+        @blocklist = load_fmgp_json(arg).map { |i| i.to_s }.to_set
+      elsif arg.end_with?('allowlist.json')
+        @allowlist = load_fmgp_json(arg).map { |i| i.to_s }.to_set
       elsif arg.end_with?('.json')
         @feeds << load_fmgp_json(arg)
       elsif arg == '--dry-run'
@@ -149,8 +149,8 @@ class ImportScripts::FMGP < ImportScripts::Base
     @posts_imported = 0
     @topics_skipped = 0
     @posts_skipped = 0
-    @topics_blacklisted = 0
-    @posts_blacklisted = 0
+    @blocked_topics = 0
+    @blocked_posts = 0
     # count uploaded file size
     @totalsize = 0
 
@@ -324,10 +324,10 @@ class ImportScripts::FMGP < ImportScripts::Base
             newuser.approved = true
             newuser.approved_by_id = @system_user.id
             newuser.approved_at = newuser.created_at
-            if @blacklist.include?(id.to_s)
+            if @blocklist.include?(id.to_s)
               now = DateTime.now
               forever = 1000.years.from_now
-              # you can suspend as well if you want your blacklist to
+              # you can suspend as well if you want your blocklist to
               # be hard to recover from
               #newuser.suspended_at = now
               #newuser.suspended_till = forever
@@ -348,7 +348,7 @@ class ImportScripts::FMGP < ImportScripts::Base
         # user already on system
         u = User.find(google_user_info.user_id)
         if u.silenced? || u.suspended?
-          @blacklist.add(id)
+          @blocklist.add(id)
         end
         @users[id] = u
         email = u.email
@@ -371,7 +371,7 @@ class ImportScripts::FMGP < ImportScripts::Base
             category["posts"].each do |post|
               # G+ post / Discourse topic
               import_topic(post, category)
-              print("\r#{@topics_imported}/#{@posts_imported} topics/posts (skipped: #{@topics_skipped}/#{@posts_skipped} blacklisted: #{@topics_blacklisted}/#{@posts_blacklisted})       ")
+              print("\r#{@topics_imported}/#{@posts_imported} topics/posts (skipped: #{@topics_skipped}/#{@posts_skipped} blocklisted: #{@blocked_topics}/#{@blocked_posts})       ")
             end
           end
         end
@@ -389,13 +389,13 @@ class ImportScripts::FMGP < ImportScripts::Base
       @topics_skipped += 1
     else
       # new post
-      if !@whitelist.nil? && !@whitelist.include?(post["author"]["id"])
-        # only ignore non-whitelisted if whitelist defined
+      if !@allowlist.nil? && !@allowlist.include?(post["author"]["id"])
+        # only ignore non-allowlisted if allowlist defined
         return
       end
       postmap = make_postmap(post, category, nil)
       if postmap.nil?
-        @topics_blacklisted += 1
+        @blocked_topics += 1
         return
       end
       p = create_post(postmap, postmap[:id]) if !@dryrun
@@ -409,7 +409,7 @@ class ImportScripts::FMGP < ImportScripts::Base
       else
         commentmap = make_postmap(comment, nil, p)
         if commentmap.nil?
-          @posts_blacklisted += 1
+          @blocked_posts += 1
         else
           @posts_imported += 1
           new_comment = create_post(commentmap, commentmap[:id]) if !@dryrun
@@ -420,7 +420,7 @@ class ImportScripts::FMGP < ImportScripts::Base
 
   def make_postmap(post, category, parent)
     post_author_id = post["author"]["id"]
-    return nil if @blacklist.include?(post_author_id.to_s)
+    return nil if @blocklist.include?(post_author_id.to_s)
 
     raw = formatted_message(post)
     # if no message, image, or images, it's just empty
@@ -573,7 +573,7 @@ class ImportScripts::FMGP < ImportScripts::Base
       # Also deal with 0x80 (really‽) and non-breaking spaces
       text = fragment[1].gsub(/(\u200d|\u0080)/, "").gsub(/\u00a0/, " ")
       if fragment[2].nil?
-        return text
+        text
       else
         if fragment[2]["italic"].present?
           text = "<i>#{text}</i>"
@@ -585,7 +585,7 @@ class ImportScripts::FMGP < ImportScripts::Base
           # s more likely than del to represent user intent?
           text = "<s>#{text}</s>"
         end
-        return text
+        text
       end
     elsif fragment[0] == 1
       "\n"
@@ -604,17 +604,17 @@ class ImportScripts::FMGP < ImportScripts::Base
       # G+ occasionally doesn't put proper spaces after users
       if user = find_user_by_import_id(fragment[2])
         # user was in this import's authors
-        return "@#{user.username} "
+        "@#{user.username} "
       else
         if google_user_info = UserAssociatedAccount.find_by(provider_name: 'google_oauth2', provider_uid: fragment[2])
           # user was not in this import, but has logged in or been imported otherwise
           user = User.find(google_user_info.user_id)
-          return "@#{user.username} "
+          "@#{user.username} "
         else
           raise RuntimeError.new("Google user #{fragment[1]} (id #{fragment[2]}) not imported") if !@dryrun
           # if you want to fall back to their G+ name, just erase the raise above,
           # but this should not happen
-          return "<b>+#{fragment[1]}</b>"
+          "<b>+#{fragment[1]}</b>"
         end
       end
     elsif fragment[0] == 4
@@ -669,14 +669,14 @@ class ImportScripts::FMGP < ImportScripts::Base
     end
     if text == url
       # leave the URL bare and Discourse will do the right thing
-      return url
+      url
     else
       # It turns out that the only place we get here, google has done its own text
       # interpolation that doesn't look good on Discourse, so while it looks like
       # this should be:
       # return "[#{text}](#{url})"
       # it actually looks better to throw away the google-provided text:
-      return url
+      url
     end
   end
 end

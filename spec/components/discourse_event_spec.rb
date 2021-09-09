@@ -31,10 +31,16 @@ describe DiscourseEvent do
       )
     }
 
+    let(:event_handler) do
+      Proc.new { |user| user.name = 'Two Face' }
+    end
+
     before do
-      DiscourseEvent.on(:acid_face) do |user|
-        user.name = 'Two Face'
-      end
+      DiscourseEvent.on(:acid_face, &event_handler)
+    end
+
+    after do
+      DiscourseEvent.off(:acid_face, &event_handler)
     end
 
     context 'when event does not exist' do
@@ -60,21 +66,42 @@ describe DiscourseEvent do
 
     context 'when multiple events exist' do
 
-      before do
-        DiscourseEvent.on(:acid_face) do |user|
-          user.job = 'Supervillian'
-        end
+      let(:event_handler_2) do
+        Proc.new { |user| user.job = 'Supervillain' }
+      end
 
+      before do
+        DiscourseEvent.on(:acid_face, &event_handler_2)
         DiscourseEvent.trigger(:acid_face, harvey)
       end
 
+      after do
+        DiscourseEvent.off(:acid_face, &event_handler_2)
+      end
+
       it 'triggers both events' do
-        expect(harvey.job).to eq('Supervillian')
+        expect(harvey.job).to eq('Supervillain')
         expect(harvey.name).to eq('Two Face')
+      end
+    end
+
+    context '#all_off' do
+
+      let(:event_handler_2) do
+        Proc.new { |user| user.job = 'Supervillain' }
+      end
+
+      before do
+        DiscourseEvent.on(:acid_face, &event_handler_2)
+      end
+
+      it 'removes all handlers with a key' do
+        harvey.job = 'gardening'
+        DiscourseEvent.all_off(:acid_face)
+        DiscourseEvent.trigger(:acid_face, harvey) # Doesn't change anything
+        expect(harvey.job).to eq('gardening')
       end
 
     end
-
   end
-
 end

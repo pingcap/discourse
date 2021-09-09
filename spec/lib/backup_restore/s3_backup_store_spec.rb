@@ -6,14 +6,14 @@ require 'backup_restore/s3_backup_store'
 require_relative 'shared_examples_for_backup_store'
 
 describe BackupRestore::S3BackupStore do
-  before(:all) do
+  before do
     @s3_client = Aws::S3::Client.new(stub_responses: true)
     @s3_options = { client: @s3_client }
 
     @objects = []
 
     def expected_prefix
-      Rails.configuration.multisite ? "backups/#{RailsMultisite::ConnectionManagement.current_db}/" : ""
+      "#{RailsMultisite::ConnectionManagement.current_db}/"
     end
 
     def check_context(context)
@@ -22,7 +22,7 @@ describe BackupRestore::S3BackupStore do
       expect(context.params[:prefix]).to eq(expected_prefix) if context.params.key?(:prefix)
     end
 
-    @s3_client.stub_responses(:list_objects, -> (context) do
+    @s3_client.stub_responses(:list_objects_v2, -> (context) do
       check_context(context)
 
       { contents: objects_with_prefix(context) }
@@ -65,9 +65,7 @@ describe BackupRestore::S3BackupStore do
         last_modified: Time.zone.now
       }
     end)
-  end
 
-  before do
     SiteSetting.s3_backup_bucket = "s3-backup-bucket"
     SiteSetting.s3_access_key_id = "s3-access-key-id"
     SiteSetting.s3_secret_access_key = "s3-secret-access-key"
@@ -82,7 +80,7 @@ describe BackupRestore::S3BackupStore do
 
   context "S3 specific behavior" do
     before { create_backups }
-    after(:all) { remove_backups }
+    after { remove_backups }
 
     describe "#delete_old" do
       it "doesn't delete files when cleanup is disabled" do
@@ -102,26 +100,21 @@ describe BackupRestore::S3BackupStore do
 
   def objects_with_prefix(context)
     prefix = context.params[:prefix]
-
-    if prefix.blank?
-      @objects.reject { |obj| obj[:key].include?("backups/") }
-    else
-      @objects.select { |obj| obj[:key].start_with?(prefix) }
-    end
+    @objects.select { |obj| obj[:key].start_with?(prefix) }
   end
 
   def create_backups
     @objects.clear
 
-    @objects << { key: "b.tar.gz", size: 17, last_modified: Time.parse("2018-09-13T15:10:00Z") }
-    @objects << { key: "a.tgz", size: 29, last_modified: Time.parse("2018-02-11T09:27:00Z") }
-    @objects << { key: "r.sql.gz", size: 11, last_modified: Time.parse("2017-12-20T03:48:00Z") }
-    @objects << { key: "no-backup.txt", size: 12, last_modified: Time.parse("2018-09-05T14:27:00Z") }
-    @objects << { key: "subfolder/c.tar.gz", size: 23, last_modified: Time.parse("2019-01-24T18:44:00Z") }
+    @objects << { key: "default/b.tar.gz", size: 17, last_modified: Time.parse("2018-09-13T15:10:00Z") }
+    @objects << { key: "default/a.tgz", size: 29, last_modified: Time.parse("2018-02-11T09:27:00Z") }
+    @objects << { key: "default/r.sql.gz", size: 11, last_modified: Time.parse("2017-12-20T03:48:00Z") }
+    @objects << { key: "default/no-backup.txt", size: 12, last_modified: Time.parse("2018-09-05T14:27:00Z") }
+    @objects << { key: "default/subfolder/c.tar.gz", size: 23, last_modified: Time.parse("2019-01-24T18:44:00Z") }
 
-    @objects << { key: "backups/second/multi-2.tar.gz", size: 19, last_modified: Time.parse("2018-11-27T03:16:54Z") }
-    @objects << { key: "backups/second/multi-1.tar.gz", size: 22, last_modified: Time.parse("2018-11-26T03:17:09Z") }
-    @objects << { key: "backups/second/subfolder/multi-3.tar.gz", size: 23, last_modified: Time.parse("2019-01-24T18:44:00Z") }
+    @objects << { key: "second/multi-2.tar.gz", size: 19, last_modified: Time.parse("2018-11-27T03:16:54Z") }
+    @objects << { key: "second/multi-1.tar.gz", size: 22, last_modified: Time.parse("2018-11-26T03:17:09Z") }
+    @objects << { key: "second/subfolder/multi-3.tar.gz", size: 23, last_modified: Time.parse("2019-01-24T18:44:00Z") }
   end
 
   def remove_backups

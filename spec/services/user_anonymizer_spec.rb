@@ -39,8 +39,8 @@ describe UserAnonymizer do
       expect(user.reload.email).to eq("#{user.username}@anonymized.invalid")
     end
 
-    it "changes the primary email address when there is an email domain whitelist" do
-      SiteSetting.email_domains_whitelist = 'example.net|wayne.com|discourse.org'
+    it "changes the primary email address when there is an email domain allowlist" do
+      SiteSetting.allowed_email_domains = 'example.net|wayne.com|discourse.org'
 
       make_anonymous
       expect(user.reload.email).to eq("#{user.username}@anonymized.invalid")
@@ -198,26 +198,33 @@ describe UserAnonymizer do
       expect(history.details).not_to match(orig_username)
     end
 
-    it "removes external auth assocations" do
-      user.github_user_info = GithubUserInfo.create(user_id: user.id, screen_name: "example", github_user_id: "examplel123123")
+    it "removes external auth associations" do
       user.user_associated_accounts = [UserAssociatedAccount.create(user_id: user.id, provider_uid: "example", provider_name: "facebook")]
       user.single_sign_on_record = SingleSignOnRecord.create(user_id: user.id, external_id: "example", last_payload: "looks good")
       user.oauth2_user_infos = [Oauth2UserInfo.create(user_id: user.id, uid: "example", provider: "example")]
-      UserOpenId.create(user_id: user.id, email: user.email, url: "http://example.com/openid", active: true)
       make_anonymous
       user.reload
-      expect(user.github_user_info).to eq(nil)
       expect(user.user_associated_accounts).to be_empty
       expect(user.single_sign_on_record).to eq(nil)
       expect(user.oauth2_user_infos).to be_empty
-      expect(user.user_open_ids.count).to eq(0)
     end
 
     it "removes api key" do
-      ApiKey.create(user_id: user.id)
+      ApiKey.create!(user_id: user.id)
+
       expect { make_anonymous }.to change { ApiKey.count }.by(-1)
+
       user.reload
       expect(user.api_keys).to be_empty
+    end
+
+    it "removes user api key" do
+      user_api_key = Fabricate(:user_api_key, user: user)
+
+      expect { make_anonymous }.to change { UserApiKey.count }.by(-1)
+
+      user.reload
+      expect(user.user_api_keys).to be_empty
     end
 
     context "executes job" do
@@ -226,11 +233,11 @@ describe UserAnonymizer do
       end
 
       it "removes invites" do
-        Fabricate(:invite, user: user)
-        Fabricate(:invite, user: another_user)
+        Fabricate(:invited_user, invite: Fabricate(:invite), user: user)
+        Fabricate(:invited_user, invite: Fabricate(:invite), user: another_user)
 
-        expect { make_anonymous }.to change { Invite.count }.by(-1)
-        expect(Invite.where(user_id: user.id).count).to eq(0)
+        expect { make_anonymous }.to change { InvitedUser.count }.by(-1)
+        expect(InvitedUser.where(user_id: user.id).count).to eq(0)
       end
 
       it "removes email tokens" do
@@ -359,6 +366,19 @@ describe UserAnonymizer do
       expect(user_profile_view.reload.ip_address).to eq(anon_ip)
     end
 
+  end
+
+  describe "anonymize_emails" do
+    it "destroys all associated invites" do
+      invite = Fabricate(:invite, email: 'test@example.com')
+      user = invite.redeem
+
+      Jobs.run_immediately!
+      described_class.make_anonymous(user, admin)
+
+      expect(user.email).not_to eq('test@example.com')
+      expect(Invite.exists?(id: invite.id)).to eq(false)
+    end
   end
 
 end

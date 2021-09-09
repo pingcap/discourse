@@ -25,87 +25,46 @@ module Jobs
       s3_hostname = URI.parse(base_url).hostname
       s3_cdn_hostname = URI.parse(SiteSetting.Upload.s3_cdn_url || "").hostname
 
-      # Any URLs in site settings are fair game
-      ignore_urls = [
-        SiteSetting.logo_url(warn: false),
-        SiteSetting.logo_small_url(warn: false),
-        SiteSetting.digest_logo_url(warn: false),
-        SiteSetting.mobile_logo_url(warn: false),
-        SiteSetting.large_icon_url(warn: false),
-        SiteSetting.favicon_url(warn: false),
-        SiteSetting.default_opengraph_image_url(warn: false),
-        SiteSetting.twitter_summary_large_image_url(warn: false),
-        SiteSetting.apple_touch_icon_url(warn: false),
-        *SiteSetting.selectable_avatars.split("\n"),
-      ].flatten.map do |url|
-        if url.present?
-          url = url.dup
-
-          if s3_cdn_hostname.present? && s3_hostname.present?
-            url.gsub!(s3_cdn_hostname, s3_hostname)
-          end
-
-          url[base_url] && url[url.index(base_url)..-1]
-        else
-          nil
-        end
-      end.compact.uniq
-
       result = Upload.by_users
         .where("uploads.retain_hours IS NULL OR uploads.created_at < current_timestamp - interval '1 hour' * uploads.retain_hours")
         .where("uploads.created_at < ?", grace_period.hour.ago)
-        .joins(<<~SQL)
-          LEFT JOIN site_settings ss
-          ON NULLIF(ss.value, '')::integer = uploads.id
-          AND ss.data_type = #{SiteSettings::TypeSupervisor.types[:upload].to_i}
-        SQL
+        .where("uploads.access_control_post_id IS NULL")
         .joins("LEFT JOIN post_uploads pu ON pu.upload_id = uploads.id")
-        .joins("LEFT JOIN users u ON u.uploaded_avatar_id = uploads.id")
-        .joins("LEFT JOIN user_avatars ua ON ua.gravatar_upload_id = uploads.id OR ua.custom_upload_id = uploads.id")
-        .joins("LEFT JOIN user_profiles up2 ON up2.profile_background = uploads.url OR up2.card_background = uploads.url")
-        .joins("LEFT JOIN user_profiles up ON up.profile_background_upload_id = uploads.id OR up.card_background_upload_id = uploads.id")
-        .joins("LEFT JOIN categories c ON c.uploaded_logo_id = uploads.id OR c.uploaded_background_id = uploads.id")
-        .joins("LEFT JOIN custom_emojis ce ON ce.upload_id = uploads.id")
-        .joins("LEFT JOIN theme_fields tf ON tf.upload_id = uploads.id")
-        .joins("LEFT JOIN user_exports ue ON ue.upload_id = uploads.id")
         .where("pu.upload_id IS NULL")
-        .where("u.uploaded_avatar_id IS NULL")
-        .where("ua.gravatar_upload_id IS NULL AND ua.custom_upload_id IS NULL")
-        .where("up.profile_background_upload_id IS NULL AND up.card_background_upload_id IS NULL")
-        .where("up2.profile_background IS NULL AND up2.card_background IS NULL")
-        .where("c.uploaded_logo_id IS NULL AND c.uploaded_background_id IS NULL")
-        .where("ce.upload_id IS NULL")
-        .where("tf.upload_id IS NULL")
-        .where("ue.upload_id IS NULL")
-        .where("ss.value IS NULL")
-
-      result = result.where("uploads.url NOT IN (?)", ignore_urls) if ignore_urls.present?
+        .with_no_non_post_relations
 
       result.find_each do |upload|
         if upload.sha1.present?
           encoded_sha = Base62.encode(upload.sha1.hex)
           next if ReviewableQueuedPost.pending.where("payload->>'raw' LIKE '%#{upload.sha1}%' OR payload->>'raw' LIKE '%#{encoded_sha}%'").exists?
           next if Draft.where("data LIKE '%#{upload.sha1}%' OR data LIKE '%#{encoded_sha}%'").exists?
+          next if ThemeSetting.where(data_type: ThemeSetting.types[:upload]).where("value LIKE ?", "%#{upload.sha1}%").exists?
+          if defined?(ChatMessage) &&
+              ChatMessage.where("message LIKE ? OR message LIKE ?", "%#{upload.sha1}%", "%#{encoded_sha}%").exists?
+            next
+          end
           upload.destroy
         else
           upload.delete
         end
       end
 
+      ExternalUploadStub.cleanup!
+
       self.last_cleanup = Time.zone.now.to_i
     end
 
     def last_cleanup=(v)
-      $redis.setex(last_cleanup_key, 7.days.to_i, v.to_s)
+      Discourse.redis.setex(last_cleanup_key, 7.days.to_i, v.to_s)
     end
 
     def last_cleanup
-      v = $redis.get(last_cleanup_key)
+      v = Discourse.redis.get(last_cleanup_key)
       v ? v.to_i : v
     end
 
     def reset_last_cleanup!
-      $redis.del(last_cleanup_key)
+      Discourse.redis.del(last_cleanup_key)
     end
 
     protected

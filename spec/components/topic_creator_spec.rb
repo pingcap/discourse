@@ -3,7 +3,6 @@
 require 'rails_helper'
 
 describe TopicCreator do
-
   fab!(:user)      { Fabricate(:user, trust_level: TrustLevel[2]) }
   fab!(:moderator) { Fabricate(:moderator) }
   fab!(:admin)     { Fabricate(:admin) }
@@ -36,6 +35,18 @@ describe TopicCreator do
         expect(TopicCreator.create(moderator, Guardian.new(moderator), valid_attrs)).to be_valid
       end
 
+      it "supports both meta_data and custom_fields" do
+        opts = valid_attrs.merge(
+          meta_data: { import_topic_id: "foo" },
+          custom_fields: { import_id: "bar" }
+        )
+
+        topic = TopicCreator.create(admin, Guardian.new(admin), opts)
+
+        expect(topic.custom_fields["import_topic_id"]).to eq("foo")
+        expect(topic.custom_fields["import_id"]).to eq("bar")
+      end
+
       context 'regular user' do
         before { SiteSetting.min_trust_to_create_topic = TrustLevel[0] }
 
@@ -58,6 +69,16 @@ describe TopicCreator do
           topic = TopicCreator.create(user, Guardian.new(user), valid_attrs.merge(category: category.id))
           expect(topic).to be_valid
           expect(topic.category).to eq(category)
+        end
+
+        it "ignores participant_count without raising an error" do
+          topic = TopicCreator.create(user, Guardian.new(user), valid_attrs.merge(participant_count: 3))
+          expect(topic.participant_count).to eq(1)
+        end
+
+        it "accepts participant_count in import mode" do
+          topic = TopicCreator.create(user, Guardian.new(user), valid_attrs.merge(import_mode: true, participant_count: 3))
+          expect(topic.participant_count).to eq(3)
         end
       end
     end
@@ -82,7 +103,7 @@ describe TopicCreator do
 
       context 'staff-only tags' do
         before do
-          create_staff_tags(['alpha'])
+          create_staff_only_tags(['alpha'])
         end
 
         it "regular users can't add staff-only tags" do
@@ -102,9 +123,9 @@ describe TopicCreator do
         fab!(:category) { Fabricate(:category, name: "beta", minimum_required_tags: 2) }
 
         it "fails for regular user if minimum_required_tags is not satisfied" do
-          expect do
-            TopicCreator.create(user, Guardian.new(user), valid_attrs.merge(category: category.id))
-          end.to raise_error(ActiveRecord::Rollback)
+          expect(
+            TopicCreator.new(user, Guardian.new(user), valid_attrs.merge(category: category.id)).valid?
+          ).to be_falsy
         end
 
         it "lets admin create a topic regardless of minimum_required_tags" do
@@ -132,27 +153,27 @@ describe TopicCreator do
         fab!(:category) { Fabricate(:category, name: "beta", required_tag_group: tag_group, min_tags_from_required_group: 1) }
 
         it "when no tags are not present" do
-          expect do
-            TopicCreator.create(user, Guardian.new(user), valid_attrs.merge(category: category.id))
-          end.to raise_error(ActiveRecord::Rollback)
+          expect(
+            TopicCreator.new(user, Guardian.new(user), valid_attrs.merge(category: category.id)).valid?
+          ).to be_falsy
         end
 
         it "when tags are not part of the tag group" do
-          expect do
-            TopicCreator.create(user, Guardian.new(user), valid_attrs.merge(category: category.id, tags: ['nope']))
-          end.to raise_error(ActiveRecord::Rollback)
+          expect(
+            TopicCreator.new(user, Guardian.new(user), valid_attrs.merge(category: category.id, tags: ['nope'])).valid?
+          ).to be_falsy
         end
 
         it "when requirement is met" do
-          topic = TopicCreator.create(user, Guardian.new(user), valid_attrs.merge(category: category.id, tags: [tag1.name, tag2.name]))
-          expect(topic).to be_valid
-          expect(topic.tags.length).to eq(2)
+          expect(
+            TopicCreator.new(user, Guardian.new(user), valid_attrs.merge(category: category.id, tags: [tag1.name, tag2.name])).valid?
+          ).to be_truthy
         end
 
         it "lets staff ignore the restriction" do
-          topic = TopicCreator.create(user, Guardian.new(admin), valid_attrs.merge(category: category.id))
-          expect(topic).to be_valid
-          expect(topic.tags.length).to eq(0)
+          expect(
+            TopicCreator.new(user, Guardian.new(admin), valid_attrs.merge(category: category.id)).valid?
+          ).to be_truthy
         end
       end
     end
@@ -176,16 +197,6 @@ describe TopicCreator do
           expect(TopicCreator.create(user, Guardian.new(user), pm_valid_attrs)).to be_valid
         end
 
-        it "should be possible for a trusted user to send private messages via email" do
-          SiteSetting.manual_polling_enabled = true
-          SiteSetting.reply_by_email_address = "sam+%{reply_key}@sam.com"
-          SiteSetting.reply_by_email_enabled = true
-          SiteSetting.enable_personal_email_messages = true
-          SiteSetting.min_trust_to_send_email_messages = TrustLevel[1]
-
-          expect(TopicCreator.create(user, Guardian.new(user), pm_to_email_valid_attrs)).to be_valid
-        end
-
         it "enable_personal_messages setting should not be checked when sending private message to staff via flag" do
           SiteSetting.enable_personal_messages = false
           SiteSetting.min_trust_to_send_messages = TrustLevel[4]
@@ -198,7 +209,6 @@ describe TopicCreator do
           SiteSetting.manual_polling_enabled = true
           SiteSetting.reply_by_email_address = "sam+%{reply_key}@sam.com"
           SiteSetting.reply_by_email_enabled = true
-          SiteSetting.enable_personal_email_messages = true
           SiteSetting.min_trust_to_send_email_messages = TrustLevel[1]
           attrs = pm_to_email_valid_attrs.dup
           attrs[:target_emails] = "t" * 256
@@ -215,14 +225,59 @@ describe TopicCreator do
             TopicCreator.create(user, Guardian.new(user), pm_valid_attrs)
           end.to raise_error(ActiveRecord::Rollback)
         end
+      end
 
-        it "min_trust_to_send_email_messages should be checked when sending private messages via email" do
-          SiteSetting.min_trust_to_send_email_messages = TrustLevel[4]
-
-          expect do
-            TopicCreator.create(user, Guardian.new(user), pm_to_email_valid_attrs)
-          end.to raise_error(ActiveRecord::Rollback)
+      context 'to emails' do
+        it 'works for staff' do
+          SiteSetting.min_trust_to_send_email_messages = 'staff'
+          expect(TopicCreator.create(admin, Guardian.new(admin), pm_to_email_valid_attrs)).to be_valid
         end
+
+        it 'work for trusted users' do
+          SiteSetting.min_trust_to_send_email_messages = 3
+          user.update!(trust_level: 3)
+          expect(TopicCreator.create(user, Guardian.new(user), pm_to_email_valid_attrs)).to be_valid
+        end
+
+        it 'does not work for non-staff' do
+          SiteSetting.min_trust_to_send_email_messages = 'staff'
+          expect { TopicCreator.create(user, Guardian.new(user), pm_to_email_valid_attrs) }.to raise_error(ActiveRecord::Rollback)
+        end
+
+        it 'does not work for untrusted users' do
+          SiteSetting.min_trust_to_send_email_messages = 3
+          user.update!(trust_level: 2)
+          expect { TopicCreator.create(user, Guardian.new(user), pm_to_email_valid_attrs) }.to raise_error(ActiveRecord::Rollback)
+        end
+      end
+    end
+
+    context 'setting timestamps' do
+      it 'supports Time instances' do
+        freeze_time
+
+        topic = TopicCreator.create(user, Guardian.new(user), valid_attrs.merge(
+          created_at: 1.week.ago,
+          pinned_at: 3.days.ago
+        ))
+
+        expect(topic.created_at).to eq_time(1.week.ago)
+        expect(topic.pinned_at).to eq_time(3.days.ago)
+      end
+
+      it 'supports strings' do
+        freeze_time
+
+        time1 = Time.zone.parse('2019-09-02')
+        time2 = Time.zone.parse('2020-03-10 15:17')
+
+        topic = TopicCreator.create(user, Guardian.new(user), valid_attrs.merge(
+          created_at: '2019-09-02',
+          pinned_at: '2020-03-10 15:17'
+        ))
+
+        expect(topic.created_at).to eq_time(time1)
+        expect(topic.pinned_at).to eq_time(time2)
       end
     end
   end

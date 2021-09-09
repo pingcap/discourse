@@ -25,16 +25,6 @@ class SiteController < ApplicationController
     render json: custom_emoji
   end
 
-  def selectable_avatars
-    avatars = if SiteSetting.selectable_avatars_enabled?
-      (SiteSetting.selectable_avatars.presence || "").split("\n")
-    else
-      []
-    end
-
-    render json: avatars, root: false
-  end
-
   def basic_info
     results = {
       logo_url: UrlHelper.absolute(SiteSetting.site_logo_url),
@@ -44,7 +34,8 @@ class SiteController < ApplicationController
       title: SiteSetting.title,
       description: SiteSetting.site_description,
       header_primary_color: ColorScheme.hex_for_name('header_primary') || '333333',
-      header_background_color: ColorScheme.hex_for_name('header_background') || 'ffffff'
+      header_background_color: ColorScheme.hex_for_name('header_background') || 'ffffff',
+      login_required: SiteSetting.login_required
     }
 
     if mobile_logo_url = SiteSetting.site_mobile_logo_url.presence

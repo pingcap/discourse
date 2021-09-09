@@ -99,6 +99,36 @@ describe PostActionCreator do
       expect(score.reviewed_at).to be_blank
     end
 
+    describe "Auto hide spam flagged posts" do
+      before do
+        user.trust_level = TrustLevel[3]
+        post.user.trust_level = TrustLevel[0]
+        SiteSetting.high_trust_flaggers_auto_hide_posts = true
+      end
+
+      it "hides the post when the flagger is a TL3 user and the poster is a TL0 user" do
+        result = PostActionCreator.create(user, post, :spam)
+
+        expect(post.hidden?).to eq(true)
+      end
+
+      it 'does not hide the post if the setting is disabled' do
+        SiteSetting.high_trust_flaggers_auto_hide_posts = false
+
+        result = PostActionCreator.create(user, post, :spam)
+
+        expect(post.hidden?).to eq(false)
+      end
+
+      it 'sets the force_review field' do
+        result = PostActionCreator.create(user, post, :spam)
+
+        reviewable = result.reviewable
+
+        expect(reviewable.force_review).to eq(true)
+      end
+    end
+
     context "existing reviewable" do
       let!(:reviewable) {
         PostActionCreator.create(Fabricate(:user), post, :inappropriate).reviewable
@@ -114,6 +144,59 @@ describe PostActionCreator do
         expect(score).to be_present
         expect(score.reviewed_by).to be_blank
         expect(score.reviewed_at).to be_blank
+      end
+
+      describe "When the post was already reviewed by staff" do
+        fab!(:admin) { Fabricate(:admin) }
+
+        before { reviewable.perform(admin, :ignore) }
+
+        it "fails because the post was recently reviewed" do
+          freeze_time 10.seconds.from_now
+          result = PostActionCreator.create(user, post, :inappropriate)
+
+          expect(result.success?).to eq(false)
+        end
+
+        it "succeeds with other flag action types" do
+          freeze_time 10.seconds.from_now
+          spam_result = PostActionCreator.create(user, post, :spam)
+
+          expect(reviewable.reload.pending?).to eq(true)
+        end
+
+        it "fails when other flag action types are open" do
+          freeze_time 10.seconds.from_now
+          spam_result = PostActionCreator.create(user, post, :spam)
+
+          inappropriate_result = PostActionCreator.create(Fabricate(:user), post, :inappropriate)
+
+          reviewable.reload
+
+          expect(inappropriate_result.success?).to eq(false)
+          expect(reviewable.pending?).to eq(true)
+          expect(reviewable.reviewable_scores.select(&:pending?).count).to eq(1)
+        end
+
+        it "successfully flags the post if it was reviewed more than 24 hours ago" do
+          reviewable.update!(updated_at: 25.hours.ago)
+          post.last_version_at = 30.hours.ago
+
+          result = PostActionCreator.create(user, post, :inappropriate)
+
+          expect(result.success?).to eq(true)
+          expect(result.reviewable).to be_present
+        end
+
+        it "successfully flags the post if it was edited after being reviewed" do
+          reviewable.update!(updated_at: 10.minutes.ago)
+          post.last_version_at = 1.minute.ago
+
+          result = PostActionCreator.create(user, post, :inappropriate)
+
+          expect(result.success?).to eq(true)
+          expect(result.reviewable).to be_present
+        end
       end
     end
   end
@@ -134,6 +217,45 @@ describe PostActionCreator do
       expect(scores[0]).to be_agreed
       expect(scores[1]).to be_agreed
       expect(reviewable.reload).to be_approved
+    end
+  end
+
+  context "queue_for_review" do
+    fab!(:admin) { Fabricate(:admin) }
+
+    it 'fails if the user is not a staff member' do
+      creator = PostActionCreator.new(
+        user, post,
+        PostActionType.types[:notify_moderators], queue_for_review: true
+      )
+      result = creator.perform
+
+      expect(result.success?).to eq(false)
+    end
+
+    it 'creates a new reviewable and hides the post' do
+      result = build_creator.perform
+
+      expect(result.success?).to eq(true)
+
+      score = result.reviewable.reviewable_scores.last
+      expect(score.reason).to eq('queued_by_staff')
+      expect(post.reload.hidden?).to eq(true)
+    end
+
+    it 'hides the topic even if it has replies' do
+      Fabricate(:post, topic: post.topic)
+
+      result = build_creator.perform
+
+      expect(post.topic.reload.visible?).to eq(false)
+    end
+
+    def build_creator
+      PostActionCreator.new(
+        admin, post,
+        PostActionType.types[:notify_moderators], queue_for_review: true
+      )
     end
   end
 end

@@ -22,8 +22,8 @@ RSpec.describe ApplicationController do
     end
 
     it "should redirect to SSO if enabled" do
-      SiteSetting.sso_url = 'http://someurl.com'
-      SiteSetting.enable_sso = true
+      SiteSetting.discourse_connect_url = 'http://someurl.com'
+      SiteSetting.enable_discourse_connect = true
       get "/"
       expect(response).to redirect_to("/session/sso")
     end
@@ -41,6 +41,24 @@ RSpec.describe ApplicationController do
 
       # Google and GitHub enabled, direct to login UI
       SiteSetting.enable_github_logins = true
+      get "/"
+      expect(response).to redirect_to("/login")
+    end
+
+    it "should not redirect to SSO when auth_immediately is disabled" do
+      SiteSetting.auth_immediately = false
+      SiteSetting.discourse_connect_url = 'http://someurl.com'
+      SiteSetting.enable_discourse_connect = true
+
+      get "/"
+      expect(response).to redirect_to("/login")
+    end
+
+    it "should not redirect to authenticator when auth_immediately is disabled" do
+      SiteSetting.auth_immediately = false
+      SiteSetting.enable_google_oauth2_logins = true
+      SiteSetting.enable_local_logins = false
+
       get "/"
       expect(response).to redirect_to("/login")
     end
@@ -83,6 +101,24 @@ RSpec.describe ApplicationController do
         get "/"
         expect(response).to redirect_to("/login")
       end
+    end
+
+    it 'contains authentication data when cookies exist' do
+      cookie_data = "someauthenticationdata"
+      cookies['authentication_data'] = cookie_data
+      get '/login'
+      expect(response.status).to eq(200)
+      expect(response.body).to include("data-authentication-data=\"#{cookie_data}\"")
+      expect(response.headers["Set-Cookie"]).to include("authentication_data=;") # Delete cookie
+    end
+
+    it 'deletes authentication data cookie even if already authenticated' do
+      sign_in(Fabricate(:user))
+      cookies['authentication_data'] = "someauthenticationdata"
+      get '/'
+      expect(response.status).to eq(200)
+      expect(response.body).not_to include("data-authentication-data=")
+      expect(response.headers["Set-Cookie"]).to include("authentication_data=;") # Delete cookie
     end
   end
 
@@ -153,6 +189,51 @@ RSpec.describe ApplicationController do
       get "/"
       expect(response.status).to eq(200)
     end
+
+    it "correctly redirects for Unicode usernames" do
+      SiteSetting.enforce_second_factor = "all"
+      SiteSetting.unicode_usernames = true
+      user = sign_in(Fabricate(:unicode_user))
+
+      get "/"
+      expect(response).to redirect_to("/u/#{user.encoded_username}/preferences/second-factor")
+    end
+
+    context "when enforcing second factor for staff" do
+      before do
+        SiteSetting.enforce_second_factor = "staff"
+        sign_in(admin)
+      end
+
+      context "when the staff member has not enabled TOTP or security keys" do
+        it "redirects the staff to the second factor preferences" do
+          get "/"
+          expect(response).to redirect_to("/u/#{admin.username}/preferences/second-factor")
+        end
+      end
+
+      context "when the staff member has enabled TOTP" do
+        before do
+          Fabricate(:user_second_factor_totp, user: admin)
+        end
+
+        it "does not redirects the staff to set up 2FA" do
+          get "/"
+          expect(response.status).to eq(200)
+        end
+      end
+
+      context "when the staff member has enabled security keys" do
+        before do
+          Fabricate(:user_security_key_with_random_credential, user: admin)
+        end
+
+        it "does not redirects the staff to set up 2FA" do
+          get "/"
+          expect(response.status).to eq(200)
+        end
+      end
+    end
   end
 
   describe 'invalid request params' do
@@ -179,7 +260,7 @@ RSpec.describe ApplicationController do
       if (log.include? 'exception app middleware')
         # heisentest diagnostics
         puts
-        puts "EXTRA DIAGNOSTICS FOR INTERMITENT TEST FAIL"
+        puts "EXTRA DIAGNOSTICS FOR INTERMITTENT TEST FAIL"
         puts log
         puts ">> action_dispatch.exception"
         ex = request.env['action_dispatch.exception']
@@ -188,7 +269,7 @@ RSpec.describe ApplicationController do
 
       expect(log).not_to include('exception app middleware')
 
-      expect(JSON.parse(response.body)).to eq(
+      expect(response.parsed_body).to eq(
         "status" => 400,
         "error" => "Bad Request"
       )
@@ -201,9 +282,7 @@ RSpec.describe ApplicationController do
       get "/search/query.json", params: { trem: "misspelled term" }
 
       expect(response.status).to eq(400)
-      expect(JSON.parse(response.body)).to eq(
-        "errors" => ["param is missing or the value is empty: term"]
-      )
+      expect(response.parsed_body["errors"].first).to include("param is missing or the value is empty: term")
     end
   end
 
@@ -261,7 +340,7 @@ RSpec.describe ApplicationController do
         permalink = Permalink.create!(url: trashed_topic.relative_url, category_id: category.id)
         get "/t/#{trashed_topic.slug}/#{trashed_topic.id}"
         expect(response.status).to eq(301)
-        expect(response).to redirect_to("/forum/c/#{category.slug}")
+        expect(response).to redirect_to("/forum/c/#{category.slug}/#{category.id}")
 
         permalink.destroy
         permalink = Permalink.create!(url: trashed_topic.relative_url, post_id: new_topic.posts.last.id)
@@ -302,7 +381,7 @@ RSpec.describe ApplicationController do
 
         it 'should handle 404 to a css file' do
 
-          $redis.del("page_not_found_topics")
+          Discourse.cache.delete("page_not_found_topics:#{I18n.locale}")
 
           topic1 = Fabricate(:topic)
           get '/stylesheets/mobile_1_4cd559272273fe6d3c7db620c617d596a5fdf240.css', headers: { 'HTTP_ACCEPT' => 'text/css,*/*,q=0.1' }
@@ -323,7 +402,8 @@ RSpec.describe ApplicationController do
       end
 
       it 'should cache results' do
-        $redis.del("page_not_found_topics")
+        Discourse.cache.delete("page_not_found_topics:#{I18n.locale}")
+        Discourse.cache.delete("page_not_found_topics:fr")
 
         topic1 = Fabricate(:topic)
         get '/t/nope-nope/99999999'
@@ -335,6 +415,13 @@ RSpec.describe ApplicationController do
         expect(response.status).to eq(404)
         expect(response.body).to include(topic1.title)
         expect(response.body).to_not include(topic2.title)
+
+        # Different locale should have different cache
+        SiteSetting.default_locale = :fr
+        get '/t/nope-nope/99999999'
+        expect(response.status).to eq(404)
+        expect(response.body).to include(topic1.title)
+        expect(response.body).to include(topic2.title)
       end
     end
   end
@@ -355,13 +442,13 @@ RSpec.describe ApplicationController do
 
       get "/"
       expect(response.status).to eq(200)
-      expect(controller.theme_ids).to eq([theme.id])
+      expect(controller.theme_id).to eq(theme.id)
 
       theme.update_attribute(:user_selectable, false)
 
       get "/"
       expect(response.status).to eq(200)
-      expect(controller.theme_ids).to eq([SiteSetting.default_theme_id])
+      expect(controller.theme_id).to eq(SiteSetting.default_theme_id)
     end
 
     it "can be overridden with a cookie" do
@@ -371,15 +458,7 @@ RSpec.describe ApplicationController do
 
       get "/"
       expect(response.status).to eq(200)
-      expect(controller.theme_ids).to eq([theme2.id])
-
-      theme2.update!(user_selectable: false, component: true)
-      theme.add_relative_theme!(:child, theme2)
-      cookies['theme_ids'] = "#{theme.id},#{theme2.id}|#{user.user_option.theme_key_seq}"
-
-      get "/"
-      expect(response.status).to eq(200)
-      expect(controller.theme_ids).to eq([theme.id, theme2.id])
+      expect(controller.theme_id).to eq(theme2.id)
     end
 
     it "falls back to the default theme when the user has no cookies or preferences" do
@@ -389,25 +468,25 @@ RSpec.describe ApplicationController do
 
       get "/"
       expect(response.status).to eq(200)
-      expect(controller.theme_ids).to eq([theme2.id])
+      expect(controller.theme_id).to eq(theme2.id)
     end
 
     it "can be overridden with preview_theme_id param" do
       sign_in(admin)
-      cookies['theme_ids'] = "#{theme.id},#{theme2.id}|#{admin.user_option.theme_key_seq}"
+      cookies['theme_ids'] = "#{theme.id}|#{admin.user_option.theme_key_seq}"
 
       get "/", params: { preview_theme_id: theme2.id }
       expect(response.status).to eq(200)
-      expect(controller.theme_ids).to eq([theme2.id])
+      expect(controller.theme_id).to eq(theme2.id)
 
       get "/", params: { preview_theme_id: non_selectable_theme.id }
-      expect(controller.theme_ids).to eq([non_selectable_theme.id])
+      expect(controller.theme_id).to eq(non_selectable_theme.id)
     end
 
     it "does not allow non privileged user to preview themes" do
       sign_in(user)
       get "/", params: { preview_theme_id: non_selectable_theme.id }
-      expect(controller.theme_ids).to eq([SiteSetting.default_theme_id])
+      expect(controller.theme_id).to eq(SiteSetting.default_theme_id)
     end
 
     it "cookie can fail back to user if out of sync" do
@@ -416,7 +495,7 @@ RSpec.describe ApplicationController do
 
       get "/"
       expect(response.status).to eq(200)
-      expect(controller.theme_ids).to eq([theme.id])
+      expect(controller.theme_id).to eq(theme.id)
     end
   end
 
@@ -430,6 +509,20 @@ RSpec.describe ApplicationController do
       )
 
       expect(response.body).not_to include("test123")
+    end
+  end
+
+  describe 'allow_embedding_site_in_an_iframe' do
+
+    it "should have the 'X-Frame-Options' header with value 'sameorigin'" do
+      get("/latest")
+      expect(response.headers['X-Frame-Options']).to eq("SAMEORIGIN")
+    end
+
+    it "should not include the 'X-Frame-Options' header" do
+      SiteSetting.allow_embedding_site_in_an_iframe = true
+      get("/latest")
+      expect(response.headers).not_to include('X-Frame-Options')
     end
   end
 
@@ -522,7 +615,6 @@ RSpec.describe ApplicationController do
       script_src = parse(response.headers['Content-Security-Policy'])['script-src']
 
       expect(script_src).to include('example.com')
-      expect(script_src).to include("'unsafe-eval'")
     end
 
     it 'does not set CSP when responding to non-HTML' do
@@ -533,6 +625,19 @@ RSpec.describe ApplicationController do
 
       expect(response.headers).to_not include('Content-Security-Policy')
       expect(response.headers).to_not include('Content-Security-Policy-Report-Only')
+    end
+
+    it 'when GTM is enabled it adds the same nonce to the policy and the GTM tag' do
+      SiteSetting.content_security_policy = true
+      SiteSetting.gtm_container_id = 'GTM-ABCDEF'
+
+      get '/latest'
+      nonce = ApplicationHelper.google_tag_manager_nonce
+      expect(response.headers).to include('Content-Security-Policy')
+
+      script_src = parse(response.headers['Content-Security-Policy'])['script-src']
+      expect(script_src.to_s).to include(nonce)
+      expect(response.body).to include(nonce)
     end
 
     def parse(csp_string)
@@ -547,5 +652,183 @@ RSpec.describe ApplicationController do
     get '/', headers: { HTTP_ACCEPT: '*/*' }
     expect(response.status).to eq(200)
     expect(response.body).to include('Discourse')
+  end
+
+  it 'has canonical tag' do
+    get '/', headers: { HTTP_ACCEPT: '*/*' }
+    expect(response.body).to have_tag("link", with: { rel: "canonical", href: "http://test.localhost/" })
+    get '/?query_param=true', headers: { HTTP_ACCEPT: '*/*' }
+    expect(response.body).to have_tag("link", with: { rel: "canonical", href: "http://test.localhost/" })
+    get '/latest?page=2&additional_param=true', headers: { HTTP_ACCEPT: '*/*' }
+    expect(response.body).to have_tag("link", with: { rel: "canonical", href: "http://test.localhost/latest?page=2" })
+    get '/404', headers: { HTTP_ACCEPT: '*/*' }
+    expect(response.body).to have_tag("link", with: { rel: "canonical", href: "http://test.localhost/404" })
+    topic = create_post.topic
+    get "/t/#{topic.slug}/#{topic.id}"
+    expect(response.body).to have_tag("link", with: { rel: "canonical", href: "http://test.localhost/t/#{topic.slug}/#{topic.id}" })
+  end
+
+  context "default locale" do
+    before do
+      SiteSetting.default_locale = :fr
+      sign_in(Fabricate(:user))
+    end
+
+    after do
+      I18n.reload!
+    end
+
+    context "with rate limits" do
+      before do
+        RateLimiter.clear_all!
+        RateLimiter.enable
+      end
+
+      it "serves a LimitExceeded error in the preferred locale" do
+        SiteSetting.max_likes_per_day = 1
+        post1 = Fabricate(:post)
+        post2 = Fabricate(:post)
+        override = TranslationOverride.create(
+          locale: "fr",
+          translation_key: "rate_limiter.by_type.create_like",
+          value: "French LimitExceeded error message"
+        )
+        I18n.reload!
+
+        post "/post_actions.json", params: {
+          id: post1.id, post_action_type_id: PostActionType.types[:like]
+        }
+        expect(response.status).to eq(200)
+
+        post "/post_actions.json", params: {
+          id: post2.id, post_action_type_id: PostActionType.types[:like]
+        }
+        expect(response.status).to eq(429)
+        expect(response.parsed_body["errors"].first).to eq(override.value)
+      end
+    end
+
+    it "serves an InvalidParameters error with the default locale" do
+      override = TranslationOverride.create(
+        locale: "fr",
+        translation_key: "invalid_params",
+        value: "French InvalidParameters error message"
+      )
+      I18n.reload!
+
+      get "/search.json", params: { q: "hello\0hello" }
+      expect(response.status).to eq(400)
+      expect(response.parsed_body["errors"].first).to eq(override.value)
+    end
+  end
+
+  describe "set_locale" do
+    # Using /bootstrap.json because it returns a locale-dependent value
+    def headers(locale)
+      { HTTP_ACCEPT_LANGUAGE: locale }
+    end
+
+    context "allow_user_locale disabled" do
+      context "accept-language header differs from default locale" do
+        before do
+          SiteSetting.allow_user_locale = false
+          SiteSetting.default_locale = "en"
+        end
+
+        context "with an anonymous user" do
+          it "uses the default locale" do
+            get "/bootstrap.json", headers: headers("fr")
+            expect(response.status).to eq(200)
+            expect(response.parsed_body['bootstrap']['locale_script']).to end_with("en.js")
+          end
+        end
+
+        context "with a logged in user" do
+          it "it uses the default locale" do
+            user = Fabricate(:user, locale: :fr)
+            sign_in(user)
+
+            get "/bootstrap.json", headers: headers("fr")
+            expect(response.status).to eq(200)
+            expect(response.parsed_body['bootstrap']['locale_script']).to end_with("en.js")
+          end
+        end
+      end
+    end
+
+    context "set_locale_from_accept_language_header enabled" do
+      context "accept-language header differs from default locale" do
+        before do
+          SiteSetting.allow_user_locale = true
+          SiteSetting.set_locale_from_accept_language_header = true
+          SiteSetting.default_locale = "en"
+        end
+
+        context "with an anonymous user" do
+          it "uses the locale from the headers" do
+            get "/bootstrap.json", headers: headers("fr")
+            expect(response.status).to eq(200)
+            expect(response.parsed_body['bootstrap']['locale_script']).to end_with("fr.js")
+          end
+
+          it "doesn't leak after requests" do
+            get "/bootstrap.json", headers: headers("fr")
+            expect(response.status).to eq(200)
+            expect(response.parsed_body['bootstrap']['locale_script']).to end_with("fr.js")
+            expect(I18n.locale.to_s).to eq(SiteSettings::DefaultsProvider::DEFAULT_LOCALE)
+          end
+        end
+
+        context "with a logged in user" do
+          let(:user) { Fabricate(:user, locale: :fr) }
+
+          before do
+            sign_in(user)
+          end
+
+          it "uses the user's preferred locale" do
+            get "/bootstrap.json", headers: headers("fr")
+            expect(response.status).to eq(200)
+            expect(response.parsed_body['bootstrap']['locale_script']).to end_with("fr.js")
+          end
+
+          it "serves a 404 page in the preferred locale" do
+            get "/missingroute", headers: headers("fr")
+            expect(response.status).to eq(404)
+            expected_title = I18n.t("page_not_found.title", locale: :fr)
+            expect(response.body).to include(CGI.escapeHTML(expected_title))
+          end
+
+          it "serves a RenderEmpty page in the preferred locale" do
+            get "/u/#{user.username}/preferences/interface"
+            expect(response.status).to eq(200)
+            expect(response.body).to have_tag('script', with: { src: "/assets/locales/fr.js" })
+          end
+        end
+      end
+
+      context "the preferred locale includes a region" do
+        it "returns the locale and region separated by an underscore" do
+          SiteSetting.allow_user_locale = true
+          SiteSetting.set_locale_from_accept_language_header = true
+          SiteSetting.default_locale = "en"
+
+          get "/bootstrap.json", headers: headers("zh-CN")
+          expect(response.status).to eq(200)
+          expect(response.parsed_body['bootstrap']['locale_script']).to end_with("zh_CN.js")
+        end
+      end
+
+      context 'accept-language header is not set' do
+        it 'uses the site default locale' do
+          SiteSetting.allow_user_locale = true
+          SiteSetting.default_locale = 'en'
+
+          get "/bootstrap.json", headers: headers("")
+          expect(response.status).to eq(200)
+          expect(response.parsed_body['bootstrap']['locale_script']).to end_with("en.js")
+        end
+      end
+    end
   end
 end

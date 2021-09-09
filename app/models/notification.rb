@@ -4,8 +4,9 @@ class Notification < ActiveRecord::Base
   belongs_to :user
   belongs_to :topic
 
+  has_one :shelved_notification
+
   MEMBERSHIP_REQUEST_CONSOLIDATION_WINDOW_HOURS = 24
-  MEMBERSHIP_REQUEST_CONSOLIDATION_THRESHOLD = 3
 
   validates_presence_of :data
   validates_presence_of :notification_type
@@ -15,10 +16,25 @@ class Notification < ActiveRecord::Base
   scope :visible , lambda { joins('LEFT JOIN topics ON notifications.topic_id = topics.id')
     .where('topics.id IS NULL OR topics.deleted_at IS NULL') }
 
-  scope :filter_by_display_username_and_type, ->(username, notification_type) {
-    where("data::json ->> 'display_username' = ?", username)
-      .where(notification_type: notification_type)
-      .order(created_at: :desc)
+  scope :filter_by_consolidation_data, ->(notification_type, data) {
+    notifications = where(notification_type: notification_type)
+
+    case notification_type
+    when types[:liked], types[:liked_consolidated]
+      key = "display_username"
+      consolidation_window = SiteSetting.likes_notification_consolidation_window_mins.minutes.ago
+    when types[:private_message]
+      key = "topic_title"
+      consolidation_window = MEMBERSHIP_REQUEST_CONSOLIDATION_WINDOW_HOURS.hours.ago
+    when types[:membership_request_consolidated]
+      key = "group_name"
+      consolidation_window = MEMBERSHIP_REQUEST_CONSOLIDATION_WINDOW_HOURS.hours.ago
+    end
+
+    notifications = notifications.where("created_at > ? AND data::json ->> '#{key}' = ?", consolidation_window, data[key.to_sym]) if data[key&.to_sym].present?
+    notifications = notifications.where("data::json ->> 'username2' IS NULL") if notification_type == types[:liked]
+
+    notifications
   }
 
   attr_accessor :skip_send_email
@@ -27,14 +43,39 @@ class Notification < ActiveRecord::Base
 
   after_commit(on: :create) do
     DiscourseEvent.trigger(:notification_created, self)
-    send_email unless consolidate_membership_requests
+    send_email unless NotificationConsolidator.new(self).consolidate!
+  end
+
+  before_create do
+    # if we have manually set the notification to high_priority on create then
+    # make sure that is respected
+    self.high_priority = self.high_priority || Notification.high_priority_types.include?(self.notification_type)
+  end
+
+  def self.purge_old!
+    return if SiteSetting.max_notifications_per_user == 0
+
+    DB.exec(<<~SQL, SiteSetting.max_notifications_per_user)
+      DELETE FROM notifications n1
+      USING (
+        SELECT * FROM (
+          SELECT
+            user_id,
+            id,
+            rank() OVER (PARTITION BY user_id ORDER BY id DESC)
+          FROM notifications
+        ) AS X
+        WHERE rank = ?
+      ) n2
+      WHERE n1.user_id = n2.user_id AND n1.id < n2.id
+    SQL
   end
 
   def self.ensure_consistency!
-    DB.exec(<<~SQL, Notification.types[:private_message])
+    DB.exec(<<~SQL)
       DELETE
         FROM notifications n
-       WHERE notification_type = ?
+       WHERE high_priority AND notification_type <> #{types[:chat_mention].to_i}
          AND NOT EXISTS (
             SELECT 1
               FROM posts p
@@ -70,8 +111,25 @@ class Notification < ActiveRecord::Base
                         post_approved: 20,
                         code_review_commit_approved: 21,
                         membership_request_accepted: 22,
-                        membership_request_consolidated: 23
+                        membership_request_consolidated: 23,
+                        bookmark_reminder: 24,
+                        reaction: 25,
+                        votes_released: 26,
+                        event_reminder: 27,
+                        event_invitation: 28,
+                        chat_mention: 29
                        )
+  end
+
+  def self.high_priority_types
+    @high_priority_types ||= [
+      types[:private_message],
+      types[:bookmark_reminder]
+    ]
+  end
+
+  def self.normal_priority_types
+    @normal_priority_types ||= types.reject { |_k, v| high_priority_types.include?(v) }.values
   end
 
   def self.mark_posts_read(user, topic_id, post_numbers)
@@ -176,14 +234,14 @@ class Notification < ActiveRecord::Base
 
     if notifications.present?
 
-      ids = DB.query_single(<<~SQL, count.to_i)
+      ids = DB.query_single(<<~SQL, limit: count.to_i)
          SELECT n.id FROM notifications n
          WHERE
-           n.notification_type = 6 AND
+           n.high_priority = TRUE AND
            n.user_id = #{user.id.to_i} AND
            NOT read
         ORDER BY n.id ASC
-        LIMIT ?
+        LIMIT :limit
       SQL
 
       if ids.length > 0
@@ -196,9 +254,9 @@ class Notification < ActiveRecord::Base
       end
 
       notifications.uniq(&:id).sort do |x, y|
-        if x.unread_pm? && !y.unread_pm?
+        if x.unread_high_priority? && !y.unread_high_priority?
           -1
-        elsif y.unread_pm? && !x.unread_pm?
+        elsif y.unread_high_priority? && !x.unread_high_priority?
           1
         else
           y.created_at <=> x.created_at
@@ -210,8 +268,8 @@ class Notification < ActiveRecord::Base
 
   end
 
-  def unread_pm?
-    Notification.types[:private_message] == self.notification_type && !read
+  def unread_high_priority?
+    self.high_priority? && !read
   end
 
   def post_id
@@ -227,71 +285,11 @@ class Notification < ActiveRecord::Base
   end
 
   def send_email
-    NotificationEmailer.process_notification(self) if !skip_send_email
-  end
+    return if skip_send_email
 
-  private
-
-  def consolidate_membership_requests
-    return unless unread_pm?
-
-    post_id = data_hash[:original_post_id]
-    return if post_id.blank?
-
-    custom_field = PostCustomField.select(:value).find_by(post_id: post_id, name: "requested_group_id")
-    return if custom_field.blank?
-
-    group_id = custom_field.value.to_i
-    group_name = Group.select(:name).find_by(id: group_id)&.name
-    return if group_name.blank?
-
-    consolidation_window = MEMBERSHIP_REQUEST_CONSOLIDATION_WINDOW_HOURS.hours.ago
-    timestamp = Time.zone.now
-    unread = user.notifications.unread
-
-    consolidated_notification = unread
-      .where("created_at > ? AND data::json ->> 'group_name' = ?", consolidation_window, group_name)
-      .find_by(notification_type: Notification.types[:membership_request_consolidated])
-
-    if consolidated_notification.present?
-      data = consolidated_notification.data_hash
-      data["count"] += 1
-
-      Notification.transaction do
-        consolidated_notification.update!(
-          data: data.to_json,
-          read: false,
-          updated_at: timestamp
-        )
-
-        destroy!
-      end
-
-      return true
-    end
-
-    notifications = unread
-      .where(notification_type: Notification.types[:private_message])
-      .where("created_at > ? AND data::json ->> 'topic_title' = ?", consolidation_window, data_hash[:topic_title])
-
-    return if notifications.count < MEMBERSHIP_REQUEST_CONSOLIDATION_THRESHOLD
-
-    Notification.transaction do
-      Notification.create!(
-        notification_type: Notification.types[:membership_request_consolidated],
-        user_id: user_id,
-        data: {
-          group_name: group_name,
-          count: notifications.count
-        }.to_json,
-        updated_at: timestamp,
-        created_at: timestamp
-      )
-
-      notifications.destroy_all
-    end
-
-    true
+    user.do_not_disturb? ?
+      ShelvedNotification.create(notification_id: self.id) :
+      NotificationEmailer.process_notification(self)
   end
 
 end
@@ -310,14 +308,15 @@ end
 #  topic_id          :integer
 #  post_number       :integer
 #  post_action_id    :integer
+#  high_priority     :boolean          default(FALSE), not null
 #
 # Indexes
 #
 #  idx_notifications_speedup_unread_count                       (user_id,notification_type) WHERE (NOT read)
 #  index_notifications_on_post_action_id                        (post_action_id)
-#  index_notifications_on_read_or_n_type                        (user_id,id DESC,read,topic_id) UNIQUE WHERE (read OR (notification_type <> 6))
 #  index_notifications_on_topic_id_and_post_number              (topic_id,post_number)
 #  index_notifications_on_user_id_and_created_at                (user_id,created_at)
-#  index_notifications_on_user_id_and_id                        (user_id,id) UNIQUE WHERE ((notification_type = 6) AND (NOT read))
 #  index_notifications_on_user_id_and_topic_id_and_post_number  (user_id,topic_id,post_number)
+#  index_notifications_read_or_not_high_priority                (user_id,id DESC,read,topic_id) WHERE (read OR (high_priority = false))
+#  index_notifications_unique_unread_high_priority              (user_id,id) UNIQUE WHERE ((NOT read) AND (high_priority = true))
 #

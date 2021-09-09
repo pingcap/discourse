@@ -1,5 +1,5 @@
 .body-page {
-  /* intended only for /about /faq, /guidelines, /tos, and /privacy */
+  /* covers /about, /faq, /guidelines, /tos, /privacy, and login-required */
   width: 100%;
   max-width: 700px;
   .about-page & {
@@ -9,22 +9,28 @@
     }
     .about.category-moderators {
       .badge-wrapper.bullet .badge-category {
-        color: $primary;
+        color: var(--primary);
       }
     }
   }
   .mobile-view & {
     font-size: $font-0;
-    margin-top: 20px;
   }
   li {
     margin-bottom: 8px;
   }
   .nav-pills {
-    margin-bottom: 20px;
+    margin: 0 0 2em;
   }
   ul:not(.nav-pills),
   ol:not(.nav-pills) {
     margin-left: 40px;
+  }
+}
+
+.body-page-button-container {
+  display: flex;
+  button {
+    margin-right: 0.75em;
   }
 }

@@ -544,6 +544,115 @@ describe StaffActionLogger do
       expect(user_history.action).to eq(UserHistory.actions[:post_rejected])
       expect(user_history.details).to include(reviewable.payload['raw'])
     end
+  end
 
+  describe 'log_topic_closed' do
+    fab!(:topic) { Fabricate(:topic) }
+
+    it "raises an error when argument is missing" do
+      expect { logger.log_topic_closed(nil) }.to raise_error(Discourse::InvalidParameters)
+    end
+
+    it "creates a new UserHistory record" do
+      expect { logger.log_topic_closed(topic, closed: true) }.to change { UserHistory.where(action: UserHistory.actions[:topic_closed]).count }.by(1)
+      expect { logger.log_topic_closed(topic, closed: false) }.to change { UserHistory.where(action: UserHistory.actions[:topic_opened]).count }.by(1)
+    end
+  end
+
+  describe 'log_topic_archived' do
+    fab!(:topic) { Fabricate(:topic) }
+
+    it "raises an error when argument is missing" do
+      expect { logger.log_topic_archived(nil) }.to raise_error(Discourse::InvalidParameters)
+    end
+
+    it "creates a new UserHistory record" do
+      expect { logger.log_topic_archived(topic, archived: true) }.to change { UserHistory.where(action: UserHistory.actions[:topic_archived]).count }.by(1)
+      expect { logger.log_topic_archived(topic, archived: false) }.to change { UserHistory.where(action: UserHistory.actions[:topic_unarchived]).count }.by(1)
+    end
+  end
+
+  describe 'log_post_staff_note' do
+    fab!(:post) { Fabricate(:post) }
+
+    it "raises an error when argument is missing" do
+      expect { logger.log_topic_archived(nil) }.to raise_error(Discourse::InvalidParameters)
+    end
+
+    it "creates a new UserHistory record" do
+      expect { logger.log_post_staff_note(post, { new_value: 'my note', old_value: nil }) }.to change { UserHistory.count }.by(1)
+      user_history = UserHistory.last
+      expect(user_history.action).to eq(UserHistory.actions[:post_staff_note_create])
+      expect(user_history.new_value).to eq('my note')
+      expect(user_history.previous_value).to eq(nil)
+
+      expect { logger.log_post_staff_note(post, { new_value: '', old_value: 'my note' }) }.to change { UserHistory.count }.by(1)
+      user_history = UserHistory.last
+      expect(user_history.action).to eq(UserHistory.actions[:post_staff_note_destroy])
+      expect(user_history.new_value).to eq(nil)
+      expect(user_history.previous_value).to eq('my note')
+    end
+  end
+
+  describe 'log_post_staff_note' do
+    fab!(:post) { Fabricate(:post) }
+
+    it "raises an error when argument is missing" do
+      expect { logger.log_topic_archived(nil) }.to raise_error(Discourse::InvalidParameters)
+    end
+
+    it "creates a new UserHistory record" do
+      expect { logger.log_post_staff_note(post, { new_value: 'my note', old_value: nil }) }.to change { UserHistory.count }.by(1)
+      user_history = UserHistory.last
+      expect(user_history.action).to eq(UserHistory.actions[:post_staff_note_create])
+      expect(user_history.new_value).to eq('my note')
+      expect(user_history.previous_value).to eq(nil)
+
+      expect { logger.log_post_staff_note(post, { new_value: nil, old_value: 'my note' }) }.to change { UserHistory.count }.by(1)
+      user_history = UserHistory.last
+      expect(user_history.action).to eq(UserHistory.actions[:post_staff_note_destroy])
+      expect(user_history.new_value).to eq(nil)
+      expect(user_history.previous_value).to eq('my note')
+    end
+  end
+
+  describe '#log_watched_words_creation' do
+    fab!(:watched_word) { Fabricate(:watched_word, action: WatchedWord.actions[:block]) }
+
+    it "raises an error when watched_word is missing" do
+      expect { logger.log_watched_words_creation(nil) }.to raise_error(Discourse::InvalidParameters)
+    end
+
+    it "creates a new UserHistory record" do
+      logger.log_watched_words_creation(watched_word)
+
+      expect(UserHistory.count).to eq(1)
+      user_history = UserHistory.last
+
+      expect(user_history.subject).to eq(nil)
+      expect(user_history.details).to include(watched_word.word)
+      expect(user_history.context).to eq("block")
+      expect(user_history.action).to eq(UserHistory.actions[:watched_word_create])
+    end
+  end
+
+  describe '#log_watched_words_deletion' do
+    fab!(:watched_word) { Fabricate(:watched_word, action: WatchedWord.actions[:block]) }
+
+    it "raises an error when watched_word is missing" do
+      expect { logger.log_watched_words_deletion(nil) }.to raise_error(Discourse::InvalidParameters)
+    end
+
+    it "creates a new UserHistory record" do
+      logger.log_watched_words_deletion(watched_word)
+
+      expect(UserHistory.count).to eq(1)
+      user_history = UserHistory.last
+
+      expect(user_history.subject).to eq(nil)
+      expect(user_history.details).to include(watched_word.word)
+      expect(user_history.context).to eq("block")
+      expect(user_history.action).to eq(UserHistory.actions[:watched_word_destroy])
+    end
   end
 end

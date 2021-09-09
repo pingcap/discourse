@@ -1,14 +1,13 @@
-# encoding: utf-8
-#
-# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+# WARNING: Never edit this file.
+# It will be overwritten when translations are pulled from Crowdin.
 #
 # To work with us on translations, join this project:
-# https://www.transifex.com/projects/p/discourse-org/
+# https://translate.discourse.org/
 
 zh_CN:
   js:
     details:
-      title: 隐藏详情
+      title: 隐藏详细信息
     composer:
-      details_title: 概要
-      details_text: "本文本将被隐藏"
+      details_title: 摘要
+      details_text: "此文本将被隐藏"

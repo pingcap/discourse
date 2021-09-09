@@ -63,16 +63,16 @@ class AdminDashboardData
   end
 
   def self.set_problems_started
-    existing_time = $redis.get(problems_started_key)
-    $redis.setex(problems_started_key, 14.days.to_i, existing_time || Time.zone.now.to_s)
+    existing_time = Discourse.redis.get(problems_started_key)
+    Discourse.redis.setex(problems_started_key, 14.days.to_i, existing_time || Time.zone.now.to_s)
   end
 
   def self.clear_problems_started
-    $redis.del problems_started_key
+    Discourse.redis.del problems_started_key
   end
 
   def self.problems_started_at
-    s = $redis.get(problems_started_key)
+    s = Discourse.redis.get(problems_started_key)
     s ? Time.zone.parse(s) : nil
   end
 
@@ -85,14 +85,12 @@ class AdminDashboardData
       'dashboard.bad_favicon_url',
       'dashboard.poll_pop3_timeout',
       'dashboard.poll_pop3_auth_error',
-      'dashboard.deprecated_api_usage',
-      'dashboard.update_mail_receiver'
     ]
 
     add_problem_check :rails_env_check, :host_names_check, :force_https_check,
                       :ram_check, :google_oauth2_config_check,
                       :facebook_config_check, :twitter_config_check,
-                      :github_config_check, :s3_config_check,
+                      :github_config_check, :s3_config_check, :s3_cdn_check,
                       :image_magick_check, :failing_emails_check,
                       :subfolder_ends_in_slash_check,
                       :pop3_polling_configuration, :email_polling_errored_recently,
@@ -109,19 +107,19 @@ class AdminDashboardData
   end
 
   def self.problem_message_check(i18n_key)
-    $redis.get(problem_message_key(i18n_key)) ? I18n.t(i18n_key, base_path: Discourse.base_path) : nil
+    Discourse.redis.get(problem_message_key(i18n_key)) ? I18n.t(i18n_key, base_path: Discourse.base_path) : nil
   end
 
   def self.add_problem_message(i18n_key, expire_seconds = nil)
     if expire_seconds.to_i > 0
-      $redis.setex problem_message_key(i18n_key), expire_seconds.to_i, 1
+      Discourse.redis.setex problem_message_key(i18n_key), expire_seconds.to_i, 1
     else
-      $redis.set problem_message_key(i18n_key), 1
+      Discourse.redis.set problem_message_key(i18n_key), 1
     end
   end
 
   def self.clear_problem_message(i18n_key)
-    $redis.del problem_message_key(i18n_key)
+    Discourse.redis.del problem_message_key(i18n_key)
   end
 
   def self.problem_message_key(i18n_key)
@@ -190,6 +188,12 @@ class AdminDashboardData
     nil
   end
 
+  def s3_cdn_check
+    if (GlobalSetting.use_s3? || SiteSetting.enable_s3_uploads) && SiteSetting.Upload.s3_cdn_url.blank?
+      I18n.t('dashboard.s3_cdn_warning')
+    end
+  end
+
   def image_magick_check
     I18n.t('dashboard.image_magick_warning') if SiteSetting.create_thumbnails && !system("command -v convert >/dev/null;")
   end
@@ -200,7 +204,7 @@ class AdminDashboardData
   end
 
   def subfolder_ends_in_slash_check
-    I18n.t('dashboard.subfolder_ends_in_slash') if Discourse.base_uri =~ /\/$/
+    I18n.t('dashboard.subfolder_ends_in_slash') if Discourse.base_path =~ /\/$/
   end
 
   def pop3_polling_configuration
@@ -229,7 +233,8 @@ class AdminDashboardData
       begin
         WordWatcher.word_matcher_regexp(action, raise_errors: true)
       rescue RegexpError => e
-        return I18n.t('dashboard.watched_word_regexp_error', base_path: Discourse.base_path, action: action)
+        translated_action = I18n.t("admin_js.admin.watched_words.actions.#{action}")
+        I18n.t('dashboard.watched_word_regexp_error', base_path: Discourse.base_path, action: translated_action)
       end
     end
     nil

@@ -4,6 +4,9 @@ require 'rails_helper'
 require 'email/sender'
 
 describe Email::Sender do
+  before do
+    SiteSetting.secure_media_allow_embed_images_in_emails = false
+  end
   fab!(:post) { Fabricate(:post) }
 
   context "disable_emails is enabled" do
@@ -48,6 +51,20 @@ describe Email::Sender do
         Mail::Message.any_instance.expects(:deliver_now).once
         message = Mail::Message.new(to: moderator.email, body: "hello")
         Email::Sender.new(message, :hello).send
+      end
+
+      it "delivers mail to staff user when confirming new email if user is provided" do
+        Mail::Message.any_instance.expects(:deliver_now).once
+        Fabricate(:email_change_request, {
+          user: moderator,
+          new_email: "newemail@testmoderator.com",
+          old_email: moderator.email,
+          change_state: EmailChangeRequest.states[:authorizing_new]
+        })
+        message = Mail::Message.new(
+          to: "newemail@testmoderator.com", body: "hello"
+        )
+        Email::Sender.new(message, :confirm_new_email, moderator).send
       end
     end
   end
@@ -319,6 +336,48 @@ describe Email::Sender do
         expect(email_log.email_type).to eq('valid_type')
         expect(email_log.to_address).to eq('eviltrout@test.domain')
         expect(email_log.user_id).to be_blank
+        expect(email_log.raw).to eq(nil)
+      end
+
+      context 'when the email is sent using group SMTP credentials' do
+        let(:reply) { Fabricate(:post, topic: post.topic, reply_to_user: post.user, reply_to_post_number: post.post_number) }
+        let(:notification) { Fabricate(:posted_notification, user: post.user, post: reply) }
+        let(:message) do
+          GroupSmtpMailer.send_mail(
+            group,
+            post.user.email,
+            post
+          )
+        end
+        let(:group) { Fabricate(:smtp_group) }
+
+        before do
+          SiteSetting.enable_smtp = true
+        end
+
+        it 'adds the group id and raw content to the email log' do
+          TopicAllowedGroup.create(topic: post.topic, group: group)
+
+          email_sender.send
+
+          expect(email_log).to be_present
+          expect(email_log.email_type).to eq('valid_type')
+          expect(email_log.to_address).to eq(post.user.email)
+          expect(email_log.user_id).to be_blank
+          expect(email_log.smtp_group_id).to eq(group.id)
+          expect(email_log.raw).to include("Hello world")
+        end
+
+        it "does not add any of the mailing list headers" do
+          TopicAllowedGroup.create(topic: post.topic, group: group)
+          email_sender.send
+
+          expect(message.header['List-ID']).to eq(nil)
+          expect(message.header['List-Post']).to eq(nil)
+          expect(message.header['List-Archive']).to eq(nil)
+          expect(message.header['Precedence']).to eq(nil)
+          expect(message.header['List-Unsubscribe']).to eq(nil)
+        end
       end
     end
 
@@ -335,6 +394,7 @@ describe Email::Sender do
       it 'should create the right log' do
         email_sender.send
         expect(email_log.post_id).to eq(post.id)
+        expect(email_log.topic_id).to eq(topic.id)
         expect(email_log.topic.id).to eq(topic.id)
       end
     end
@@ -375,7 +435,7 @@ describe Email::Sender do
     fab!(:post) { Fabricate(:post) }
     fab!(:reply) do
       raw = <<~RAW
-        Hello world!
+        Hello world! It’s a great day!
         #{UploadMarkdown.new(small_pdf).attachment_markdown}
         #{UploadMarkdown.new(large_pdf).attachment_markdown}
         #{UploadMarkdown.new(image).image_markdown}
@@ -404,6 +464,124 @@ describe Email::Sender do
         .to contain_exactly(*[small_pdf, large_pdf, csv_file].map(&:original_filename))
     end
 
+    context "when secure media enabled" do
+      before do
+        setup_s3
+        store = stub_s3_store
+
+        SiteSetting.secure_media = true
+        SiteSetting.login_required = true
+        SiteSetting.email_total_attachment_size_limit_kb = 14_000
+        SiteSetting.secure_media_max_email_embed_image_size_kb = 5_000
+
+        Jobs.run_immediately!
+        Jobs::PullHotlinkedImages.any_instance.expects(:execute)
+        FileStore::S3Store.any_instance.expects(:has_been_uploaded?).returns(true).at_least_once
+        CookedPostProcessor.any_instance.stubs(:get_size).returns([244, 66])
+
+        @secure_image_file = file_from_fixtures("logo.png", "images")
+        @secure_image = UploadCreator.new(@secure_image_file, "logo.png")
+          .create_for(Discourse.system_user.id)
+        @secure_image.update_secure_status(override: true)
+        @secure_image.update(access_control_post_id: reply.id)
+        reply.update(raw: reply.raw + "\n" + "#{UploadMarkdown.new(@secure_image).image_markdown}")
+        reply.rebake!
+      end
+
+      it "does not attach images when embedding them is not allowed" do
+        Email::Sender.new(message, :valid_type).send
+        expect(message.attachments.length).to eq(3)
+      end
+
+      context "when embedding secure images in email is allowed" do
+        before do
+          SiteSetting.secure_media_allow_embed_images_in_emails = true
+        end
+
+        it "can inline images with duplicate names" do
+          @secure_image_2 = UploadCreator.new(file_from_fixtures("logo-dev.png", "images"), "logo.png").create_for(Discourse.system_user.id)
+          @secure_image_2.update_secure_status(override: true)
+          @secure_image_2.update(access_control_post_id: reply.id)
+
+          Jobs::PullHotlinkedImages.any_instance.expects(:execute)
+          reply.update(raw: "#{UploadMarkdown.new(@secure_image).image_markdown}\n#{UploadMarkdown.new(@secure_image_2).image_markdown}")
+          reply.rebake!
+
+          Email::Sender.new(message, :valid_type).send
+          expect(message.attachments.size).to eq(2)
+          expect(message.to_s.scan(/cid:[\w\-@.]+/).length).to eq(2)
+          expect(message.to_s.scan(/cid:[\w\-@.]+/).uniq.length).to eq(2)
+        end
+
+        it "does not attach images that are not marked as secure" do
+          Email::Sender.new(message, :valid_type).send
+          expect(message.attachments.length).to eq(4)
+        end
+
+        it "does not embed images that are too big" do
+          SiteSetting.secure_media_max_email_embed_image_size_kb = 1
+          Email::Sender.new(message, :valid_type).send
+          expect(message.attachments.length).to eq(3)
+        end
+
+        it "uses the email styles to inline secure images and attaches the secure image upload to the email" do
+          Email::Sender.new(message, :valid_type).send
+          expect(message.attachments.length).to eq(4)
+          expect(message.attachments.map(&:filename))
+            .to contain_exactly(*[small_pdf, large_pdf, csv_file, @secure_image].map(&:original_filename))
+          expect(message.attachments["logo.png"].body.raw_source.force_encoding("UTF-8")).to eq(File.read(@secure_image_file))
+          expect(message.html_part.body).to include("cid:")
+          expect(message.html_part.body).to include("embedded-secure-image")
+          expect(message.attachments.length).to eq(4)
+        end
+
+        it "uses correct UTF-8 encoding for the body of the email" do
+          Email::Sender.new(message, :valid_type).send
+          expect(message.html_part.body).not_to include("Itâ\u0080\u0099s")
+          expect(message.html_part.body).to include("It’s")
+          expect(message.html_part.charset.downcase).to eq("utf-8")
+        end
+
+        context "when the uploaded secure image has an optimized image" do
+          let!(:optimized) { Fabricate(:optimized_image, upload: @secure_image) }
+          let!(:optimized_image_file) { file_from_fixtures("smallest.png", "images") }
+
+          before do
+            url = Discourse.store.store_optimized_image(optimized_image_file, optimized)
+            optimized.update(url: Discourse.store.absolute_base_url + '/' + url)
+            Discourse.store.cache_file(optimized_image_file, File.basename("#{optimized.sha1}.png"))
+          end
+
+          it "uses the email styles and the optimized image to inline secure images and attaches the secure image upload to the email" do
+            Email::Sender.new(message, :valid_type).send
+            expect(message.attachments.length).to eq(4)
+            expect(message.attachments.map(&:filename))
+              .to contain_exactly(*[small_pdf, large_pdf, csv_file, @secure_image].map(&:original_filename))
+            expect(message.attachments["logo.png"].body.raw_source.force_encoding("UTF-8")).to eq(File.read(optimized_image_file))
+            expect(message.html_part.body).to include("cid:")
+            expect(message.html_part.body).to include("embedded-secure-image")
+          end
+
+          it "uses the optimized image size in the max size limit calculation, not the original image size" do
+            SiteSetting.email_total_attachment_size_limit_kb = 45
+            Email::Sender.new(message, :valid_type).send
+            expect(message.attachments.length).to eq(4)
+            expect(message.attachments["logo.png"].body.raw_source.force_encoding("UTF-8")).to eq(File.read(optimized_image_file))
+          end
+        end
+      end
+    end
+
+    it "adds only non-image uploads as attachments to the email and leaves the image intact with original source" do
+      SiteSetting.email_total_attachment_size_limit_kb = 10_000
+      Email::Sender.new(message, :valid_type).send
+
+      expect(message.attachments.length).to eq(3)
+      expect(message.attachments.map(&:filename))
+        .to contain_exactly(*[small_pdf, large_pdf, csv_file].map(&:original_filename))
+      expect(message.html_part.body).to include("<img src=\"#{Discourse.base_url}#{image.url}\"")
+    end
+
     it "respects the size limit and attaches only files that fit into the max email size" do
       SiteSetting.email_total_attachment_size_limit_kb = 40
       Email::Sender.new(message, :valid_type).send
@@ -411,6 +589,23 @@ describe Email::Sender do
       expect(message.attachments.length).to eq(2)
       expect(message.attachments.map(&:filename))
         .to contain_exactly(*[small_pdf, csv_file].map(&:original_filename))
+    end
+
+    it "structures the email as a multipart/mixed with a multipart/alternative first part" do
+      SiteSetting.email_total_attachment_size_limit_kb = 10_000
+      Email::Sender.new(message, :valid_type).send
+
+      expect(message.content_type).to start_with("multipart/mixed")
+      expect(message.parts.size).to eq(4)
+      expect(message.parts[0].content_type).to start_with("multipart/alternative")
+      expect(message.parts[0].parts.size).to eq(2)
+    end
+
+    it "uses correct UTF-8 encoding for the body of the email" do
+      Email::Sender.new(message, :valid_type).send
+      expect(message.html_part.body).not_to include("Itâ\u0080\u0099s")
+      expect(message.html_part.body).to include("It’s")
+      expect(message.html_part.charset.downcase).to eq("utf-8")
     end
   end
 
@@ -429,6 +624,25 @@ describe Email::Sender do
 
       log = SkippedEmailLog.last
       expect(log.reason_type).to eq(SkippedEmailLog.reason_types[:sender_post_deleted])
+    end
+
+  end
+
+  context 'with a deleted topic' do
+
+    it 'should skip sending the email' do
+      post = Fabricate(:post, topic: Fabricate(:topic, deleted_at: 1.day.ago))
+
+      message = Mail::Message.new to: 'disc@ourse.org', body: 'some content'
+      message.header['X-Discourse-Post-Id'] = post.id
+      message.header['X-Discourse-Topic-Id'] = post.topic_id
+      message.expects(:deliver_now).never
+
+      email_sender = Email::Sender.new(message, :valid_type)
+      expect { email_sender.send }.to change { SkippedEmailLog.count }
+
+      log = SkippedEmailLog.last
+      expect(log.reason_type).to eq(SkippedEmailLog.reason_types[:sender_topic_deleted])
     end
 
   end
@@ -490,4 +704,30 @@ describe Email::Sender do
     end
   end
 
+  context "with cc addresses" do
+    let(:message) do
+      message = Mail::Message.new to: 'eviltrout@test.domain', body: 'test body', cc: 'someguy@test.com;otherguy@xyz.com'
+      message.stubs(:deliver_now)
+      message
+    end
+
+    fab!(:user) { Fabricate(:user) }
+    let(:email_sender) { Email::Sender.new(message, :valid_type, user) }
+
+    it "logs the cc addresses in the email log (but not users if they do not match the emails)" do
+      email_sender.send
+      email_log = EmailLog.last
+      expect(email_log.cc_addresses).to eq("someguy@test.com;otherguy@xyz.com")
+      expect(email_log.cc_users).to eq([])
+    end
+
+    it "logs the cc users if they match the emails" do
+      user1 = Fabricate(:user, email: "someguy@test.com")
+      user2 = Fabricate(:user, email: "otherguy@xyz.com")
+      email_sender.send
+      email_log = EmailLog.last
+      expect(email_log.cc_addresses).to eq("someguy@test.com;otherguy@xyz.com")
+      expect(email_log.cc_users).to match_array([user1, user2])
+    end
+  end
 end

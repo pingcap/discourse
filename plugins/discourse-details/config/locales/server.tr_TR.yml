@@ -1,8 +1,11 @@
-# encoding: utf-8
-#
-# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+# WARNING: Never edit this file.
+# It will be overwritten when translations are pulled from Crowdin.
 #
 # To work with us on translations, join this project:
-# https://www.transifex.com/projects/p/discourse-org/
+# https://translate.discourse.org/
 
-tr_TR: {}
+tr_TR:
+  site_settings:
+    details_enabled: 'Bir gönderiye genişletilebilir ayrıntılar ekleme özelliğini açın. Bu özelliğe, oluşturucunun araç çubuğundaki açılır menüden ulaşılabilir. Bu ayarı değiştirirseniz, tüm gönderileri "rake posts:rebake" komutu ile yeniden düzenlemeniz gerekir.'
+  details:
+    excerpt_details: "(daha fazla ayrıntı için tıklayın)"

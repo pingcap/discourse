@@ -40,6 +40,28 @@ describe TagUser do
       TagUser.change(user.id, tag.id, regular)
       expect(TopicUser.get(topic, user).notification_level).to eq tracking
     end
+
+    it "watches or tracks on change using a synonym" do
+      user = Fabricate(:user)
+      tag = Fabricate(:tag)
+      synonym = Fabricate(:tag, target_tag: tag)
+      post = create_post(tags: [tag.name])
+      topic = post.topic
+
+      TopicUser.change(user.id, topic.id, total_msecs_viewed: 1)
+
+      TagUser.change(user.id, synonym.id, tracking)
+      expect(TopicUser.get(topic, user).notification_level).to eq tracking
+
+      TagUser.change(user.id, synonym.id, watching)
+      expect(TopicUser.get(topic, user).notification_level).to eq watching
+
+      TagUser.change(user.id, synonym.id, regular)
+      expect(TopicUser.get(topic, user).notification_level).to eq tracking
+
+      expect(TagUser.where(user_id: user.id, tag_id: synonym.id).first).to be_nil
+      expect(TagUser.where(user_id: user.id, tag_id: tag.id).first).to be_present
+    end
   end
 
   context "batch_set" do
@@ -58,6 +80,30 @@ describe TagUser do
       expect(TopicUser.get(topic, user).notification_level).to eq tracking
 
       TagUser.batch_set(user, :watching, [tag.name])
+
+      expect(TopicUser.get(topic, user).notification_level).to eq watching
+
+      TagUser.batch_set(user, :watching, [])
+
+      expect(TopicUser.get(topic, user).notification_level).to eq tracking
+    end
+
+    it "watches and unwatches tags correctly using tag synonym" do
+
+      user = Fabricate(:user)
+      tag = Fabricate(:tag)
+      synonym = Fabricate(:tag, target_tag: tag)
+      post = create_post(tags: [tag.name])
+      topic = post.topic
+
+      # we need topic user record to ensure watch picks up other wise it is implicit
+      TopicUser.change(user.id, topic.id, total_msecs_viewed: 1)
+
+      TagUser.batch_set(user, :tracking, [synonym.name])
+
+      expect(TopicUser.get(topic, user).notification_level).to eq tracking
+
+      TagUser.batch_set(user, :watching, [synonym.name])
 
       expect(TopicUser.get(topic, user).notification_level).to eq watching
 
@@ -154,7 +200,7 @@ describe TagUser do
         staff = Fabricate(:admin)
         topic = create_post.topic
 
-        create_staff_tags(['foo'])
+        create_staff_only_tags(['foo'])
 
         result = DiscourseTagging.tag_topic_by_names(topic, Guardian.new(user), ["foo"])
         expect(result).to eq(false)
@@ -183,6 +229,50 @@ describe TagUser do
         TagUser.create!(user: user, tag: tracked_tag, notification_level: TagUser.notification_levels[:tracking])
         user.destroy!
         expect(TagUser.where(user_id: user.id).count).to eq(0)
+      end
+    end
+  end
+
+  describe "#notification_levels_for" do
+    let!(:tag1) { Fabricate(:tag) }
+    let!(:tag2) { Fabricate(:tag) }
+    let!(:tag3) { Fabricate(:tag) }
+    let!(:tag4) { Fabricate(:tag) }
+
+    context "for anon" do
+      let(:user) { nil }
+      before do
+        SiteSetting.default_tags_watching = tag1.name
+        SiteSetting.default_tags_tracking = tag2.name
+        SiteSetting.default_tags_watching_first_post = tag3.name
+        SiteSetting.default_tags_muted = tag4.name
+      end
+      it "every tag from the default_tags_* site settings get overridden to watching_first_post, except for muted" do
+        levels = TagUser.notification_levels_for(user)
+        expect(levels[tag1.name]).to eq(TagUser.notification_levels[:regular])
+        expect(levels[tag2.name]).to eq(TagUser.notification_levels[:regular])
+        expect(levels[tag3.name]).to eq(TagUser.notification_levels[:regular])
+        expect(levels[tag4.name]).to eq(TagUser.notification_levels[:muted])
+      end
+    end
+
+    context "for a user" do
+      let(:user) { Fabricate(:user) }
+      before do
+        TagUser.create(user: user, tag: tag1, notification_level: TagUser.notification_levels[:watching])
+        TagUser.create(user: user, tag: tag2, notification_level: TagUser.notification_levels[:tracking])
+        TagUser.create(user: user, tag: tag3, notification_level: TagUser.notification_levels[:watching_first_post])
+        TagUser.create(user: user, tag: tag4, notification_level: TagUser.notification_levels[:muted])
+      end
+      it "gets the tag_user notification levels for all tags the user is tracking and does not
+      include tags the user is not tracking at all" do
+        tag5 = Fabricate(:tag)
+        levels = TagUser.notification_levels_for(user)
+        expect(levels[tag1.name]).to eq(TagUser.notification_levels[:watching])
+        expect(levels[tag2.name]).to eq(TagUser.notification_levels[:tracking])
+        expect(levels[tag3.name]).to eq(TagUser.notification_levels[:watching_first_post])
+        expect(levels[tag4.name]).to eq(TagUser.notification_levels[:muted])
+        expect(levels.key?(tag5.name)).to eq(false)
       end
     end
   end

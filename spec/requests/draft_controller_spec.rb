@@ -21,6 +21,25 @@ describe DraftController do
     expect(Draft.get(user, 'xyz', 0)).to eq(%q({"my":"data"}))
   end
 
+  it "returns 404 when the key is missing" do
+    _user = sign_in(Fabricate(:user))
+    post "/draft.json", params: { data: { my: "data" }.to_json, sequence: 0 }
+    expect(response.status).to eq(404)
+  end
+
+  it "returns a draft if requested" do
+    user = sign_in(Fabricate(:user))
+    Draft.set(user, 'hello', 0, 'test')
+
+    get "/draft.json", params: { draft_key: 'hello' }
+    expect(response.status).to eq(200)
+    json = response.parsed_body
+    expect(json['draft']).to eq('test')
+
+    get "/draft.json"
+    expect(response.status).to eq(404)
+  end
+
   it 'checks for an conflict on update' do
     user = sign_in(Fabricate(:user))
     post = Fabricate(:post, user: user)
@@ -35,7 +54,7 @@ describe DraftController do
       }.to_json
     }
 
-    expect(JSON.parse(response.body)['conflict_user']).to eq(nil)
+    expect(response.parsed_body['conflict_user']).to eq(nil)
 
     post "/draft.json", params: {
       draft_key: "topic",
@@ -47,7 +66,7 @@ describe DraftController do
       }.to_json
     }
 
-    json = JSON.parse(response.body)
+    json = response.parsed_body
 
     expect(json['conflict_user']['id']).to eq(post.last_editor.id)
     expect(json['conflict_user']).to include('avatar_template')
@@ -75,7 +94,7 @@ describe DraftController do
     }
 
     expect(response.status).to eq(200)
-    json = JSON.parse(response.body)
+    json = response.parsed_body
     expect(json["draft_sequence"]).to eq(1)
   end
 
@@ -91,7 +110,7 @@ describe DraftController do
 
     expect(response.status).to eq(200)
 
-    json = JSON.parse(response.body)
+    json = response.parsed_body
     expect(json["draft_sequence"]).to eq(0)
 
     post "/draft.json", params: {
@@ -102,7 +121,7 @@ describe DraftController do
     }
 
     expect(response.status).to eq(200)
-    json = JSON.parse(response.body)
+    json = response.parsed_body
     expect(json["draft_sequence"]).to eq(1)
 
     expect(DraftSequence.current(user, "abc")).to eq(1)
@@ -115,19 +134,19 @@ describe DraftController do
     }
 
     expect(response.status).to eq(200)
-    json = JSON.parse(response.body)
-    expect(json["draft_sequence"]).to eq(1)
+    json = response.parsed_body
+    expect(json["draft_sequence"]).to eq(2)
 
     post "/draft.json", params: {
       draft_key: "abc",
-      sequence: 1,
+      sequence: 2,
       data: { c: "test" }.to_json,
       owner: "abc"
     }
 
     expect(response.status).to eq(200)
-    json = JSON.parse(response.body)
-    expect(json["draft_sequence"]).to eq(2)
+    json = response.parsed_body
+    expect(json["draft_sequence"]).to eq(3)
   end
 
   it 'raises an error for out-of-sequence draft setting' do

@@ -56,15 +56,17 @@ class PostDestroyer
   def destroy
     payload = WebHook.generate_payload(:post, @post) if WebHook.active_web_hooks(:post).exists?
     topic = @post.topic
+    is_first_post = @post.is_first_post? && topic
+    has_topic_web_hooks = is_first_post && WebHook.active_web_hooks(:topic).exists?
 
-    if @post.is_first_post? && topic
-      topic_view = TopicView.new(topic.id, Discourse.system_user)
-      topic_payload = WebHook.generate_payload(:topic, topic_view, WebHookTopicViewSerializer) if WebHook.active_web_hooks(:topic).exists?
+    if has_topic_web_hooks
+      topic_view = TopicView.new(topic.id, Discourse.system_user, skip_staff_action: true)
+      topic_payload = WebHook.generate_payload(:topic, topic_view, WebHookTopicViewSerializer)
     end
 
     delete_removed_posts_after = @opts[:delete_removed_posts_after] || SiteSetting.delete_removed_posts_after
 
-    if @user.staff? || delete_removed_posts_after < 1
+    if delete_removed_posts_after < 1 || post_is_reviewable? || Guardian.new(@user).can_moderate_topic?(topic) || permanent?
       perform_delete
     elsif @user.id == @post.user_id
       mark_for_deletion(delete_removed_posts_after)
@@ -74,33 +76,43 @@ class PostDestroyer
 
     DiscourseEvent.trigger(:post_destroyed, @post, @opts, @user)
     WebHook.enqueue_post_hooks(:post_destroyed, @post, payload)
+    Jobs.enqueue(:sync_topic_user_bookmarked, topic_id: topic.id) if topic
 
-    if @post.is_first_post? && @post.topic
-      UserActionManager.topic_destroyed(@post.topic)
-      DiscourseEvent.trigger(:topic_destroyed, @post.topic, @user)
-      WebHook.enqueue_topic_hooks(:topic_destroyed, @post.topic, topic_payload)
+    if is_first_post
+      UserProfile.remove_featured_topic_from_all_profiles(@topic)
+      UserActionManager.topic_destroyed(topic)
+      DiscourseEvent.trigger(:topic_destroyed, topic, @user)
+      WebHook.enqueue_topic_hooks(:topic_destroyed, topic, topic_payload) if has_topic_web_hooks
     end
   end
 
   def recover
-    if @user.staff? && @post.deleted_at
+    if (post_is_reviewable? || Guardian.new(@user).can_moderate_topic?(@post.topic)) && @post.deleted_at
       staff_recovered
     elsif @user.staff? || @user.id == @post.user_id
       user_recovered
     end
     topic = Topic.with_deleted.find @post.topic_id
+    topic.update_column(:user_id, Discourse::SYSTEM_USER_ID) if !topic.user_id
     topic.recover!(@user) if @post.is_first_post?
     topic.update_statistics
+
     UserActionManager.post_created(@post)
     DiscourseEvent.trigger(:post_recovered, @post, @opts, @user)
+    Jobs.enqueue(:sync_topic_user_bookmarked, topic_id: topic.id) if topic
+
     if @post.is_first_post?
       UserActionManager.topic_created(topic)
       DiscourseEvent.trigger(:topic_recovered, topic, @user)
       StaffActionLogger.new(@user).log_topic_delete_recover(topic, "recover_topic", @opts.slice(:context)) if @user.id != @post.user_id
+      update_imap_sync(@post, false)
     end
   end
 
   def staff_recovered
+    new_post_attrs = { user_deleted: false }
+    new_post_attrs[:user_id] = Discourse::SYSTEM_USER_ID if !@post.user_id
+    @post.update_columns(new_post_attrs)
     @post.recover!
 
     mark_topic_changed
@@ -132,9 +144,10 @@ class PostDestroyer
 
   # When a post is properly deleted. Well, it's still soft deleted, but it will no longer
   # show up in the topic
+  # Permanent option allows to hard delete.
   def perform_delete
     Post.transaction do
-      @post.trash!(@user)
+      permanent? ? @post.destroy! : @post.trash!(@user)
       if @post.topic
         make_previous_post_the_last_one
         mark_topic_changed
@@ -142,15 +155,24 @@ class PostDestroyer
         Topic.reset_highest(@post.topic_id)
       end
       trash_public_post_actions
+      trash_revisions
       trash_user_actions
       remove_associated_replies
       remove_associated_notifications
-      if @post.topic && @post.is_first_post?
-        StaffActionLogger.new(@user).log_topic_delete_recover(@post.topic, "delete_topic", @opts.slice(:context)) if @user.id != @post.user_id
-        @post.topic.trash!(@user)
-      elsif @user.id != @post.user_id
-        StaffActionLogger.new(@user).log_post_deletion(@post, @opts.slice(:context))
+
+      if @user.id != @post.user_id && !@opts[:skip_staff_log]
+        if @post.topic && @post.is_first_post?
+          StaffActionLogger.new(@user).log_topic_delete_recover(@post.topic, "delete_topic", @opts.slice(:context))
+        else
+          StaffActionLogger.new(@user).log_post_deletion(@post, @opts.slice(:context))
+        end
       end
+
+      if @post.topic && @post.is_first_post?
+        permanent? ? @post.topic.destroy! : @post.topic.trash!(@user)
+        PublishedPage.unpublish!(@user, @post.topic) if @post.topic.published_page
+      end
+      TopicLink.where(link_post_id: @post.id).destroy_all
       update_associated_category_latest_topic
       update_user_counts
       TopicUser.update_post_action_cache(post_id: @post.id)
@@ -164,9 +186,14 @@ class PostDestroyer
       end
     end
 
+    update_imap_sync(@post, true) if @post.topic&.deleted_at
     feature_users_in_the_topic if @post.topic
-    @post.publish_change_to_clients! :deleted if @post.topic
-    TopicTrackingState.publish_delete(@post.topic) if @post.topic && @post.post_number == 1
+    @post.publish_change_to_clients!(permanent? ? :destroyed : :deleted) if @post.topic
+    TopicTrackingState.send(permanent? ? :publish_destroy : :publish_delete, @post.topic) if @post.topic && @post.post_number == 1
+  end
+
+  def permanent?
+    @opts[:force_destroy] || (@opts[:permanent] && @user == @post.user && @post.topic.private_message?)
   end
 
   # When a user 'deletes' their own post. We just change the text.
@@ -174,9 +201,9 @@ class PostDestroyer
     I18n.with_locale(SiteSetting.default_locale) do
 
       # don't call revise from within transaction, high risk of deadlock
-      key = @post.is_first_post? ? 'js.topic.deleted_by_author' : 'js.post.deleted_by_author'
+      key = @post.is_first_post? ? 'js.topic.deleted_by_author_simple' : 'js.post.deleted_by_author_simple'
       @post.revise(@user,
-        { raw: I18n.t(key, count: delete_removed_posts_after) },
+        { raw: I18n.t(key) },
         force_new_version: true,
         deleting_post: true
       )
@@ -207,6 +234,13 @@ class PostDestroyer
 
   private
 
+  def post_is_reviewable?
+    return true if @user.staff?
+
+    topic = @post.topic || Topic.with_deleted.find(@post.topic_id)
+    Guardian.new(@user).can_review_topic?(topic) && Reviewable.exists?(target: @post)
+  end
+
   # we need topics to change if ever a post in them is deleted or created
   # this ensures users relying on this information can keep unread tracking
   # working as desired
@@ -220,14 +254,16 @@ class PostDestroyer
   end
 
   def make_previous_post_the_last_one
-    last_post = Post
+    last_post = Post.where("topic_id = ? and id <> ?", @post.topic_id, @post.id)
       .select(:created_at, :user_id, :post_number)
       .where("topic_id = ? and id <> ?", @post.topic_id, @post.id)
+      .where.not(user_id: nil)
+      .where.not(post_type: Post.types[:whisper])
       .order('created_at desc')
       .limit(1)
       .first
 
-    if last_post.present? && @post.topic.present?
+    if last_post.present?
       topic = @post.topic
       topic.last_posted_at = last_post.created_at
       topic.last_post_user_id = last_post.user_id
@@ -250,7 +286,9 @@ class PostDestroyer
 
   def trash_public_post_actions
     if public_post_actions = PostAction.publics.where(post_id: @post.id)
-      public_post_actions.each { |pa| pa.trash!(@user) }
+      public_post_actions.each { |pa| permanent? ? pa.destroy! : pa.trash!(@user) }
+
+      return if permanent?
 
       @post.custom_fields["deleted_public_actions"] = public_post_actions.ids
       @post.save_custom_fields
@@ -258,6 +296,11 @@ class PostDestroyer
       f = PostActionType.public_types.map { |k, _| ["#{k}_count", 0] }
       Post.with_deleted.where(id: @post.id).update_all(Hash[*f.flatten])
     end
+  end
+
+  def trash_revisions
+    return unless permanent?
+    @post.revisions.each(&:destroy!)
   end
 
   def agree(reviewable)
@@ -272,6 +315,8 @@ class PostDestroyer
   end
 
   def notify_deletion(reviewable)
+    return if @post.user.blank?
+
     allowed_user = @user.human? && @user.staff?
     return unless allowed_user && rs = reviewable.reviewable_scores.order('created_at DESC').first
 
@@ -305,10 +350,10 @@ class PostDestroyer
   end
 
   def remove_associated_replies
-    post_ids = PostReply.where(reply_id: @post.id).pluck(:post_id)
+    post_ids = PostReply.where(reply_post_id: @post.id).pluck(:post_id)
 
     if post_ids.present?
-      PostReply.where(reply_id: @post.id).delete_all
+      PostReply.where(reply_post_id: @post.id).delete_all
       Post.where(id: post_ids).each { |p| p.update_column :reply_count, p.replies.count }
     end
   end
@@ -344,11 +389,6 @@ class PostDestroyer
       author.user_stat.topic_count -= 1 if @post.is_first_post?
     end
 
-    # We don't count replies to your own topics in topic_reply_count
-    if @topic && author.id != @topic.user_id
-      author.user_stat.update_topic_reply_count
-    end
-
     author.user_stat.save!
 
     if @post.created_at == author.last_posted_at
@@ -365,6 +405,13 @@ class PostDestroyer
         end
       end
     end
+  end
+
+  def update_imap_sync(post, sync)
+    return if !SiteSetting.enable_imap
+    incoming = IncomingEmail.find_by(post_id: post.id, topic_id: post.topic_id)
+    return if !incoming || !incoming.imap_uid
+    incoming.update(imap_sync: sync)
   end
 
 end

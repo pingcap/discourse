@@ -9,7 +9,6 @@ class CategoryDetailedSerializer < BasicCategorySerializer
              :topics_month,
              :topics_year,
              :topics_all_time,
-             :description_excerpt,
              :is_uncategorized,
              :subcategory_ids
 
@@ -25,14 +24,6 @@ class CategoryDetailedSerializer < BasicCategorySerializer
 
   def include_is_uncategorized?
     is_uncategorized
-  end
-
-  def description_excerpt
-    PrettyText.excerpt(description, 300) if description
-  end
-
-  def include_subcategory_ids?
-    subcategory_ids.present?
   end
 
   def topics_day

@@ -23,7 +23,7 @@ class UserApiKeysController < ApplicationController
     unless current_user
       cookies[:destination_url] = request.fullpath
 
-      if SiteSetting.enable_sso?
+      if SiteSetting.enable_discourse_connect?
         redirect_to path('/session/sso')
       else
         redirect_to path('/login')
@@ -71,8 +71,7 @@ class UserApiKeysController < ApplicationController
       client_id: params[:client_id],
       user_id: current_user.id,
       push_url: params[:push_url],
-      key: SecureRandom.hex,
-      scopes: scopes
+      scopes: scopes.map { |name| UserApiKeyScope.new(name: name) }
     )
 
     # we keep the payload short so it encrypts easily with public key
@@ -116,7 +115,7 @@ class UserApiKeysController < ApplicationController
     unless current_user
       cookies[:destination_url] = request.fullpath
 
-      if SiteSetting.enable_sso?
+      if SiteSetting.enable_discourse_connect?
         redirect_to path('/session/sso')
       else
         redirect_to path('/login')
@@ -146,11 +145,8 @@ class UserApiKeysController < ApplicationController
     revoke_key = find_key if params[:id]
 
     if current_key = request.env['HTTP_USER_API_KEY']
-      request_key = UserApiKey.find_by(key: current_key)
+      request_key = UserApiKey.with_key(current_key).first
       revoke_key ||= request_key
-      if request_key && request_key.id != revoke_key.id && !request_key.scopes.include?("write")
-        raise Discourse::InvalidAccess
-      end
     end
 
     raise Discourse::NotFound unless revoke_key
@@ -167,7 +163,7 @@ class UserApiKeysController < ApplicationController
 
   def find_key
     key = UserApiKey.find(params[:id])
-    raise Discourse::InvalidAccess unless current_user.admin || key.user_id = current_user.id
+    raise Discourse::InvalidAccess unless current_user.admin || key.user_id == current_user.id
     key
   end
 
@@ -205,7 +201,7 @@ class UserApiKeysController < ApplicationController
     raise Discourse::InvalidAccess unless UserApiKey.allowed_scopes.superset?(Set.new(["one_time_password"]))
 
     otp = SecureRandom.hex
-    $redis.setex "otp_#{otp}", 10.minutes, username
+    Discourse.redis.setex "otp_#{otp}", 10.minutes, username
 
     Base64.encode64(public_key.public_encrypt(otp))
   end

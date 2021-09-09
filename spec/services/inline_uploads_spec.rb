@@ -54,6 +54,11 @@ RSpec.describe InlineUploads do
         MD
       end
 
+      it "should work with invalid img tags" do
+        md = '<img data-id="<>">'
+        expect(InlineUploads.process(md)).to eq(md)
+      end
+
       it "should not correct code blocks" do
         md = "`<a class=\"attachment\" href=\"#{upload2.url}\">In Code Block</a>`"
 
@@ -654,10 +659,7 @@ RSpec.describe InlineUploads do
 
       before do
         upload3
-        SiteSetting.enable_s3_uploads = true
-        SiteSetting.s3_upload_bucket = "s3-upload-bucket"
-        SiteSetting.s3_access_key_id = "some key"
-        SiteSetting.s3_secret_access_key = "some secret key"
+        setup_s3
         SiteSetting.s3_cdn_url = "https://s3.cdn.com"
       end
 
@@ -679,43 +681,30 @@ RSpec.describe InlineUploads do
 
       it "should correct markdown references" do
         md = <<~MD
-        This is a [some reference] somethign
+        This is a [some reference] something
 
         [some reference]: https:#{upload.url}
         MD
 
         expect(InlineUploads.process(md)).to eq(<<~MD)
-        This is a [some reference] somethign
+        This is a [some reference] something
 
         [some reference]: #{Discourse.base_url}#{upload.short_path}
         MD
       end
+    end
+  end
 
-      it "should correct image URLs in multisite" do
-        begin
-          Rails.configuration.multisite = true
+  describe ".match_md_inline_img" do
+    it "matches URLs with various characters" do
+      md = <<~MD
+      ![test](https://some-site.com/a_test?q=1&b=hello%20there)
+      MD
 
-          md = <<~MD
-          https:#{upload2.url} https:#{upload2.url}
-          #{URI.join(SiteSetting.s3_cdn_url, URI.parse(upload2.url).path).to_s}
+      url = nil
+      InlineUploads.match_md_inline_img(md, external_src: true) { |_match, src| url = src }
 
-          <img src="#{upload.url}" alt="some image">
-          <img src="#{URI.join(SiteSetting.s3_cdn_url, URI.parse(upload2.url).path).to_s}" alt="some image">
-          <img src="#{upload3.url}">
-          MD
-
-          expect(InlineUploads.process(md)).to eq(<<~MD)
-          #{Discourse.base_url}#{upload2.short_path} #{Discourse.base_url}#{upload2.short_path}
-          #{Discourse.base_url}#{upload2.short_path}
-
-          ![some image](#{upload.short_url})
-          ![some image](#{upload2.short_url})
-          ![](#{upload3.short_url})
-          MD
-        ensure
-          Rails.configuration.multisite = false
-        end
-      end
+      expect(url).to eq("https://some-site.com/a_test?q=1&b=hello%20there")
     end
   end
 end

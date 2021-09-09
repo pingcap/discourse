@@ -19,4 +19,49 @@ RSpec.describe ForumsController do
     end
   end
 
+  describe "during shutdown" do
+    before(:each) do
+      $shutdown = true
+    end
+    after(:each) do
+      $shutdown = nil
+    end
+
+    it "returns a 500 response" do
+      get "/srv/status"
+      expect(response.status).to eq(500)
+    end
+    it "returns a 200 response when given shutdown_ok" do
+      get "/srv/status?shutdown_ok=1"
+      expect(response.status).to eq(200)
+    end
+  end
+
+  describe "cluster parameter" do
+    it "returns a 500 response if the cluster is not configured" do
+      get "/srv/status?cluster=abc"
+      expect(response.status).to eq(500)
+      expect(response.body).to include("not configured")
+    end
+
+    it "returns a 500 response if the cluster does not match" do
+      global_setting(:cluster_name, "mycluster")
+      get "/srv/status?cluster=abc"
+      expect(response.status).to eq(500)
+      expect(response.body).to include("not match")
+    end
+
+    it "returns a 200 response if the cluster does match" do
+      global_setting(:cluster_name, "mycluster")
+      get "/srv/status?cluster=abc"
+      expect(response.status).to eq(500)
+      expect(response.body).to include("not match")
+    end
+
+    it "returns a 200 response when given shutdown_ok" do
+      get "/srv/status?shutdown_ok=1"
+      expect(response.status).to eq(200)
+    end
+  end
+
 end

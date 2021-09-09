@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # UserHistory stores information about actions that users have taken,
-# like deleting users, changing site settings, dimissing notifications, etc.
+# like deleting users, changing site settings, dismissing notifications, etc.
 # Use other classes, like StaffActionLogger, to log records to this table.
 class UserHistory < ActiveRecord::Base
   belongs_to :acting_user, class_name: 'User'
@@ -103,7 +103,20 @@ class UserHistory < ActiveRecord::Base
       api_key_destroy: 82,
       revoke_title: 83,
       change_title: 84,
-      override_upload_secure_status: 85
+      override_upload_secure_status: 85,
+      page_published: 86,
+      page_unpublished: 87,
+      add_email: 88,
+      update_email: 89,
+      destroy_email: 90,
+      topic_closed: 91,
+      topic_opened: 92,
+      topic_archived: 93,
+      topic_unarchived: 94,
+      post_staff_note_create: 95,
+      post_staff_note_destroy: 96,
+      watched_word_create: 97,
+      watched_word_destroy: 98
     )
   end
 
@@ -183,7 +196,20 @@ class UserHistory < ActiveRecord::Base
       :api_key_create,
       :api_key_update,
       :api_key_destroy,
-      :override_upload_secure_status
+      :override_upload_secure_status,
+      :page_published,
+      :page_unpublished,
+      :add_email,
+      :update_email,
+      :destroy_email,
+      :topic_closed,
+      :topic_opened,
+      :topic_archived,
+      :topic_unarchived,
+      :post_staff_note_create,
+      :post_staff_note_destroy,
+      :watched_word_create,
+      :watched_word_destroy
     ]
   end
 

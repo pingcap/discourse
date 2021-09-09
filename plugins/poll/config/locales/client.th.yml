@@ -1,9 +1,8 @@
-# encoding: utf-8
-#
-# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+# WARNING: Never edit this file.
+# It will be overwritten when translations are pulled from Crowdin.
 #
 # To work with us on translations, join this project:
-# https://www.transifex.com/projects/p/discourse-org/
+# https://translate.discourse.org/
 
 th:
   js:
@@ -13,15 +12,6 @@ th:
       total_votes:
         other: "คะแนนโหวตทั้งหมด"
       average_rating: "คะแนนเฉลี่ย: <strong>%{average}</strong>"
-      multiple:
-        help:
-          at_least_min_options:
-            other: "เลือกอย่างน้อย<strong>%{count}</strong>ตัวเลือก"
-          up_to_max_options:
-            other: "เลือกได้ถึง<strong>%{count}</strong>ตัวเลือก"
-          x_options:
-            other: "เลือก<strong>%{count}</strong>ตัวเลือก"
-          between_min_and_max_options: "เลือกระหว่าง<strong>%{min}</strong>และ<strong>%{max}</strong>ตัวเลือก"
       cast-votes:
         title: "โหวต"
         label: "โหวตเดี๋ยวนี้"
@@ -30,7 +20,8 @@ th:
         label: "แสดงผล"
       hide-results:
         title: "กลับสู่การโหวต"
-        label: "ซ่อนผล"
+      export-results:
+        label: "ส่งออก"
       open:
         title: "เปิดโพล"
         label: "เปิด"
@@ -46,11 +37,8 @@ th:
         title: สร้างโพล
         insert: แทรกโพล
         help:
-          options_count: ใส่อย่างน้อย 2 ตัวเลือก
           invalid_values: ค่าต่ำสุดต้องน้อยกว่าค่าสูงสุด
         poll_type:
           label: ชนิด
         poll_public:
           label: แสดงรายชื่อผู้โหวต
-        poll_options:
-          label: ใส่ตัวเลือกบรรทัดละ 1 ตัวเลือก

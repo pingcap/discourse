@@ -50,6 +50,7 @@ class TopicConverter
 
       add_allowed_users
       update_post_uploads_secure_status
+      UserProfile.remove_featured_topic_from_all_profiles(@topic)
 
       Jobs.enqueue(:topic_action_converter, topic_id: @topic.id)
       Jobs.enqueue(:delete_inaccessible_notifications, topic_id: @topic.id)
@@ -81,6 +82,10 @@ class TopicConverter
     existing_allowed_users = @topic.topic_allowed_users.pluck(:user_id)
     users_to_allow = posters << @user.id
 
+    if (users_to_allow | existing_allowed_users).length > SiteSetting.max_allowed_message_recipients
+      users_to_allow = [@user.id]
+    end
+
     (users_to_allow - existing_allowed_users).uniq.each do |user_id|
       @topic.topic_allowed_users.build(user_id: user_id)
     end
@@ -98,10 +103,8 @@ class TopicConverter
   end
 
   def update_post_uploads_secure_status
-    @topic.posts.each do |post|
-      next if post.uploads.empty?
-      post.update_uploads_secure_status
-      post.rebake!
+    DB.after_commit do
+      Jobs.enqueue(:update_topic_upload_security, topic_id: @topic.id)
     end
   end
 end

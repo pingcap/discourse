@@ -3,12 +3,25 @@
 require "aws-sdk-s3"
 
 class S3Helper
+  FIFTEEN_MEGABYTES = 15 * 1024 * 1024
 
   class SettingMissing < StandardError; end
 
   attr_reader :s3_bucket_name, :s3_bucket_folder_path
 
-  DOWNLOAD_URL_EXPIRES_AFTER_SECONDS ||= 15
+  ##
+  # Controls the following:
+  #
+  # * cache time for secure-media URLs
+  # * expiry time for S3 presigned URLs, which include backup downloads and
+  #   any upload that has a private ACL (e.g. secure uploads)
+  DOWNLOAD_URL_EXPIRES_AFTER_SECONDS ||= 5.minutes.to_i
+
+  ##
+  # Controls the following:
+  #
+  # * presigned put_object URLs for direct S3 uploads
+  UPLOAD_URL_EXPIRES_AFTER_SECONDS ||= 10.minutes.to_i
 
   def initialize(s3_bucket_name, tombstone_prefix = '', options = {})
     @s3_client = options.delete(:client)
@@ -28,7 +41,7 @@ class S3Helper
   end
 
   def self.get_bucket_and_folder_path(s3_bucket_name)
-    s3_bucket_name.downcase.split("/".freeze, 2)
+    s3_bucket_name.downcase.split("/", 2)
   end
 
   def upload(file, path, options = {})
@@ -36,8 +49,8 @@ class S3Helper
     obj = s3_bucket.object(path)
 
     etag = begin
-      if File.size(file.path) >= Aws::S3::FileUploader::FIFTEEN_MEGABYTES
-        options[:multipart_threshold] = Aws::S3::FileUploader::FIFTEEN_MEGABYTES
+      if File.size(file.path) >= FIFTEEN_MEGABYTES
+        options[:multipart_threshold] = FIFTEEN_MEGABYTES
         obj.upload_file(file, options)
         obj.load
         obj.etag
@@ -63,11 +76,17 @@ class S3Helper
 
     # delete the file
     s3_filename.prepend(multisite_upload_path) if Rails.configuration.multisite
-    s3_bucket.object(get_path_for_s3_upload(s3_filename)).delete
+    delete_object(get_path_for_s3_upload(s3_filename))
+  rescue Aws::S3::Errors::NoSuchKey
+  end
+
+  def delete_object(key)
+    s3_bucket.object(key).delete
   rescue Aws::S3::Errors::NoSuchKey
   end
 
   def copy(source, destination, options: {})
+    destination = get_path_for_s3_upload(destination)
     if !Rails.configuration.multisite
       options[:copy_source] = File.join(@s3_bucket_name, source)
     else
@@ -75,21 +94,23 @@ class S3Helper
         options[:copy_source] = File.join(@s3_bucket_name, source)
       elsif @s3_bucket_folder_path
         folder, filename = begin
-          source.split("/".freeze, 2)
-        end
+                             source.split("/", 2)
+                           end
         options[:copy_source] = File.join(@s3_bucket_name, folder, multisite_upload_path, filename)
       else
         options[:copy_source] = File.join(@s3_bucket_name, multisite_upload_path, source)
       end
     end
-    s3_bucket
-      .object(destination)
-      .copy_from(options)
+
+    response = s3_bucket.object(destination).copy_from(options)
+    [destination, response.copy_object_result.etag.gsub('"', '')]
   end
 
   # make sure we have a cors config for assets
   # otherwise we will have no fonts
   def ensure_cors!(rules = nil)
+    return unless SiteSetting.s3_install_cors_rule
+
     rule = nil
 
     begin
@@ -204,6 +225,7 @@ class S3Helper
     }
 
     opts[:endpoint] = SiteSetting.s3_endpoint if SiteSetting.s3_endpoint.present?
+    opts[:http_continue_timeout] = SiteSetting.s3_http_continue_timeout
 
     unless obj.s3_use_iam_profile
       opts[:access_key_id] = obj.s3_access_key_id
@@ -214,9 +236,9 @@ class S3Helper
   end
 
   def download_file(filename, destination_path, failure_message = nil)
-    unless object(filename).download_file(destination_path)
-      raise failure_message&.to_s || "Failed to download file"
-    end
+    object(filename).download_file(destination_path)
+  rescue => err
+    raise failure_message&.to_s || "Failed to download #{filename} because #{err.message.length > 0 ? err.message : err.class.to_s}"
   end
 
   def s3_client
@@ -242,12 +264,19 @@ class S3Helper
   end
 
   def get_path_for_s3_upload(path)
-    path = File.join(@s3_bucket_folder_path, path) if @s3_bucket_folder_path && path !~ /^#{@s3_bucket_folder_path}\//
+    if @s3_bucket_folder_path &&
+        !path.starts_with?(@s3_bucket_folder_path) &&
+        !path.starts_with?(File.join(FileStore::BaseStore::TEMPORARY_UPLOAD_PREFIX, @s3_bucket_folder_path))
+      return File.join(@s3_bucket_folder_path, path)
+    end
+
     path
   end
 
   def multisite_upload_path
-    File.join("uploads", RailsMultisite::ConnectionManagement.current_db, "/")
+    path = File.join("uploads", RailsMultisite::ConnectionManagement.current_db, "/")
+    return path if !Rails.env.test?
+    File.join(path, "test_#{ENV['TEST_ENV_NUMBER'].presence || '0'}", "/")
   end
 
   def s3_resource

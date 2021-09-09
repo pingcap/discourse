@@ -3,12 +3,11 @@
 module BackupRestore
   class S3BackupStore < BackupStore
     UPLOAD_URL_EXPIRES_AFTER_SECONDS ||= 21_600 # 6 hours
-    MULTISITE_PREFIX = "backups"
 
     def initialize(opts = {})
-      s3_options = S3Helper.s3_options(SiteSetting)
-      s3_options.merge!(opts[:s3_options]) if opts[:s3_options]
-      @s3_helper = S3Helper.new(s3_bucket_name_with_prefix, '', s3_options)
+      @s3_options = S3Helper.s3_options(SiteSetting)
+      @s3_options.merge!(opts[:s3_options]) if opts[:s3_options]
+      @s3_helper = S3Helper.new(s3_bucket_name_with_prefix, '', @s3_options.clone)
     end
 
     def remote?
@@ -49,7 +48,23 @@ module BackupRestore
       presigned_url(obj, :put, UPLOAD_URL_EXPIRES_AFTER_SECONDS)
     rescue Aws::Errors::ServiceError => e
       Rails.logger.warn("Failed to generate upload URL for S3: #{e.message.presence || e.class.name}")
-      raise StorageError
+      raise StorageError.new(e.message.presence || e.class.name)
+    end
+
+    def vacate_legacy_prefix
+      legacy_s3_helper = S3Helper.new(s3_bucket_name_with_legacy_prefix, '', @s3_options.clone)
+      bucket, prefix = s3_bucket_name_with_prefix.split('/', 2)
+      legacy_keys = legacy_s3_helper.list
+        .reject { |o| o.key.starts_with? prefix }
+        .map { |o| o.key }
+      legacy_keys.each do |legacy_key|
+        @s3_helper.s3_client.copy_object({
+          copy_source: File.join(bucket, legacy_key),
+          bucket: bucket,
+          key: File.join(prefix, legacy_key.split('/').last)
+        })
+        legacy_s3_helper.delete_object(legacy_key)
+      end
     end
 
     private
@@ -66,7 +81,7 @@ module BackupRestore
       objects
     rescue Aws::Errors::ServiceError => e
       Rails.logger.warn("Failed to list backups from S3: #{e.message.presence || e.class.name}")
-      raise StorageError
+      raise StorageError.new(e.message.presence || e.class.name)
     end
 
     def create_file_from_object(obj, include_download_source = false)
@@ -99,8 +114,12 @@ module BackupRestore
     end
 
     def s3_bucket_name_with_prefix
+      File.join(SiteSetting.s3_backup_bucket, RailsMultisite::ConnectionManagement.current_db)
+    end
+
+    def s3_bucket_name_with_legacy_prefix
       if Rails.configuration.multisite
-        File.join(SiteSetting.s3_backup_bucket, MULTISITE_PREFIX, RailsMultisite::ConnectionManagement.current_db)
+        File.join(SiteSetting.s3_backup_bucket, "backups", RailsMultisite::ConnectionManagement.current_db)
       else
         SiteSetting.s3_backup_bucket
       end

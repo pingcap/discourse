@@ -8,7 +8,7 @@ module FileStore
 
     def store_file(file, path)
       copy_file(file, "#{public_dir}#{path}")
-      "#{Discourse.base_uri}#{path}"
+      "#{Discourse.base_path}#{path}"
     end
 
     def remove_file(url, _)
@@ -36,7 +36,7 @@ module FileStore
     end
 
     def relative_base_url
-      File.join(Discourse.base_uri, upload_path)
+      File.join(Discourse.base_path, upload_path)
     end
 
     def external?
@@ -66,7 +66,7 @@ module FileStore
     end
 
     def get_path_for(type, upload_id, sha, extension)
-      File.join("/", upload_path, super(type, upload_id, sha, extension))
+      prefix_path(super(type, upload_id, sha, extension))
     end
 
     def copy_file(file, path)
@@ -100,6 +100,16 @@ module FileStore
       list_missing(OptimizedImage) unless skip_optimized
     end
 
+    def copy_from(source_path)
+      FileUtils.mkdir_p(File.join(public_dir, upload_path))
+
+      Discourse::Utils.execute_command(
+        'rsync', '-a', '--safe-links', "#{source_path}/", "#{upload_path}/",
+        failure_message: "Failed to copy uploads.",
+        chdir: public_dir
+      )
+    end
+
     private
 
     def list_missing(model)
@@ -124,5 +134,8 @@ module FileStore
       puts "#{count} of #{model.count} #{model.name.underscore.pluralize} are missing" if count > 0
     end
 
+    def prefix_path(path)
+      File.join("/", upload_path, path)
+    end
   end
 end

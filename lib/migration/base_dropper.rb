@@ -2,7 +2,7 @@
 
 module Migration
   class BaseDropper
-    FUNCTION_SCHEMA_NAME ||= "discourse_functions".freeze
+    FUNCTION_SCHEMA_NAME ||= "discourse_functions"
 
     def self.create_readonly_function(table_name, column_name = nil)
       DB.exec <<~SQL
@@ -61,7 +61,7 @@ module Migration
 
     def self.existing_discourse_function_names
       DB.query_single(<<~SQL)
-        SELECT routine_name
+        SELECT routine_name::text
         FROM information_schema.routines
         WHERE routine_type = 'FUNCTION' AND specific_schema = '#{FUNCTION_SCHEMA_NAME}'
       SQL

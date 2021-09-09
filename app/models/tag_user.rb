@@ -19,7 +19,28 @@ class TagUser < ActiveRecord::Base
     records = TagUser.where(user: user, notification_level: notification_levels[level])
     old_ids = records.pluck(:tag_id)
 
-    tag_ids = tags.empty? ? [] : Tag.where_name(tags).pluck(:id)
+    tag_ids = if tags.empty?
+      []
+    elsif tags.first&.is_a?(String)
+      Tag.where_name(tags).pluck(:id)
+    else
+      tags
+    end
+
+    Tag.where(id: tag_ids).joins(:target_tag).each do |tag|
+      tag_ids[tag_ids.index(tag.id)] = tag.target_tag_id
+    end
+
+    tag_ids.uniq!
+
+    if tag_ids.present? &&
+        TagUser.where(user_id: user.id, tag_id: tag_ids)
+            .where
+            .not(notification_level: notification_levels[level])
+            .update_all(notification_level: notification_levels[level]) > 0
+
+      changed = true
+    end
 
     remove = (old_ids - tag_ids)
     if remove.present?
@@ -27,9 +48,21 @@ class TagUser < ActiveRecord::Base
       changed = true
     end
 
-    (tag_ids - old_ids).each do |id|
-      TagUser.create!(user: user, tag_id: id, notification_level: notification_levels[level])
-      changed = true
+    now = Time.zone.now
+
+    new_records_attrs = (tag_ids - old_ids).map do |tag_id|
+      {
+        user_id: user.id,
+        tag_id: tag_id,
+        notification_level: notification_levels[level],
+        created_at: now,
+        updated_at: now
+      }
+    end
+
+    unless new_records_attrs.empty?
+      result = TagUser.insert_all(new_records_attrs)
+      changed = true if result.rows.length > 0
     end
 
     if changed
@@ -41,7 +74,17 @@ class TagUser < ActiveRecord::Base
   end
 
   def self.change(user_id, tag_id, level)
-    tag_id = tag_id.id if tag_id.is_a?(::Tag)
+    if tag_id.is_a?(::Tag)
+      tag = tag_id
+      tag_id = tag.id
+    else
+      tag = Tag.find_by_id(tag_id)
+    end
+
+    if tag.synonym?
+      tag_id = tag.target_tag_id
+    end
+
     user_id = user_id.id if user_id.is_a?(::User)
 
     tag_id = tag_id.to_i
@@ -147,6 +190,28 @@ class TagUser < ActiveRecord::Base
     builder.exec(tracking: notification_levels[:tracking],
                  regular: notification_levels[:regular],
                  auto_track_tag: TopicUser.notification_reasons[:auto_track_tag])
+  end
+
+  def self.notification_levels_for(user)
+    # Anonymous users have all default tags set to regular tracking,
+    # except for default muted tags which stay muted.
+    if user.blank?
+      notification_levels = [
+        SiteSetting.default_tags_watching_first_post.split("|"),
+        SiteSetting.default_tags_watching.split("|"),
+        SiteSetting.default_tags_tracking.split("|")
+      ].flatten.map do |name|
+        [name, self.notification_levels[:regular]]
+      end
+
+      notification_levels += SiteSetting.default_tags_muted.split("|").map do |name|
+        [name, self.notification_levels[:muted]]
+      end
+    else
+      notification_levels = TagUser.where(user: user).joins(:tag).pluck("tags.name", :notification_level)
+    end
+
+    Hash[*notification_levels.flatten]
   end
 
 end

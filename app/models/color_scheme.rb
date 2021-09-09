@@ -2,7 +2,7 @@
 
 class ColorScheme < ActiveRecord::Base
 
-  # rubocop:disable Layout/AlignHash
+  # rubocop:disable Layout/HashAlignment
 
   CUSTOM_SCHEMES = {
     'Dark': {
@@ -50,7 +50,7 @@ class ColorScheme < ActiveRecord::Base
       "tertiary" =>          '416376',
       "quaternary" =>        '5e99b9',
       "header_background" => '86bddb',
-      "header_primary" =>    'ffffff',
+      "header_primary" =>    '203243',
       "highlight" =>         '86bddb',
       "danger" =>            'bf3c3c',
       "success" =>           '70db82',
@@ -94,18 +94,49 @@ class ColorScheme < ActiveRecord::Base
       "danger" =>            '6c3e63',
       "success" =>           'd9b2bb',
       "love" =>              'd9b2bb'
+    },
+    "WCAG": {
+      "primary" =>           '000000',
+      "primary-medium" =>    '696969',
+      "primary-low-mid" =>   '909090',
+      "secondary" =>         'ffffff',
+      "tertiary" =>          '3369FF',
+      "quaternary" =>        '3369FF',
+      "header_background" => 'ffffff',
+      "header_primary" =>    '000000',
+      "highlight" =>         '3369FF',
+      "highlight-high" =>    '0036E6',
+      "highlight-medium" =>  'e0e9ff',
+      "highlight-low" =>     'e0e9ff',
+      "danger" =>            'BB1122',
+      "success" =>           '3d854d',
+      "love" =>              '9D256B'
+    },
+    "WCAG Dark": {
+      "primary" =>           'ffffff',
+      "primary-medium" =>    '999999',
+      "primary-low-mid" =>   '888888',
+      "secondary" =>         '0c0c0c',
+      "tertiary" =>          '759AFF',
+      "quaternary" =>        '759AFF',
+      "header_background" => '000000',
+      "header_primary" =>    'ffffff',
+      "highlight" =>         '3369FF',
+      "danger" =>            'BB1122',
+      "success" =>           '3d854d',
+      "love" =>              '9D256B'
     }
   }
 
-  # rubocop:enable Layout/AlignHash
+  # rubocop:enable Layout/HashAlignment
 
   LIGHT_THEME_ID = 'Light'
 
   def self.base_color_scheme_colors
-    base_with_hash = {}
+    base_with_hash = []
 
     base_colors.each do |name, color|
-      base_with_hash[name] = "#{color}"
+      base_with_hash << { name: name, hex: "#{color}" }
     end
 
     list = [
@@ -113,7 +144,11 @@ class ColorScheme < ActiveRecord::Base
     ]
 
     CUSTOM_SCHEMES.each do |k, v|
-      list.push(id: k.to_s, colors: v)
+      colors = []
+      v.each do |name, color|
+        colors << { name: name, hex: "#{color}" }
+      end
+      list.push(id: k.to_s, colors: colors)
     end
 
     list
@@ -124,15 +159,16 @@ class ColorScheme < ActiveRecord::Base
   end
 
   attr_accessor :is_base
+  attr_accessor :skip_publish
 
   has_many :color_scheme_colors, -> { order('id ASC') }, dependent: :destroy
 
   alias_method :colors, :color_scheme_colors
 
   before_save :bump_version
-  after_save :publish_discourse_stylesheet
-  after_save :dump_hex_cache
-  after_destroy :dump_hex_cache
+  after_save_commit :publish_discourse_stylesheet, unless: :skip_publish
+  after_save_commit :dump_caches
+  after_destroy :dump_caches
   belongs_to :theme
 
   validates_associated :color_scheme_colors
@@ -173,7 +209,7 @@ class ColorScheme < ActiveRecord::Base
   def self.base_color_schemes
     base_color_scheme_colors.map do |hash|
       scheme = new(name: I18n.t("color_schemes.#{hash[:id].downcase.gsub(' ', '_')}"), base_scheme_id: hash[:id])
-      scheme.colors = hash[:colors].map { |k, v| { name: k.to_s, hex: v.sub("#", "") } }
+      scheme.colors = hash[:colors].map { |k| { name: k[:name], hex: k[:hex] } }
       scheme.is_base = true
       scheme
     end
@@ -196,6 +232,7 @@ class ColorScheme < ActiveRecord::Base
     new_color_scheme = new(name: params[:name])
     new_color_scheme.via_wizard = true if params[:via_wizard]
     new_color_scheme.base_scheme_id = params[:base_scheme_id]
+    new_color_scheme.user_selectable = true if params[:user_selectable]
 
     colors = CUSTOM_SCHEMES[params[:base_scheme_id].to_sym]&.map do |name, hex|
       { name: name, hex: hex }
@@ -209,6 +246,7 @@ class ColorScheme < ActiveRecord::Base
     end if params[:colors]
 
     new_color_scheme.colors = colors
+    new_color_scheme.skip_publish if params[:skip_publish]
     new_color_scheme.save
     new_color_scheme
   end
@@ -271,21 +309,34 @@ class ColorScheme < ActiveRecord::Base
 
   def publish_discourse_stylesheet
     if self.id
-      theme_ids = Theme.where(color_scheme_id: self.id).pluck(:id)
-      if theme_ids.present?
-        Stylesheet::Manager.cache.clear
-        Theme.notify_theme_change(
-          theme_ids,
-          with_scheme: true,
-          clear_manager_cache: false,
-          all_themes: true
-        )
-      end
+      self.class.publish_discourse_stylesheets!(self.id)
     end
   end
 
-  def dump_hex_cache
+  def self.publish_discourse_stylesheets!(id = nil)
+    Stylesheet::Manager.clear_color_scheme_cache!
+
+    theme_ids = []
+    if id
+      theme_ids = Theme.where(color_scheme_id: id).pluck(:id)
+    else
+      theme_ids = Theme.all.pluck(:id)
+    end
+    if theme_ids.present?
+      Stylesheet::Manager.cache.clear
+
+      Theme.notify_theme_change(
+        theme_ids,
+        with_scheme: true,
+        clear_manager_cache: false,
+        all_themes: true
+      )
+    end
+  end
+
+  def dump_caches
     self.class.hex_cache.clear
+    ApplicationSerializer.expire_cache_fragment!("user_color_schemes")
   end
 
   def bump_version
@@ -294,18 +345,37 @@ class ColorScheme < ActiveRecord::Base
     end
   end
 
+  def is_dark?
+    return if colors.empty?
+
+    primary_b = brightness(colors_by_name["primary"].hex)
+    secondary_b = brightness(colors_by_name["secondary"].hex)
+
+    primary_b > secondary_b
+  end
+
+  def is_wcag?
+    base_scheme_id&.start_with?('WCAG')
+  end
+
+  # Equivalent to dc-color-brightness() in variables.scss
+  def brightness(color)
+    rgb = color.scan(/../).map { |c| c.to_i(16) }
+    (rgb[0].to_i * 299 + rgb[1].to_i * 587 + rgb[2].to_i * 114) / 1000.0
+  end
 end
 
 # == Schema Information
 #
 # Table name: color_schemes
 #
-#  id             :integer          not null, primary key
-#  name           :string           not null
-#  version        :integer          default(1), not null
-#  created_at     :datetime         not null
-#  updated_at     :datetime         not null
-#  via_wizard     :boolean          default(FALSE), not null
-#  base_scheme_id :string
-#  theme_id       :integer
+#  id              :integer          not null, primary key
+#  name            :string           not null
+#  version         :integer          default(1), not null
+#  created_at      :datetime         not null
+#  updated_at      :datetime         not null
+#  via_wizard      :boolean          default(FALSE), not null
+#  base_scheme_id  :string
+#  theme_id        :integer
+#  user_selectable :boolean          default(FALSE), not null
 #

@@ -10,13 +10,15 @@
     <%- else %>
       <%= discourse_stylesheet_link_tag(mobile_view? ? :mobile : :desktop) %>
     <%- end %>
-    <%- if theme_ids.present? %>
+    <%- if theme_id.present? %>
       <%= discourse_stylesheet_link_tag(mobile_view? ? :mobile_theme : :desktop_theme) %>
     <%- end %>
     <%= theme_lookup("head_tag") %>
     <%= render_google_universal_analytics_code %>
     <%= yield :head %>
-
+    <% if show_browser_update? %>
+      <style>.buorg {position:absolute; z-index:111111; width:100%; top:0px; left:0px; background:#FDF2AB; text-align:left; font-family: sans-serif; color:#000; font-size: 14px;} .buorg div {padding: 8px;} .buorg a, .buorg a:visited {color:#E25600; text-decoration: underline;} @media print { .buorg { display: none !important; } }</style>
+    <% end %>
     <%= build_plugin_html 'server:before-head-close-crawler' %>
   </head>
   <body class="crawler">
@@ -34,19 +36,42 @@
       <%= yield %>
     </div>
     <footer class="container wrap">
-      <nav class='crawler-nav' itemscope itemtype='http://schema.org/SiteNavigationElement'>
+      <nav class='crawler-nav'>
         <ul>
-        <li itemprop="name"><a href='<%= path "/" %>' itemprop="url"><%= t 'home_title' %> </a></li>
-        <li itemprop="name"><a href='<%= path "/categories" %>' itemprop="url"><%= t 'js.filters.categories.title' %> </a></li>
-        <li itemprop="name"><a href='<%= path "/guidelines" %>' itemprop="url"><%= t 'guidelines_topic.title' %> </a></li>
-        <li itemprop="name"><a href='<%= path "/tos" %>' itemprop="url"><%= t 'tos_topic.title' %> </a></li>
-        <li itemprop="name"><a href='<%= path "/privacy" %>' itemprop="url"><%= t 'privacy_topic.title' %> </a></li>
+        <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+          <span itemprop='name'>
+            <a href='<%= path "/" %>' itemprop="url"><%= t 'home_title' %> </a>
+          </span>
+        </li>
+        <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+          <span itemprop='name'>
+            <a href='<%= path "/categories" %>' itemprop="url"><%= t 'js.filters.categories.title' %> </a>
+          </span>
+        </li>
+        <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+          <span itemprop='name'>
+            <a href='<%= path "/guidelines" %>' itemprop="url"><%= t 'guidelines_topic.title' %> </a>
+          </span>
+        </li>
+        <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+          <span itemprop='name'>
+            <a href='<%= path "/tos" %>' itemprop="url"><%= t 'tos_topic.title' %> </a>
+          </span>
+        </li>
+        <li itemscope itemtype='http://schema.org/SiteNavigationElement'>
+          <span itemprop='name'>
+            <a href='<%= path "/privacy" %>' itemprop="url"><%= t 'privacy_topic.title' %> </a>
+          </span>
+        </li>
         </ul>
       </nav>
       <p class='powered-by-link'><%= t 'powered_by_html' %></p>
     </footer>
     <%= theme_lookup("footer") %>
     <%= theme_lookup("body_tag") %>
+    <% if show_browser_update? %>
+      <div class="buorg"><div><%= I18n.t("js.browser_update").html_safe %></div></div>
+    <% end %>
   </body>
   <%= yield :after_body %>
 </html>

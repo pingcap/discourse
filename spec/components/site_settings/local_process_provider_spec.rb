@@ -59,6 +59,6 @@ describe SiteSettings::LocalProcessProvider do
   end
 
   it "returns the correct site name" do
-    expect(provider.current_site).to eq("test")
+    expect(provider.current_site).to eq("default")
   end
 end

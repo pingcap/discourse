@@ -39,6 +39,7 @@ class UserSummary
   def links
     TopicLink
       .joins(:topic, :post)
+      .where(posts: { user_id: @user.id })
       .includes(:topic, :post)
       .where('posts.post_type IN (?)', Topic.visible_post_types(@guardian && @guardian.user))
       .merge(Topic.listable_topics.visible.secured(@guardian))
@@ -112,15 +113,16 @@ class UserSummary
     @user.id
   end
 
+  def user
+    @user
+  end
+
   def user_stat
     @user.user_stat
   end
 
   def bookmark_count
-    UserAction
-      .where(user: @user)
-      .where(action_type: UserAction::BOOKMARK)
-      .count
+    Bookmark.where(user: @user).count
   end
 
   def recent_time_read
@@ -140,11 +142,10 @@ class UserSummary
       .merge(Topic.listable_topics.visible.secured(@guardian))
       .where(user: @user)
       .group('topics.category_id')
-      .order('COUNT(*) DESC')
 
     top_categories = {}
 
-    Category.where(id: post_count_query.limit(MAX_SUMMARY_RESULTS).pluck('category_id'))
+    Category.where(id: post_count_query.order("count(*) DESC").limit(MAX_SUMMARY_RESULTS).pluck('category_id'))
       .pluck(:id, :name, :color, :text_color, :slug, :read_restricted, :parent_category_id)
       .each do |c|
         top_categories[c[0].to_i] = CategoryWithCounts.new(
@@ -166,7 +167,6 @@ class UserSummary
       .where('topics.category_id in (?)', top_categories.keys)
       .where(user: @user)
       .group('topics.category_id')
-      .order('COUNT(*) DESC')
       .pluck('category_id, COUNT(*)')
       .each do |r|
         top_categories[r[0].to_i].topic_count = r[1]
@@ -192,13 +192,22 @@ protected
   def user_counts(user_hash)
     user_ids = user_hash.keys
 
-    lookup = AvatarLookup.new(user_ids)
+    lookup = UserLookup.new(user_ids)
     user_ids.map do |user_id|
       lookup_hash = lookup[user_id]
 
-      UserWithCount.new(
-        lookup_hash.attributes.merge(count: user_hash[user_id])
-      ) if lookup_hash.present?
+      if lookup_hash.present?
+        primary_group = lookup.primary_groups[user_id]
+        flair_group = lookup.flair_groups[user_id]
+
+        UserWithCount.new(
+          lookup_hash.attributes.merge(
+            count: user_hash[user_id],
+            primary_group: primary_group,
+            flair_group: flair_group
+          )
+        )
+      end
     end.compact.sort_by { |u| -u[:count] }
   end
 

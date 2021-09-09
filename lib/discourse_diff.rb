@@ -168,7 +168,7 @@ class DiscourseDiff
   end
 
   def tokenize_html_blocks(html)
-    Nokogiri::HTML.fragment(html).search("./*").map(&:to_html)
+    Nokogiri::HTML5.fragment(html).search("./*").map(&:to_html)
   end
 
   def tokenize_html(html)
@@ -256,7 +256,7 @@ class DiscourseDiff
     USELESS_TAGS = %w{html body}
     def start_element(name, attributes = [])
       return if USELESS_TAGS.include?(name)
-      attrs = attributes.map { |a| " #{a[0]}=\"#{a[1]}\"" }.join
+      attrs = attributes.map { |a| " #{a[0]}=\"#{CGI::escapeHTML(a[1])}\"" }.join
       @tokens << "<#{name}#{attrs}>"
     end
 

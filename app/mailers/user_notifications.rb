@@ -37,6 +37,28 @@ class UserNotifications < ActionMailer::Base
                 new_user_tips: tips)
   end
 
+  def post_approved(user, opts = {})
+    post_url = opts.dig(:notification_data_hash, :post_url)
+
+    return if post_url.nil?
+
+    locale = user_locale(user)
+    build_email(user.email,
+      template: 'user_notifications.post_approved',
+      locale: locale,
+      base_url: Discourse.base_url,
+      post_url: post_url
+    )
+  end
+
+  def signup_after_reject(user, opts = {})
+    locale = user_locale(user)
+    build_email(user.email,
+                template: 'user_notifications.signup_after_reject',
+                locale: locale,
+                reject_reason: opts[:reject_reason])
+  end
+
   def suspicious_login(user, opts = {})
     ipinfo = DiscourseIpInfo.get(opts[:client_ip])
     location = ipinfo[:location]
@@ -63,6 +85,13 @@ class UserNotifications < ActionMailer::Base
                 new_email: opts[:new_email])
   end
 
+  def notify_old_email_add(user, opts = {})
+    build_email(user.email,
+                template: "user_notifications.notify_old_email_add",
+                locale: user_locale(user),
+                new_email: opts[:new_email])
+  end
+
   def confirm_old_email(user, opts = {})
     build_user_email_token_by_template(
       "user_notifications.confirm_old_email",
@@ -71,9 +100,17 @@ class UserNotifications < ActionMailer::Base
     )
   end
 
+  def confirm_old_email_add(user, opts = {})
+    build_user_email_token_by_template(
+      "user_notifications.confirm_old_email_add",
+      user,
+      opts[:email_token]
+    )
+  end
+
   def confirm_new_email(user, opts = {})
     build_user_email_token_by_template(
-      "user_notifications.confirm_new_email",
+      opts[:requested_by_admin] ? "user_notifications.confirm_new_email_via_admin" : "user_notifications.confirm_new_email",
       user,
       opts[:email_token]
     )
@@ -116,14 +153,22 @@ class UserNotifications < ActionMailer::Base
 
     return unless user_history = opts[:user_history]
 
-    build_email(
-      user.email,
-      template: "user_notifications.account_silenced",
-      locale: user_locale(user),
-      reason: user_history.details,
-      message: user_history.context,
-      silenced_till: I18n.l(user.silenced_till, format: :long)
-    )
+    if user.silenced_forever?
+      build_email(
+        user.email,
+        template: "user_notifications.account_silenced_forever",
+        locale: user_locale(user),
+        reason: user_history.details
+      )
+    else
+      build_email(
+        user.email,
+        template: "user_notifications.account_silenced",
+        locale: user_locale(user),
+        reason: user_history.details,
+        silenced_till: I18n.l(user.silenced_till, format: :long)
+      )
+    end
   end
 
   def account_suspended(user, opts = nil)
@@ -131,14 +176,22 @@ class UserNotifications < ActionMailer::Base
 
     return unless user_history = opts[:user_history]
 
-    build_email(
-      user.email,
-      template: "user_notifications.account_suspended",
-      locale: user_locale(user),
-      reason: user_history.details,
-      message: user_history.context,
-      suspended_till: I18n.l(user.suspended_till, format: :long)
-    )
+    if user.suspended_forever?
+      build_email(
+        user.email,
+        template: "user_notifications.account_suspended_forever",
+        locale: user_locale(user),
+        reason: user_history.details
+      )
+    else
+      build_email(
+        user.email,
+        template: "user_notifications.account_suspended",
+        locale: user_locale(user),
+        reason: user_history.details,
+        suspended_till: I18n.l(user.suspended_till, format: :long)
+      )
+    end
   end
 
   def account_exists(user, opts = {})
@@ -157,14 +210,6 @@ class UserNotifications < ActionMailer::Base
       locale: user_locale(user),
       email: user.email
     )
-  end
-
-  def short_date(dt)
-    if dt.year == Time.now.year
-      I18n.l(dt, format: :short_no_year)
-    else
-      I18n.l(dt, format: :date_only)
-    end
   end
 
   def digest(user, opts = {})
@@ -213,18 +258,18 @@ class UserNotifications < ActionMailer::Base
                    value: new_topics_count,
                    href: "#{Discourse.base_url}/new" }]
 
-      value = user.unread_notifications
+      # totalling unread notifications (which are low-priority only) and unread
+      # PMs and bookmark reminder notifications, so the total is both unread low
+      # and high priority PMs
+      value = user.unread_notifications + user.unread_high_priority_notifications
       @counts << { label_key: 'user_notifications.digest.unread_notifications', value: value, href: "#{Discourse.base_url}/my/notifications" } if value > 0
-
-      value = user.unread_private_messages
-      @counts << { label_key: 'user_notifications.digest.unread_messages', value: value, href: "#{Discourse.base_url}/my/messages" } if value > 0
 
       if @counts.size < 3
         value = user.unread_notifications_of_type(Notification.types[:liked])
         @counts << { label_key: 'user_notifications.digest.liked_received', value: value, href: "#{Discourse.base_url}/my/notifications" } if value > 0
       end
 
-      if @counts.size < 3 && user.user_option.digest_after_minutes >= 1440
+      if @counts.size < 3 && user.user_option.digest_after_minutes.to_i >= 1440
         value = summary_new_users_count(min_date)
         @counts << { label_key: 'user_notifications.digest.new_users', value: value, href: "#{Discourse.base_url}/about" } if value > 0
       end
@@ -349,24 +394,11 @@ class UserNotifications < ActionMailer::Base
   end
 
   def email_post_markdown(post, add_posted_by = false)
-    result = +"#{post.with_secure_media? ? strip_secure_urls(post.raw) : post.raw}\n\n"
+    result = +"#{post.raw}\n\n"
     if add_posted_by
       result << "#{I18n.t('user_notifications.posted_by', username: post.username, post_date: post.created_at.strftime("%m/%d/%Y"))}\n\n"
     end
     result
-  end
-
-  def strip_secure_urls(raw)
-    urls = Set.new
-    raw.scan(URI.regexp(%w{http https})) { urls << $& }
-
-    urls.each do |url|
-      if (url.start_with?(Discourse.store.s3_upload_host) && FileHelper.is_supported_media?(url))
-        raw = raw.sub(url, "<p class='secure-media-notice'>#{I18n.t("emails.secure_media_placeholder")}</p>")
-      end
-    end
-
-    raw
   end
 
   def self.get_context_posts(post, topic_user, user)
@@ -408,7 +440,7 @@ class UserNotifications < ActionMailer::Base
     user_name = notification_data[:original_username]
 
     if post && SiteSetting.enable_names && SiteSetting.display_name_on_email_from
-      name = User.where(id: post.user_id).pluck_first(:name)
+      name = User.where(id: notification_data[:original_user_id] || post.user_id).pluck_first(:name)
       user_name = name unless name.blank?
     end
 
@@ -506,9 +538,11 @@ class UserNotifications < ActionMailer::Base
       show_tags_in_subject = tags.any? ? tags.join(" ") : nil
     end
 
+    group = post.topic.allowed_groups&.first
+
     if post.topic.private_message?
       subject_pm =
-        if opts[:show_group_in_subject] && group = post.topic.allowed_groups&.first
+        if opts[:show_group_in_subject] && group.present?
           if group.full_name
             "[#{group.full_name}] "
           else
@@ -602,7 +636,7 @@ class UserNotifications < ActionMailer::Base
         message = email_post_markdown(post) + (reached_limit ? "\n\n#{I18n.t "user_notifications.reached_limit", count: SiteSetting.max_emails_per_day_per_user}" : "")
       end
 
-      first_footer_classes = "hilight"
+      first_footer_classes = "highlight"
       if (allow_reply_by_email && user.staged) || (user.suspended? || user.staged?)
         first_footer_classes = ""
       end
@@ -616,7 +650,8 @@ class UserNotifications < ActionMailer::Base
                     post: post,
                     in_reply_to_post: in_reply_to_post,
                     classes: Rtl.new(user).css_class,
-                    first_footer_classes: first_footer_classes
+                    first_footer_classes: first_footer_classes,
+                    reply_above_line: false
           }
         )
       end
@@ -624,7 +659,7 @@ class UserNotifications < ActionMailer::Base
 
     email_opts = {
       topic_title: Emoji.gsub_emoji_to_unicode(title),
-      topic_title_url_encoded: title ? URI.encode(title) : title,
+      topic_title_url_encoded: title ? UrlHelper.encode_component(title) : title,
       message: message,
       url: post.url(without_slug: SiteSetting.private_email?),
       post_id: post.id,
@@ -649,7 +684,7 @@ class UserNotifications < ActionMailer::Base
       use_topic_title_subject: use_topic_title_subject,
       site_description: SiteSetting.site_description,
       site_title: SiteSetting.title,
-      site_title_url_encoded: URI.encode(SiteSetting.title),
+      site_title_url_encoded: UrlHelper.encode_component(SiteSetting.title),
       locale: locale
     }
 
@@ -697,9 +732,9 @@ class UserNotifications < ActionMailer::Base
   def summary_new_users_count(min_date)
     min_date_str = min_date.is_a?(String) ? min_date : min_date.strftime('%Y-%m-%d')
     key = self.class.summary_new_users_count_key(min_date_str)
-    ((count = $redis.get(key)) && count.to_i) || begin
+    ((count = Discourse.redis.get(key)) && count.to_i) || begin
       count = User.real.where(active: true, staged: false).not_suspended.where("created_at > ?", min_date_str).count
-      $redis.setex(key, 1.day, count)
+      Discourse.redis.setex(key, 1.day, count)
       count
     end
   end

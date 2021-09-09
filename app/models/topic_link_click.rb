@@ -9,7 +9,9 @@ class TopicLinkClick < ActiveRecord::Base
 
   validates_presence_of :topic_link_id
 
-  WHITELISTED_REDIRECT_HOSTNAMES = Set.new(%W{www.youtube.com youtu.be})
+  ALLOWED_REDIRECT_HOSTNAMES = Set.new(%W{www.youtube.com youtu.be})
+  include ActiveSupport::Deprecation::DeprecatedConstantAccessor
+  deprecate_constant 'WHITELISTED_REDIRECT_HOSTNAMES', 'TopicLinkClick::ALLOWED_REDIRECT_HOSTNAMES'
 
   # Create a click from a URL and post_id
   def self.create_from(args = {})
@@ -76,7 +78,7 @@ class TopicLinkClick < ActiveRecord::Base
     # Find the forum topic link
     link = link.where(post_id: args[:post_id]) if args[:post_id].present?
 
-    # If we don't have a post, just find the first occurance of the link
+    # If we don't have a post, just find the first occurrence of the link
     link = link.where(topic_id: args[:topic_id]) if args[:topic_id].present?
     link = link.first
 
@@ -92,8 +94,8 @@ class TopicLinkClick < ActiveRecord::Base
 
       return nil unless uri
 
-      # Only redirect to whitelisted hostnames
-      return url if WHITELISTED_REDIRECT_HOSTNAMES.include?(uri.hostname) || is_cdn_link
+      # Only redirect to allowlisted hostnames
+      return url if ALLOWED_REDIRECT_HOSTNAMES.include?(uri.hostname) || is_cdn_link
 
       return nil
     end
@@ -102,8 +104,8 @@ class TopicLinkClick < ActiveRecord::Base
 
     # Rate limit the click counts to once in 24 hours
     rate_key = "link-clicks:#{link.id}:#{args[:user_id] || args[:ip]}"
-    if $redis.setnx(rate_key, "1")
-      $redis.expire(rate_key, 1.day.to_i)
+    if Discourse.redis.setnx(rate_key, "1")
+      Discourse.redis.expire(rate_key, 1.day.to_i)
       args[:ip] = nil if args[:user_id]
       create!(topic_link_id: link.id, user_id: args[:user_id], ip_address: args[:ip])
     end

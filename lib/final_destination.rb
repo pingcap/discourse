@@ -11,24 +11,26 @@ class FinalDestination
 
   def self.clear_https_cache!(domain)
     key = redis_https_key(domain)
-    $redis.without_namespace.del(key)
+    Discourse.redis.without_namespace.del(key)
   end
 
   def self.cache_https_domain(domain)
     key = redis_https_key(domain)
-    $redis.without_namespace.setex(key, "1", 1.day.to_i).present?
+    Discourse.redis.without_namespace.setex(key, 1.day.to_i, "1")
   end
 
   def self.is_https_domain?(domain)
     key = redis_https_key(domain)
-    $redis.without_namespace.get(key).present?
+    Discourse.redis.without_namespace.get(key).present?
   end
 
   def self.redis_https_key(domain)
     "HTTPS_DOMAIN_#{domain}"
   end
 
-  attr_reader :status, :cookie, :status_code, :ignored
+  DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15"
+
+  attr_reader :status, :cookie, :status_code, :content_type, :ignored
 
   def initialize(url, opts = nil)
     @url = url
@@ -38,6 +40,7 @@ class FinalDestination
     @force_get_hosts = @opts[:force_get_hosts] || []
     @preserve_fragment_url_hosts = @opts[:preserve_fragment_url_hosts] || []
     @force_custom_user_agent_hosts = @opts[:force_custom_user_agent_hosts] || []
+    @default_user_agent = @opts[:default_user_agent] || DEFAULT_USER_AGENT
     @opts[:max_redirects] ||= 5
     @opts[:lookup_ip] ||= lambda { |host| FinalDestination.lookup_ip(host) }
 
@@ -67,7 +70,7 @@ class FinalDestination
     @timeout = @opts[:timeout] || nil
     @preserve_fragment_url = @preserve_fragment_url_hosts.any? { |host| hostname_matches?(host) }
     @validate_uri = @opts.fetch(:validate_uri) { true }
-    @user_agent = @force_custom_user_agent_hosts.any? { |host| hostname_matches?(host) } ? Onebox.options.user_agent : "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+    @user_agent = @force_custom_user_agent_hosts.any? { |host| hostname_matches?(host) } ? Onebox.options.user_agent : @default_user_agent
   end
 
   def self.connection_timeout
@@ -86,6 +89,7 @@ class FinalDestination
     result = {
       "User-Agent" => @user_agent,
       "Accept" => "*/*",
+      "Accept-Language" => "*",
       "Host" => @uri.hostname
     }
 
@@ -98,8 +102,7 @@ class FinalDestination
     status_code, response_headers = nil
 
     catch(:done) do
-      Net::HTTP.start(@uri.host, @uri.port, use_ssl: @uri.is_a?(URI::HTTPS)) do |http|
-        http.open_timeout = timeout
+      Net::HTTP.start(@uri.host, @uri.port, use_ssl: @uri.is_a?(URI::HTTPS), open_timeout: timeout) do |http|
         http.read_timeout = timeout
         http.request_get(@uri.request_uri, request_headers) do |resp|
           status_code = resp.code.to_i
@@ -170,6 +173,7 @@ class FinalDestination
     end
 
     unless validate_uri
+      @status = :invalid_address
       log(:warn, "FinalDestination could not resolve URL (invalid URI): #{@uri}") if @verbose
       return nil
     end
@@ -181,23 +185,40 @@ class FinalDestination
       end
     end
 
+    if Oneboxer.cached_response_body_exists?(@uri.to_s)
+      @status = :resolved
+      return @uri
+    end
+
     headers = request_headers
+    middlewares = Excon.defaults[:middlewares]
+    middlewares << Excon::Middleware::Decompress if @http_verb == :get
+
     response = Excon.public_send(@http_verb,
       @uri.to_s,
       read_timeout: timeout,
-      headers: headers
+      connect_timeout: timeout,
+      headers: headers,
+      middlewares: middlewares
     )
 
     location = nil
     response_headers = nil
-
     response_status = response.status.to_i
 
     case response.status
     when 200
+      # Cache body of successful `get` requests
+      if @http_verb == :get
+        if Oneboxer.cache_response_body?(@uri)
+          Oneboxer.cache_response_body(@uri.to_s, response.body)
+        end
+      end
+
+      @content_type = response.headers['Content-Type'] if response.headers.has_key?('Content-Type')
       @status = :resolved
       return @uri
-    when 400, 405, 406, 409, 501
+    when 400, 405, 406, 409, 500, 501
       response_status, small_headers = small_get(request_headers)
 
       if response_status == 200
@@ -276,21 +297,35 @@ class FinalDestination
     (IPAddr.new(@uri.hostname) rescue nil).nil?
   end
 
+  def hostname
+    @uri.hostname
+  end
+
   def hostname_matches?(url)
     url = uri(url)
-    @uri && url.present? && @uri.hostname == url&.hostname
+
+    if @uri&.hostname.present? && url&.hostname.present?
+      hostname_parts = url.hostname.split('.')
+      has_wildcard = hostname_parts.first == '*'
+
+      if has_wildcard
+        @uri.hostname.end_with?(hostname_parts[1..-1].join('.'))
+      else
+        @uri.hostname == url.hostname
+      end
+    end
   end
 
   def is_dest_valid?
     return false unless @uri && @uri.host
 
-    # Whitelisted hosts
+    # Allowlisted hosts
     return true if hostname_matches?(SiteSetting.Upload.s3_cdn_url) ||
       hostname_matches?(GlobalSetting.try(:cdn_url)) ||
       hostname_matches?(Discourse.base_url_no_prefix)
 
-    if SiteSetting.whitelist_internal_hosts.present?
-      return true if SiteSetting.whitelist_internal_hosts.split("|").any? { |h| h.downcase == @uri.hostname.downcase }
+    if SiteSetting.allowed_internal_hosts.present?
+      return true if SiteSetting.allowed_internal_hosts.split("|").any? { |h| h.downcase == @uri.hostname.downcase }
     end
 
     address_s = @opts[:lookup_ip].call(@uri.hostname)
@@ -315,15 +350,12 @@ class FinalDestination
   end
 
   def escape_url
-    UrlHelper.escape_uri(
-      CGI.unescapeHTML(@url),
-      Regexp.new("[^#{URI::PATTERN::UNRESERVED}#{URI::PATTERN::RESERVED}#]")
-    )
+    UrlHelper.escape_uri(@url)
   end
 
   def private_ranges
     FinalDestination.standard_private_ranges +
-      SiteSetting.blacklist_ip_blocks.split('|').map { |r| IPAddr.new(r) rescue nil }.compact
+      SiteSetting.blocked_ip_blocks.split('|').map { |r| IPAddr.new(r) rescue nil }.compact
   end
 
   def log(log_level, message)
@@ -411,9 +443,8 @@ class FinalDestination
   end
 
   def safe_session(uri)
-    Net::HTTP.start(uri.host, uri.port, use_ssl: (uri.scheme == "https")) do |http|
+    Net::HTTP.start(uri.host, uri.port, use_ssl: (uri.scheme == "https"), open_timeout: timeout) do |http|
       http.read_timeout = timeout
-      http.open_timeout = timeout
       yield http
     end
   end

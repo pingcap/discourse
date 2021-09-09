@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_helper'
+require 'rotp'
 
 describe UsersEmailController do
 
@@ -8,11 +9,17 @@ describe UsersEmailController do
   fab!(:moderator) { Fabricate(:moderator) }
 
   describe "#confirm-new-email" do
-    it 'redirects to login for signed out accounts' do
+    it 'does not redirect to login for signed out accounts, this route works fine as anon user' do
       get "/u/confirm-new-email/asdfasdf"
 
-      expect(response.status).to eq(302)
-      expect(response.redirect_url).to eq("http://test.localhost/login")
+      expect(response.status).to eq(200)
+    end
+
+    it 'does not redirect to login for signed out accounts on login_required sites, this route works fine as anon user' do
+      SiteSetting.login_required = true
+      get "/u/confirm-new-email/asdfasdf"
+
+      expect(response.status).to eq(200)
     end
 
     it 'errors out for invalid tokens' do
@@ -24,8 +31,8 @@ describe UsersEmailController do
       expect(response.body).to include(I18n.t('change_email.already_done'))
     end
 
-    it 'does not change email if accounts mismatch' do
-      updater = EmailUpdater.new(user.guardian, user)
+    it 'does not change email if accounts mismatch for a signed in user' do
+      updater = EmailUpdater.new(guardian: user.guardian, user: user)
       updater.change_to('new.n.cool@example.com')
 
       old_email = user.email
@@ -41,11 +48,22 @@ describe UsersEmailController do
     end
 
     context "with a valid user" do
-      let(:updater) { EmailUpdater.new(user.guardian, user) }
+      let(:updater) { EmailUpdater.new(guardian: user.guardian, user: user) }
 
       before do
         sign_in(user)
         updater.change_to('new.n.cool@example.com')
+      end
+
+      it 'includes security_key_allowed_credential_ids in a hidden field' do
+        key1 = Fabricate(:user_security_key_with_random_credential, user: user)
+        key2 = Fabricate(:user_security_key_with_random_credential, user: user)
+
+        get "/u/confirm-new-email/#{user.email_tokens.last.token}"
+
+        doc = Nokogiri::HTML5(response.body)
+        credential_ids = doc.css("#security-key-allowed-credential-ids").first["value"].split(",")
+        expect(credential_ids).to contain_exactly(key1.credential_id, key2.credential_id)
       end
 
       it 'confirms with a correct token' do
@@ -113,6 +131,138 @@ describe UsersEmailController do
           user.reload
           expect(user.email).to eq("new.n.cool@example.com")
         end
+
+        context "rate limiting" do
+          before { RateLimiter.clear_all!; RateLimiter.enable }
+
+          it "rate limits by IP" do
+            freeze_time
+
+            6.times do
+              put "/u/confirm-new-email", params: {
+                token: "blah",
+                second_factor_token: "000000",
+                second_factor_method: UserSecondFactor.methods[:totp]
+              }
+
+              expect(response.status).to eq(302)
+            end
+
+            put "/u/confirm-new-email", params: {
+              token: "blah",
+              second_factor_token: "000000",
+              second_factor_method: UserSecondFactor.methods[:totp]
+            }
+
+            expect(response.status).to eq(429)
+          end
+
+          it "rate limits by username" do
+            freeze_time
+
+            6.times do |x|
+              user.email_change_requests.last.update(change_state: EmailChangeRequest.states[:complete])
+              put "/u/confirm-new-email", params: {
+                token: user.email_tokens.last.token,
+                second_factor_token: "000000",
+                second_factor_method: UserSecondFactor.methods[:totp]
+              }, env: { "REMOTE_ADDR": "1.2.3.#{x}" }
+
+              expect(response.status).to eq(302)
+            end
+
+            user.email_change_requests.last.update(change_state: EmailChangeRequest.states[:authorizing_new])
+            put "/u/confirm-new-email", params: {
+              token: user.email_tokens.last.token,
+              second_factor_token: "000000",
+              second_factor_method: UserSecondFactor.methods[:totp]
+            }, env: { "REMOTE_ADDR": "1.2.3.4" }
+
+            expect(response.status).to eq(429)
+          end
+        end
+      end
+
+      context "security key required" do
+        fab!(:user_security_key) do
+          Fabricate(
+            :user_security_key,
+            user: user,
+            credential_id: valid_security_key_data[:credential_id],
+            public_key: valid_security_key_data[:public_key]
+          )
+        end
+
+        before do
+          simulate_localhost_webauthn_challenge
+        end
+
+        it 'requires a security key' do
+          get "/u/confirm-new-email/#{user.email_tokens.last.token}"
+
+          expect(response.status).to eq(200)
+
+          response_body = response.body
+
+          expect(response_body).to include(I18n.t("login.security_key_authenticate"))
+          expect(response_body).to include(I18n.t("login.security_key_description"))
+        end
+
+        context "if the user has a TOTP enabled and wants to use that instead" do
+          before do
+            Fabricate(:user_second_factor_totp, user: user)
+          end
+
+          it 'allows entering the totp code instead' do
+            get "/u/confirm-new-email/#{user.email_tokens.last.token}?show_totp=true"
+
+            expect(response.status).to eq(200)
+
+            response_body = response.body
+
+            expect(response_body).to include(I18n.t("login.second_factor_title"))
+            expect(response_body).not_to include(I18n.t("login.security_key_authenticate"))
+          end
+        end
+
+        it 'adds an error on a security key attempt' do
+          get "/u/confirm-new-email/#{user.email_tokens.last.token}"
+          put "/u/confirm-new-email", params: {
+            token: user.email_tokens.last.token,
+            second_factor_token: "{}",
+            second_factor_method: UserSecondFactor.methods[:security_key]
+          }
+
+          expect(response.status).to eq(302)
+          expect(flash[:invalid_second_factor]).to eq(true)
+        end
+
+        it 'confirms with a correct security key token' do
+          get "/u/confirm-new-email/#{user.email_tokens.last.token}"
+          put "/u/confirm-new-email", params: {
+            second_factor_token: valid_security_key_auth_post_data.to_json,
+            second_factor_method: UserSecondFactor.methods[:security_key],
+            token: user.email_tokens.last.token
+          }
+
+          expect(response.status).to eq(302)
+
+          user.reload
+          expect(user.email).to eq("new.n.cool@example.com")
+        end
+
+        context "if the security key data JSON is garbled" do
+          it "raises an invalid parameters error" do
+            get "/u/confirm-new-email/#{user.email_tokens.last.token}"
+            put "/u/confirm-new-email", params: {
+              second_factor_token: "{someweird: 8notjson}",
+              second_factor_method: UserSecondFactor.methods[:security_key],
+              token: user.email_tokens.last.token
+            }
+
+            expect(response.status).to eq(400)
+          end
+        end
       end
     end
   end
@@ -138,7 +288,7 @@ describe UsersEmailController do
     it 'bans change when accounts do not match' do
 
       sign_in(user)
-      updater = EmailUpdater.new(moderator.guardian, moderator)
+      updater = EmailUpdater.new(guardian: moderator.guardian, user: moderator)
       updater.change_to('new.n.cool@example.com')
 
       get "/u/confirm-old-email/#{moderator.email_tokens.last.token}"
@@ -152,7 +302,7 @@ describe UsersEmailController do
       it 'confirms with a correct token' do
         # NOTE: only moderators need to confirm both old and new
         sign_in(moderator)
-        updater = EmailUpdater.new(moderator.guardian, moderator)
+        updater = EmailUpdater.new(guardian: moderator.guardian, user: moderator)
         updater.change_to('new.n.cool@example.com')
 
         get "/u/confirm-old-email/#{moderator.email_tokens.last.token}"
@@ -178,6 +328,21 @@ describe UsersEmailController do
     end
   end
 
+  describe '#create' do
+    let(:new_email) { 'bubblegum@adventuretime.ooo' }
+
+    it 'has an email token' do
+      sign_in(user)
+
+      expect { post "/u/#{user.username}/preferences/email.json", params: { email: new_email } }
+        .to change(EmailChangeRequest, :count)
+
+      emailChangeRequest = EmailChangeRequest.last
+      expect(emailChangeRequest.old_email).to eq(nil)
+      expect(emailChangeRequest.new_email).to eq(new_email)
+    end
+  end
+
   describe '#update' do
     let(:new_email) { 'bubblegum@adventuretime.ooo' }
 
@@ -199,7 +364,7 @@ describe UsersEmailController do
       it 'raises an error without an invalid email' do
         put "/u/#{user.username}/preferences/email.json", params: { email: "sam@not-email.com'" }
         expect(response.status).to eq(422)
-        expect(response.body).to include("email is invalid")
+        expect(response.body).to include("Email is invalid")
       end
 
       it "raises an error if you can't edit the user's email" do
@@ -262,8 +427,8 @@ describe UsersEmailController do
         end
       end
 
-      it 'raises an error when new email domain is present in email_domains_blacklist site setting' do
-        SiteSetting.email_domains_blacklist = "mailinator.com"
+      it 'raises an error when new email domain is present in blocked_email_domains site setting' do
+        SiteSetting.blocked_email_domains = "mailinator.com"
 
         put "/u/#{user.username}/preferences/email.json", params: {
           email: "not_good@mailinator.com"
@@ -272,8 +437,8 @@ describe UsersEmailController do
         expect(response).to_not be_successful
       end
 
-      it 'raises an error when new email domain is not present in email_domains_whitelist site setting' do
-        SiteSetting.email_domains_whitelist = "discourse.org"
+      it 'raises an error when new email domain is not present in allowed_email_domains site setting' do
+        SiteSetting.allowed_email_domains = "discourse.org"
 
         put "/u/#{user.username}/preferences/email.json", params: {
           email: new_email

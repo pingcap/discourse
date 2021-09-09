@@ -19,12 +19,35 @@ describe Notification do
         @types = Notification.types
       end
 
-      it "'mentioned' should be at 1st position" do
+      it "has a correct position for each type" do
         expect(@types[:mentioned]).to eq(1)
-      end
-
-      it "'group_mentioned' should be at 15th position" do
+        expect(@types[:replied]).to eq(2)
+        expect(@types[:quoted]).to eq(3)
+        expect(@types[:edited]).to eq(4)
+        expect(@types[:liked]).to eq(5)
+        expect(@types[:private_message]).to eq(6)
+        expect(@types[:invited_to_private_message]).to eq(7)
+        expect(@types[:invitee_accepted]).to eq(8)
+        expect(@types[:posted]).to eq(9)
+        expect(@types[:moved_post]).to eq(10)
+        expect(@types[:linked]).to eq(11)
+        expect(@types[:granted_badge]).to eq(12)
+        expect(@types[:invited_to_topic]).to eq(13)
+        expect(@types[:custom]).to eq(14)
         expect(@types[:group_mentioned]).to eq(15)
+        expect(@types[:group_message_summary]).to eq(16)
+        expect(@types[:watching_first_post]).to eq(17)
+        expect(@types[:topic_reminder]).to eq(18)
+        expect(@types[:liked_consolidated]).to eq(19)
+        expect(@types[:post_approved]).to eq(20)
+        expect(@types[:code_review_commit_approved]).to eq(21)
+        expect(@types[:membership_request_accepted]).to eq(22)
+        expect(@types[:membership_request_consolidated]).to eq(23)
+        expect(@types[:bookmark_reminder]).to eq(24)
+        expect(@types[:reaction]).to eq(25)
+        expect(@types[:votes_released]).to eq(26)
+        expect(@types[:event_reminder]).to eq(27)
+        expect(@types[:event_invitation]).to eq(28)
       end
     end
   end
@@ -87,6 +110,24 @@ describe Notification do
 
   end
 
+  describe 'high priority creation' do
+    fab!(:user) { Fabricate(:user) }
+
+    it "automatically marks the notification as high priority if it is a high priority type" do
+      notif = Notification.create(user: user, notification_type: Notification.types[:bookmark_reminder], data: {})
+      expect(notif.high_priority).to eq(true)
+      notif = Notification.create(user: user, notification_type: Notification.types[:private_message], data: {})
+      expect(notif.high_priority).to eq(true)
+      notif = Notification.create(user: user, notification_type: Notification.types[:liked], data: {})
+      expect(notif.high_priority).to eq(false)
+    end
+
+    it "allows manually specifying a notification is high priority" do
+      notif = Notification.create(user: user, notification_type: Notification.types[:liked], data: {}, high_priority: true)
+      expect(notif.high_priority).to eq(true)
+    end
+  end
+
   describe 'unread counts' do
 
     fab!(:user) { Fabricate(:user) }
@@ -117,20 +158,52 @@ describe Notification do
       it "increases unread_private_messages" do
         expect { Fabricate(:private_message_notification, user: user); user.reload }.to change(user, :unread_private_messages)
       end
+
+      it "increases unread_high_priority_notifications" do
+        expect { Fabricate(:private_message_notification, user: user); user.reload }.to change(user, :unread_high_priority_notifications)
+      end
+    end
+
+    context 'a bookmark reminder message' do
+      it "doesn't increase unread_notifications" do
+        expect { Fabricate(:bookmark_reminder_notification, user: user); user.reload }.not_to change(user, :unread_notifications)
+      end
+
+      it 'increases total_unread_notifications' do
+        expect { Fabricate(:notification, user: user); user.reload }.to change(user, :total_unread_notifications)
+      end
+
+      it "increases unread_high_priority_notifications" do
+        expect { Fabricate(:bookmark_reminder_notification, user: user); user.reload }.to change(user, :unread_high_priority_notifications)
+      end
     end
 
   end
 
   describe 'message bus' do
+    fab!(:user) { Fabricate(:user) }
 
     it 'updates the notification count on create' do
       Notification.any_instance.expects(:refresh_notification_count).returns(nil)
       Fabricate(:notification)
     end
 
+    it 'works' do
+      messages = MessageBus.track_publish do
+        user.notifications.create!(notification_type: Notification.types[:mentioned], data: '{}')
+        user.notifications.create!(notification_type: Notification.types[:mentioned], data: '{}')
+      end
+
+      expect(messages.size).to eq(2)
+      expect(messages[0].channel).to eq("/notification/#{user.id}")
+      expect(messages[0].data[:unread_notifications]).to eq(1)
+      expect(messages[1].channel).to eq("/notification/#{user.id}")
+      expect(messages[1].data[:unread_notifications]).to eq(2)
+    end
+
     it 'works for partial model instances' do
       NotificationEmailer.disable
-      partial_user = User.select(:id).find_by(id: Fabricate(:user).id)
+      partial_user = User.select(:id).find_by(id: user.id)
       partial_user.notifications.create!(notification_type: Notification.types[:mentioned], data: '{}')
     end
 
@@ -205,6 +278,13 @@ describe Notification do
                            data: '{}',
                            notification_type: Notification.types[:private_message])
 
+      Notification.create!(read: false,
+                           user_id: user.id,
+                           topic_id: t.id,
+                           post_number: 1,
+                           data: '{}',
+                           notification_type: Notification.types[:bookmark_reminder])
+
       other = Notification.create!(read: false,
                                    user_id: user.id,
                                    topic_id: t.id,
@@ -216,8 +296,11 @@ describe Notification do
       user.reload
 
       expect(user.unread_notifications).to eq(0)
-      expect(user.total_unread_notifications).to eq(2)
-      expect(user.unread_private_messages).to eq(1)
+      expect(user.total_unread_notifications).to eq(3)
+      # NOTE: because of deprecation this will be equal to unread_high_priority_notifications,
+      #       to be removed in 2.5
+      expect(user.unread_private_messages).to eq(2)
+      expect(user.unread_high_priority_notifications).to eq(2)
     end
   end
 
@@ -234,7 +317,7 @@ describe Notification do
     end
   end
 
-  describe 'ensure consistency' do
+  describe '#ensure_consistency!' do
     it 'deletes notifications if post is missing or deleted' do
 
       NotificationEmailer.disable
@@ -246,6 +329,8 @@ describe Notification do
                            notification_type: Notification.types[:private_message])
       Notification.create!(read: false, user_id: p2.user_id, topic_id: p2.topic_id, post_number: p2.post_number, data: '[]',
                            notification_type: Notification.types[:private_message])
+      Notification.create!(read: false, user_id: p2.user_id, topic_id: p2.topic_id, post_number: p2.post_number, data: '[]',
+                           notification_type: Notification.types[:bookmark_reminder])
 
       Notification.create!(read: false, user_id: p2.user_id, topic_id: p2.topic_id, post_number: p2.post_number, data: '[]',
                            notification_type: Notification.types[:liked])
@@ -256,9 +341,19 @@ describe Notification do
 
       expect(Notification.count).to eq(2)
     end
+
+    it 'does not delete chat_message notifications' do
+      user = Fabricate(:user)
+      Notification.create!(read: false, user_id: user.id, topic_id: nil, post_number: nil, data: '[]',
+                           notification_type: Notification.types[:chat_mention])
+
+      expect {
+        Notification.ensure_consistency!
+      }.to_not change { Notification.count }
+    end
   end
 
-  describe '.filter_by_display_username_and_type' do
+  describe '.filter_by_consolidation_data' do
     let(:post) { Fabricate(:post) }
     fab!(:user) { Fabricate(:user) }
 
@@ -267,8 +362,8 @@ describe Notification do
     end
 
     it 'should return the right notifications' do
-      expect(Notification.filter_by_display_username_and_type(
-        user.username_lower, Notification.types[:liked]
+      expect(Notification.filter_by_consolidation_data(
+        Notification.types[:liked], display_username: user.username_lower
       )).to eq([])
 
       expect do
@@ -280,14 +375,32 @@ describe Notification do
         PostActionCreator.like(user, post)
       end.to change { Notification.count }.by(2)
 
-      expect(Notification.filter_by_display_username_and_type(
-        user.username_lower, Notification.types[:liked]
+      expect(Notification.filter_by_consolidation_data(
+        Notification.types[:liked], display_username: user.username_lower
       )).to contain_exactly(
         Notification.find_by(notification_type: Notification.types[:liked])
       )
     end
   end
 
+  describe "do not disturb" do
+    it "calls NotificationEmailer.process_notification when user is not in 'do not disturb'" do
+      user = Fabricate(:user)
+      notification = Notification.new(read: false, user_id: user.id, topic_id: 2, post_number: 1, data: '{}', notification_type: 1)
+      NotificationEmailer.expects(:process_notification).with(notification)
+      notification.save!
+    end
+
+    it "doesn't call NotificationEmailer.process_notification when user is in 'do not disturb'" do
+      freeze_time
+      user = Fabricate(:user)
+      Fabricate(:do_not_disturb_timing, user: user, starts_at: Time.zone.now, ends_at: 1.day.from_now)
+
+      notification = Notification.new(read: false, user_id: user.id, topic_id: 2, post_number: 1, data: '{}', notification_type: 1)
+      NotificationEmailer.expects(:process_notification).with(notification).never
+      notification.save!
+    end
+  end
 end
 
 # pulling this out cause I don't want an observer
@@ -305,6 +418,10 @@ describe Notification do
 
     def unread_pm
       fab(Notification.types[:private_message], false)
+    end
+
+    def unread_bookmark_reminder
+      fab(Notification.types[:bookmark_reminder], false)
     end
 
     def pm
@@ -326,16 +443,17 @@ describe Notification do
       expect(Notification.visible.count).to eq(0)
     end
 
-    it 'orders stuff correctly' do
+    it 'orders stuff by creation descending, bumping unread high priority (pms, bookmark reminders) to top' do
+      # note we expect the final order to read bottom-up for this list of variables,
+      # with unread pm + bookmark reminder at the top of that list
       a = unread_pm
-          regular
+      regular
+      b = unread_bookmark_reminder
       c = pm
       d = regular
 
-      # bumps unread pms to front of list
-
-      notifications = Notification.recent_report(user, 3)
-      expect(notifications.map { |n| n.id }).to eq([a.id, d.id, c.id])
+      notifications = Notification.recent_report(user, 4)
+      expect(notifications.map { |n| n.id }).to eq([b.id, a.id, d.id, c.id])
 
     end
 
@@ -376,7 +494,7 @@ describe Notification do
 
       before do
         PostCustomField.create!(post_id: post.id, name: "requested_group_id", value: group.id)
-        create_membership_request_notification
+        2.times { create_membership_request_notification }
       end
 
       it 'should consolidate membership requests to a new notification' do
@@ -391,13 +509,61 @@ describe Notification do
 
         data = notification.data_hash
         expect(data[:group_name]).to eq(group.name)
-        expect(data[:count]).to eq(3)
+        expect(data[:count]).to eq(4)
 
         notification = create_membership_request_notification
         expect { notification.reload }.to raise_error(ActiveRecord::RecordNotFound)
 
-        expect(Notification.last.data_hash[:count]).to eq(4)
+        expect(Notification.last.data_hash[:count]).to eq(5)
       end
+
+      it 'consolidates membership requests with "processed" false if user is in DND' do
+        user.do_not_disturb_timings.create(starts_at: Time.now, ends_at: 3.days.from_now)
+
+        create_membership_request_notification
+        create_membership_request_notification
+
+        notification = Notification.last
+        expect(notification.notification_type).to eq(Notification.types[:membership_request_consolidated])
+        expect(notification.shelved_notification).to be_present
+      end
+    end
+  end
+
+  describe "purge_old!" do
+    fab!(:user) { Fabricate(:user) }
+    fab!(:notification1) { Fabricate(:notification, user: user) }
+    fab!(:notification2) { Fabricate(:notification, user: user) }
+    fab!(:notification3) { Fabricate(:notification, user: user) }
+    fab!(:notification4) { Fabricate(:notification, user: user) }
+
+    it "does nothing if set to 0" do
+      SiteSetting.max_notifications_per_user = 0
+      Notification.purge_old!
+
+      expect(Notification.where(user_id: user.id).count).to eq(4)
+    end
+
+    it "correctly limits" do
+      SiteSetting.max_notifications_per_user = 2
+      Notification.purge_old!
+
+      expect(Notification.where(user_id: user.id).pluck(:id)).to contain_exactly(notification4.id, notification3.id)
+    end
+  end
+
+  describe "do not disturb" do
+    fab!(:user) { Fabricate(:user) }
+
+    it "creates a shelved_notification record when created while user is in DND" do
+      user.do_not_disturb_timings.create(starts_at: Time.now, ends_at: 3.days.from_now)
+      notification = Notification.create(read: false, user_id: user.id, topic_id: 2, post_number: 1, data: '{}', notification_type: 1)
+      expect(notification.shelved_notification).to be_present
+    end
+
+    it "doesn't create a shelved_notification record when created while user is isn't DND" do
+      notification = Notification.create(read: false, user_id: user.id, topic_id: 2, post_number: 1, data: '{}', notification_type: 1)
+      expect(notification.shelved_notification).to be_nil
     end
   end
 end

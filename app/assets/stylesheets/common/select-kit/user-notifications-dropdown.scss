@@ -1,19 +1,20 @@
 .select-kit {
   &.dropdown-select-box {
     &.user-notifications-dropdown {
+      display: flex;
       text-align: left;
+
+      .d-icon {
+        margin-left: 0;
+      }
 
       .select-kit-body {
         width: 485px;
         max-width: 485px;
       }
 
-      .select-kit-header {
+      .select-kit-header-wrapper {
         justify-content: center;
-      }
-
-      .dropdown-select-box-header {
-        align-items: center;
       }
     }
   }

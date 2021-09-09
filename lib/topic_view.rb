@@ -4,6 +4,25 @@ class TopicView
   MEGA_TOPIC_POSTS_COUNT = 10000
   MIN_POST_READ_TIME = 4.0
 
+  def self.on_preload(&blk)
+    (@preload ||= Set.new) << blk
+  end
+
+  def self.cancel_preload(&blk)
+    if @preload
+      @preload.delete blk
+      if @preload.length == 0
+        @preload = nil
+      end
+    end
+  end
+
+  def self.preload(topic_view)
+    if @preload
+      @preload.each { |preload| preload.call(topic_view) }
+    end
+  end
+
   attr_reader(
     :topic,
     :posts,
@@ -35,20 +54,29 @@ class TopicView
   end
 
   def self.default_post_custom_fields
-    @default_post_custom_fields ||= [Post::NOTICE_TYPE, Post::NOTICE_ARGS, "action_code_who", "requested_group_id"]
+    @default_post_custom_fields ||= [Post::NOTICE, "action_code_who"]
   end
 
-  def self.post_custom_fields_whitelisters
-    @post_custom_fields_whitelisters ||= Set.new
+  def self.post_custom_fields_allowlisters
+    @post_custom_fields_allowlisters ||= Set.new
   end
 
-  def self.add_post_custom_fields_whitelister(&block)
-    post_custom_fields_whitelisters << block
+  def self.add_post_custom_fields_allowlister(&block)
+    post_custom_fields_allowlisters << block
   end
 
-  def self.whitelisted_post_custom_fields(user)
-    wpcf = default_post_custom_fields + post_custom_fields_whitelisters.map { |w| w.call(user) }
+  def self.allowed_post_custom_fields(user)
+    wpcf = default_post_custom_fields + post_custom_fields_allowlisters.map { |w| w.call(user) }
     wpcf.flatten.uniq
+  end
+
+  def self.add_custom_filter(key, &blk)
+    @custom_filters ||= {}
+    @custom_filters[key] = blk
+  end
+
+  def self.custom_filters
+    @custom_filters || {}
   end
 
   def initialize(topic_or_topic_id, user = nil, options = {})
@@ -56,7 +84,7 @@ class TopicView
     @user = user
     @guardian = Guardian.new(@user)
 
-    check_and_raise_exceptions
+    check_and_raise_exceptions(options[:skip_staff_action])
 
     @message_bus_last_id = MessageBus.last_id("/topic/#{@topic.id}")
     @print = options[:print].present?
@@ -66,7 +94,6 @@ class TopicView
     end
 
     @post_number = [@post_number.to_i, 1].max
-    @page = [@page.to_i, 1].max
 
     @include_suggested = options.fetch(:include_suggested) { true }
     @include_related = options.fetch(:include_related) { true }
@@ -79,6 +106,8 @@ class TopicView
 
     @limit ||= @chunk_size
 
+    @page = @page.to_i > 1 ? @page.to_i : calculate_page
+
     setup_filtered_posts
 
     @initial_load = true
@@ -87,14 +116,16 @@ class TopicView
     filter_posts(options)
 
     if @posts && !@skip_custom_fields
-      if (added_fields = User.whitelisted_user_custom_fields(@guardian)).present?
+      if (added_fields = User.allowed_user_custom_fields(@guardian)).present?
         @user_custom_fields = User.custom_fields_for_ids(@posts.pluck(:user_id), added_fields)
       end
 
-      if (whitelisted_fields = TopicView.whitelisted_post_custom_fields(@user)).present?
-        @post_custom_fields = Post.custom_fields_for_ids(@posts.pluck(:id), whitelisted_fields)
+      if (allowed_fields = TopicView.allowed_post_custom_fields(@user)).present?
+        @post_custom_fields = Post.custom_fields_for_ids(@posts.pluck(:id), allowed_fields)
       end
     end
+
+    TopicView.preload(self)
 
     @draft_key = @topic.draft_key
     @draft_sequence = DraftSequence.current(@user, @draft_key)
@@ -105,7 +136,7 @@ class TopicView
   end
 
   def show_read_indicator?
-    return false unless @user || topic.private_message?
+    return false if !@user || !topic.private_message?
 
     topic.allowed_groups.any? do |group|
       group.publish_read_state? && group.users.include?(@user)
@@ -113,15 +144,12 @@ class TopicView
   end
 
   def canonical_path
+    if SiteSetting.embed_set_canonical_url
+      topic_embed = topic.topic_embed
+      return topic_embed.embed_url if topic_embed
+    end
     path = relative_url.dup
-    path <<
-      if @page > 1
-        "?page=#{@page}"
-      else
-        page = ((@post_number - 1) / @limit) + 1
-        page > 1 ? "?page=#{page}" : ""
-      end
-
+    path << ((@page > 1) ? "?page=#{@page}" : "")
     path
   end
 
@@ -152,7 +180,7 @@ class TopicView
 
   def next_page
     @next_page ||= begin
-      if last_post && (@topic.highest_post_number > last_post.post_number)
+      if last_post && highest_post_number && (highest_post_number > last_post.post_number)
         @page + 1
       end
     end
@@ -180,6 +208,23 @@ class TopicView
 
   def page_title
     title = @topic.title
+    if @post_number > 1
+      title += " - "
+      post = @topic.posts.find_by(post_number: @post_number)
+      author = post&.user
+      if author && @guardian.can_see_post?(post)
+        title += I18n.t(
+          "inline_oneboxer.topic_page_title_post_number_by_user",
+          post_number: @post_number,
+          username: author.username
+        )
+      else
+        title += I18n.t(
+          "inline_oneboxer.topic_page_title_post_number",
+          post_number: @post_number
+        )
+      end
+    end
     if SiteSetting.topic_page_title_includes_category
       if @topic.category_id != SiteSetting.uncategorized_category_id && @topic.category_id && @topic.category
         title += " - #{@topic.category.name}"
@@ -236,16 +281,8 @@ class TopicView
   end
 
   def image_url
-    if @post_number > 1 && @desired_post.present?
-      if @desired_post.image_url.present?
-        @desired_post.image_url
-      elsif @desired_post.user
-        # show poster avatar
-        @desired_post.user.avatar_template_url.gsub("{size}", "200")
-      end
-    else
-      @topic.image_url
-    end
+    url = desired_post&.image_url if @post_number > 1
+    url || @topic.image_url
   end
 
   def filter_posts(opts = {})
@@ -353,6 +390,21 @@ class TopicView
     end
   end
 
+  def has_bookmarks?
+    return false if @user.blank?
+    @topic.bookmarks.exists?(user_id: @user.id)
+  end
+
+  def bookmarked_posts
+    return nil unless has_bookmarks?
+    @topic.bookmarks.where(user: @user).pluck(:post_id, :reminder_at).map do |post_id, reminder_at|
+      {
+        post_id: post_id,
+        reminder_at: reminder_at
+      }
+    end
+  end
+
   MAX_PARTICIPANTS = 24
 
   def post_counts_by_user
@@ -360,21 +412,20 @@ class TopicView
       if is_mega_topic?
         {}
       else
-        post_ids = unfiltered_post_ids
-
-        return {} if post_ids.blank?
-
         sql = <<~SQL
             SELECT user_id, count(*) AS count_all
               FROM posts
-             WHERE id in (:post_ids)
+             WHERE topic_id = :topic_id
+               AND post_type IN (:post_types)
                AND user_id IS NOT NULL
+               AND posts.deleted_at IS NULL
+               AND action_code IS NULL
           GROUP BY user_id
           ORDER BY count_all DESC
              LIMIT #{MAX_PARTICIPANTS}
         SQL
 
-        Hash[*DB.query_single(sql, post_ids: post_ids)]
+        Hash[*DB.query_single(sql, topic_id: @topic.id, post_types: Topic.visible_post_types(@guardian&.user))]
       end
     end
   end
@@ -413,11 +464,31 @@ class TopicView
     end
   end
 
+  def topic_allowed_group_ids
+    @topic_allowed_group_ids ||= begin
+      @topic.allowed_groups.map(&:id)
+    end
+  end
+
   def group_allowed_user_ids
     return @group_allowed_user_ids unless @group_allowed_user_ids.nil?
 
-    group_ids = @topic.allowed_groups.map(&:id)
-    @group_allowed_user_ids = Set.new(GroupUser.where(group_id: group_ids).pluck('distinct user_id'))
+    @group_allowed_user_ids = GroupUser
+      .where(group_id: topic_allowed_group_ids)
+      .pluck('distinct user_id')
+  end
+
+  def category_group_moderator_user_ids
+    @category_group_moderator_user_ids ||= begin
+      if SiteSetting.enable_category_group_moderation? && @topic.category&.reviewable_by_group.present?
+        posts_user_ids = Set.new(@posts.map(&:user_id))
+        Set.new(
+          @topic.category.reviewable_by_group.group_users.where(user_id: posts_user_ids).pluck('distinct user_id')
+        )
+      else
+        Set.new
+      end
+    end
   end
 
   def all_post_actions
@@ -428,39 +499,46 @@ class TopicView
     @links ||= TopicLink.topic_map(@guardian, @topic.id)
   end
 
+  def user_post_bookmarks
+    @user_post_bookmarks ||= @topic.bookmarks.where(user: @user)
+  end
+
   def reviewable_counts
-    if @reviewable_counts.nil?
-
-      post_ids = @posts.map(&:id)
-
+    @reviewable_counts ||= begin
       sql = <<~SQL
-        SELECT target_id,
+        SELECT
+          target_id,
           MAX(r.id) reviewable_id,
           COUNT(*) total,
           SUM(CASE WHEN s.status = :pending THEN 1 ELSE 0 END) pending
-        FROM reviewables r
-        JOIN reviewable_scores s ON reviewable_id = r.id
-        WHERE r.target_id IN (:post_ids) AND
-          r.target_type = 'Post'
-        GROUP BY target_id
+        FROM
+          reviewables r
+        JOIN
+          reviewable_scores s ON reviewable_id = r.id
+        WHERE
+          r.target_id IN (:post_ids) AND
+          r.target_type = 'Post' AND
+          COALESCE(s.reason, '') != 'category'
+        GROUP BY
+          target_id
       SQL
 
-      @reviewable_counts = {}
+      counts = {}
 
       DB.query(
         sql,
         pending: ReviewableScore.statuses[:pending],
-        post_ids: post_ids
+        post_ids: @posts.map(&:id)
       ).each do |row|
-        @reviewable_counts[row.target_id] = {
+        counts[row.target_id] = {
           total: row.total,
           pending: row.pending,
           reviewable_id: row.reviewable_id
         }
       end
-    end
 
-    @reviewable_counts
+      counts
+    end
   end
 
   def pending_posts
@@ -537,7 +615,7 @@ class TopicView
       columns = [:id]
 
       if !is_mega_topic?
-        columns << 'EXTRACT(DAYS FROM CURRENT_TIMESTAMP - created_at)::INT AS days_ago'
+        columns << '(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP - posts.created_at) / 86400)::INT AS days_ago'
       end
 
       posts.pluck(*columns)
@@ -591,6 +669,10 @@ class TopicView
     ReviewableQueuedPost.viewable_by(@user).where(topic_id: @topic.id).pending.count
   end
 
+  def published_page
+    @topic.published_page
+  end
+
   protected
 
   def read_posts_set
@@ -610,6 +692,11 @@ class TopicView
   end
 
   private
+
+  def calculate_page
+    posts_count = is_mega_topic? ? @post_number : unfiltered_posts.where("post_number <= ?", @post_number).count
+    ((posts_count - 1) / @limit) + 1
+  end
 
   def get_sort_order(post_number)
     sql = <<~SQL
@@ -638,8 +725,9 @@ class TopicView
   end
 
   def filter_post_types(posts)
-    visible_types = Topic.visible_post_types(@user)
+    return posts.where(post_type: Post.types[:regular]) if @only_regular
 
+    visible_types = Topic.visible_post_types(@user)
     if @user.present?
       posts.where("posts.user_id = ? OR post_type IN (?)", @user.id, visible_types)
     else
@@ -668,12 +756,18 @@ class TopicView
   end
 
   def filter_posts_by_ids(post_ids)
-    # TODO: Sort might be off
     @posts = Post.where(id: post_ids, topic_id: @topic.id)
-      .includes({ user: :primary_group }, :reply_to_user, :deleted_by, :incoming_email, :topic)
+      .includes(
+        { user: :primary_group },
+        :reply_to_user,
+        :deleted_by,
+        :incoming_email,
+        :topic,
+        :image_upload
+      )
       .order('sort_order')
     @posts = filter_post_types(@posts)
-    @posts = @posts.with_deleted if @guardian.can_see_deleted_posts?
+    @posts = @posts.with_deleted if @guardian.can_see_deleted_posts?(@topic.category)
     @posts
   end
 
@@ -689,7 +783,7 @@ class TopicView
 
   def unfiltered_posts
     result = filter_post_types(@topic.posts)
-    result = result.with_deleted if @guardian.can_see_deleted_posts?
+    result = result.with_deleted if @guardian.can_see_deleted_posts?(@topic.category)
     result = result.where("user_id IS NOT NULL") if @exclude_deleted_users
     result = result.where(hidden: false) if @exclude_hidden
     result
@@ -723,6 +817,10 @@ class TopicView
       @contains_gaps = true
     end
 
+    if @filter.present? && @filter.to_s != 'summary' && TopicView.custom_filters[@filter].present?
+      @filtered_posts = TopicView.custom_filters[@filter].call(@filtered_posts, self)
+    end
+
     if @best.present?
       @filtered_posts = @filtered_posts.where('posts.post_type = ?', Post.types[:regular])
       @contains_gaps = true
@@ -740,12 +838,52 @@ class TopicView
       @contains_gaps = true
     end
 
+    # Filter replies
+    if @replies_to_post_number.present?
+      post_id = filtered_post_id(@replies_to_post_number.to_i)
+      @filtered_posts = @filtered_posts.where('
+        posts.post_number = 1
+        OR posts.post_number = :post_number
+        OR posts.reply_to_post_number = :post_number
+        OR posts.id IN (SELECT pr.reply_post_id FROM post_replies pr WHERE pr.post_id = :post_id)', { post_number: @replies_to_post_number.to_i, post_id: post_id })
+
+      @contains_gaps = true
+    end
+
+    # Filtering upwards
+    if @filter_upwards_post_id.present?
+      post = Post.find(@filter_upwards_post_id)
+      post_ids = DB.query_single(<<~SQL, post_id: post.id, topic_id: post.topic_id)
+      WITH RECURSIVE breadcrumb(id, reply_to_post_number) AS (
+            SELECT p.id, p.reply_to_post_number FROM posts AS p
+              WHERE p.id = :post_id
+            UNION
+              SELECT p.id, p.reply_to_post_number FROM posts AS p, breadcrumb
+                WHERE breadcrumb.reply_to_post_number = p.post_number
+                  AND p.topic_id = :topic_id
+          )
+      SELECT id from breadcrumb
+      WHERE id <> :post_id
+      ORDER by id
+      SQL
+
+      post_ids = (post_ids[(0 - SiteSetting.max_reply_history)..-1] || post_ids)
+      post_ids.push(post.id)
+
+      @filtered_posts = @filtered_posts.where('
+        posts.post_number = 1
+        OR posts.id IN (:post_ids)
+        OR posts.id > :max_post_id', { post_ids: post_ids, max_post_id: post_ids.max })
+
+      @contains_gaps = true
+    end
+
     # Deleted
     # This should be last - don't want to tell the admin about deleted posts that clicking the button won't show
     # copy the filter for has_deleted? method
     @predelete_filtered_posts = @filtered_posts.spawn
 
-    if @guardian.can_see_deleted_posts? && !@show_deleted && has_deleted?
+    if @guardian.can_see_deleted_posts?(@topic.category) && !@show_deleted && has_deleted?
       @filtered_posts = @filtered_posts.where(
         "posts.deleted_at IS NULL OR posts.post_number = 1"
       )
@@ -755,7 +893,7 @@ class TopicView
 
   end
 
-  def check_and_raise_exceptions
+  def check_and_raise_exceptions(skip_staff_action)
     raise Discourse::NotFound if @topic.blank?
     # Special case: If the topic is private and the user isn't logged in, ask them
     # to log in!
@@ -765,7 +903,7 @@ class TopicView
     # can user see this topic?
     raise Discourse::InvalidAccess.new("can't see #{@topic}", @topic) unless @guardian.can_see?(@topic)
     # log personal message views
-    if SiteSetting.log_personal_messages_views && @topic.present? && @topic.private_message? && @topic.all_allowed_users.where(id: @user.id).blank?
+    if SiteSetting.log_personal_messages_views && !skip_staff_action && @topic.present? && @topic.private_message? && @topic.all_allowed_users.where(id: @user.id).blank?
       unless UserHistory.where(acting_user_id: @user.id, action: UserHistory.actions[:check_personal_message], topic_id: @topic.id).where("created_at > ?", 1.hour.ago).exists?
         StaffActionLogger.new(@user).log_check_personal_message(@topic)
       end

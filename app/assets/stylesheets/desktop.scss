@@ -1,28 +1,9 @@
 @import "common";
 
-/* @import "desktop/*"; TODO: get this working again */
-
-@import "desktop/alert";
-@import "desktop/banner";
-@import "desktop/compose";
-@import "desktop/discourse";
-@import "desktop/header";
-@import "desktop/login";
-@import "desktop/modal";
-@import "desktop/category-list";
-@import "desktop/latest-topic-list";
-@import "desktop/topic-list";
-@import "desktop/topic-post";
-@import "desktop/topic";
-@import "desktop/upload";
-@import "desktop/user";
-@import "desktop/history";
-@import "desktop/group";
-@import "desktop/admin_customize";
+@import "desktop/_index";
 
 // Import all component-specific files
-@import "desktop/components/*";
+@import "desktop/components/_index";
 
-/* These files doesn't actually exist, they are injected by Stylesheet::Compiler. */
-
-@import "category_backgrounds";
+// Import all admin-specific files
+@import "desktop/admin/_index";

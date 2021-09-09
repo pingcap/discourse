@@ -158,7 +158,7 @@ class ImportScripts::DiscuzX < ImportScripts::Base
 
       break if results.size < 1
 
-      # TODO: breaks the scipt reported by some users
+      # TODO: breaks the script reported by some users
       # next if all_records_exist? :users, users.map {|u| u["id"].to_i}
 
       create_users(results, total: total_count, offset: offset) do |user|
@@ -833,9 +833,9 @@ class ImportScripts::DiscuzX < ImportScripts::Base
     file_name = "#{part_4}_avatar_big.jpg"
 
     if absolute
-      return File.join(DISCUZX_BASE_DIR, AVATAR_DIR, part_1, part_2, part_3, file_name), file_name
+      [File.join(DISCUZX_BASE_DIR, AVATAR_DIR, part_1, part_2, part_3, file_name), file_name]
     else
-      return File.join(AVATAR_DIR, part_1, part_2, part_3, file_name), file_name
+      [File.join(AVATAR_DIR, part_1, part_2, part_3, file_name), file_name]
     end
   end
 

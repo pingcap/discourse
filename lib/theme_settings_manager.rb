@@ -111,6 +111,10 @@ class ThemeSettingsManager
     def textarea
       @opts[:textarea]
     end
+
+    def json_schema
+      JSON.parse(@opts[:json_schema]) rescue false
+    end
   end
 
   class Bool < self
@@ -166,5 +170,13 @@ class ThemeSettingsManager
     def choices
       @opts[:choices]
     end
+  end
+
+  class Upload < self
+    def value
+      val = super
+      Discourse.store.cdn_url(val)
+    end
+
   end
 end

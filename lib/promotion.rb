@@ -26,14 +26,20 @@ class Promotion
 
   def review_tl0
     if Promotion.tl1_met?(@user) && change_trust_level!(TrustLevel[1])
-      @user.enqueue_member_welcome_message unless @user.badges.where(id: Badge::BasicUser).count > 0
+      if Badge.exists?(id: Badge::BasicUser, enabled: true) && !@user.badges.exists?(id: Badge::BasicUser)
+        @user.enqueue_member_welcome_message
+      end
       return true
     end
     false
   end
 
   def review_tl1
-    Promotion.tl2_met?(@user) && change_trust_level!(TrustLevel[2])
+    if Promotion.tl2_met?(@user) && change_trust_level!(TrustLevel[2])
+      @user.enqueue_tl2_promotion_message
+      return true
+    end
+    false
   end
 
   def review_tl2
@@ -91,7 +97,7 @@ class Promotion
     return false if stat.days_visited < SiteSetting.tl2_requires_days_visited
     return false if stat.likes_received < SiteSetting.tl2_requires_likes_received
     return false if stat.likes_given < SiteSetting.tl2_requires_likes_given
-    return false if stat.topic_reply_count < SiteSetting.tl2_requires_topic_reply_count
+    return false if stat.calc_topic_reply_count! < SiteSetting.tl2_requires_topic_reply_count
 
     true
   end
@@ -126,8 +132,8 @@ class Promotion
     # Then consider the group locked level
     user_group_granted_trust_level = user.group_granted_trust_level
 
-    unless user_group_granted_trust_level.blank?
-      return user.update!(
+    if user_group_granted_trust_level.present?
+      return user.update(
         trust_level: user_group_granted_trust_level
       )
     end

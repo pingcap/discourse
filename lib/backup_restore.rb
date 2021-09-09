@@ -4,29 +4,26 @@ module BackupRestore
 
   class OperationRunningError < RuntimeError; end
 
-  VERSION_PREFIX = "v".freeze
-  DUMP_FILE = "dump.sql.gz".freeze
-  OLD_DUMP_FILE = "dump.sql".freeze
-  METADATA_FILE = "meta.json"
+  VERSION_PREFIX = "v"
+  DUMP_FILE = "dump.sql.gz"
   LOGS_CHANNEL = "/admin/backups/logs"
 
   def self.backup!(user_id, opts = {})
     if opts[:fork] == false
       BackupRestore::Backuper.new(user_id, opts).run
     else
-      start! BackupRestore::Backuper.new(user_id, opts)
+      spawn_process!(:backup, user_id, opts)
     end
   end
 
   def self.restore!(user_id, opts = {})
-    start! BackupRestore::Restorer.new(user_id, opts)
+    spawn_process!(:restore, user_id, opts)
   end
 
   def self.rollback!
     raise BackupRestore::OperationRunningError if BackupRestore.is_operation_running?
     if can_rollback?
       move_tables_between_schemas("backup", "public")
-      after_fork
     end
   end
 
@@ -36,21 +33,21 @@ module BackupRestore
   end
 
   def self.mark_as_running!
-    $redis.setex(running_key, 60, "1")
+    Discourse.redis.setex(running_key, 60, "1")
     save_start_logs_message_id
     keep_it_running
   end
 
   def self.is_operation_running?
-    !!$redis.get(running_key)
+    !!Discourse.redis.get(running_key)
   end
 
   def self.mark_as_not_running!
-    $redis.del(running_key)
+    Discourse.redis.del(running_key)
   end
 
   def self.should_shutdown?
-    !!$redis.get(shutdown_signal_key)
+    !!Discourse.redis.get(shutdown_signal_key)
   end
 
   def self.can_rollback?
@@ -74,26 +71,34 @@ module BackupRestore
     ActiveRecord::Migrator.current_version
   end
 
-  def self.move_tables_between_schemas(source, destination)
-    DB.exec(move_tables_between_schemas_sql(source, destination))
+  def self.postgresql_major_version
+    DB.query_single("SHOW server_version").first[/\d+/].to_i
   end
 
-  def self.move_tables_between_schemas_sql(source, destination)
-    <<-SQL
+  def self.move_tables_between_schemas(source, destination)
+    owner = database_configuration.username
+
+    ActiveRecord::Base.transaction do
+      DB.exec(move_tables_between_schemas_sql(source, destination, owner))
+    end
+  end
+
+  def self.move_tables_between_schemas_sql(source, destination, owner)
+    <<~SQL
       DO $$DECLARE row record;
       BEGIN
         -- create <destination> schema if it does not exists already
         -- NOTE: DROP & CREATE SCHEMA is easier, but we don't want to drop the public schema
-        -- ortherwise extensions (like hstore & pg_trgm) won't work anymore...
+        -- otherwise extensions (like hstore & pg_trgm) won't work anymore...
         CREATE SCHEMA IF NOT EXISTS #{destination};
         -- move all <source> tables to <destination> schema
-        FOR row IN SELECT tablename FROM pg_tables WHERE schemaname = '#{source}'
+        FOR row IN SELECT tablename FROM pg_tables WHERE schemaname = '#{source}'  AND tableowner = '#{owner}'
         LOOP
           EXECUTE 'DROP TABLE IF EXISTS #{destination}.' || quote_ident(row.tablename) || ' CASCADE;';
           EXECUTE 'ALTER TABLE #{source}.' || quote_ident(row.tablename) || ' SET SCHEMA #{destination};';
         END LOOP;
         -- move all <source> views to <destination> schema
-        FOR row IN SELECT viewname FROM pg_views WHERE schemaname = '#{source}'
+        FOR row IN SELECT viewname FROM pg_views WHERE schemaname = '#{source}' AND viewowner = '#{owner}'
         LOOP
           EXECUTE 'DROP VIEW IF EXISTS #{destination}.' || quote_ident(row.viewname) || ' CASCADE;';
           EXECUTE 'ALTER VIEW #{source}.' || quote_ident(row.viewname) || ' SET SCHEMA #{destination};';
@@ -105,14 +110,20 @@ module BackupRestore
   DatabaseConfiguration = Struct.new(:host, :port, :username, :password, :database)
 
   def self.database_configuration
-    config = ActiveRecord::Base.connection_pool.spec.config
+    config = ActiveRecord::Base.connection_pool.db_config.configuration_hash
     config = config.with_indifferent_access
+
+    # credentials for PostgreSQL in CI environment
+    if Rails.env.test?
+      username = ENV["PGUSER"]
+      password = ENV["PGPASSWORD"]
+    end
 
     DatabaseConfiguration.new(
       config["backup_host"] || config["host"],
       config["backup_port"] || config["port"],
-      config["username"] || ENV["USER"] || "postgres",
-      config["password"],
+      config["username"] || username || ENV["USER"] || "postgres",
+      config["password"] || password,
       config["database"]
     )
   end
@@ -128,7 +139,7 @@ module BackupRestore
     Thread.new do
       # this thread will be killed when the fork dies
       while true
-        $redis.expire(running_key, 1.minute)
+        Discourse.redis.expire(running_key, 1.minute)
         sleep 30.seconds
       end
     end
@@ -139,59 +150,32 @@ module BackupRestore
   end
 
   def self.set_shutdown_signal!
-    $redis.set(shutdown_signal_key, "1")
+    Discourse.redis.set(shutdown_signal_key, "1")
   end
 
   def self.clear_shutdown_signal!
-    $redis.del(shutdown_signal_key)
+    Discourse.redis.del(shutdown_signal_key)
   end
 
   def self.save_start_logs_message_id
     id = MessageBus.last_id(LOGS_CHANNEL)
-    $redis.set(start_logs_message_id_key, id)
+    Discourse.redis.set(start_logs_message_id_key, id)
   end
 
   def self.start_logs_message_id
-    $redis.get(start_logs_message_id_key).to_i
+    Discourse.redis.get(start_logs_message_id_key).to_i
   end
 
   def self.start_logs_message_id_key
     "start_logs_message_id"
   end
 
-  def self.start!(runner)
-    child = fork do
-      begin
-        after_fork
-        runner.run
-      rescue Exception => e
-        puts "--------------------------------------------"
-        puts "---------------- EXCEPTION -----------------"
-        puts e.message
-        puts e.backtrace.join("\n")
-        puts "--------------------------------------------"
-      ensure
-        begin
-          clear_shutdown_signal!
-        rescue Exception => e
-          puts "============================================"
-          puts "================ EXCEPTION ================="
-          puts e.message
-          puts e.backtrace.join("\n")
-          puts "============================================"
-        ensure
-          exit!(0)
-        end
-      end
-    end
+  def self.spawn_process!(type, user_id, opts)
+    script = File.join(Rails.root, "script", "spawn_backup_restore.rb")
+    command = ["bundle", "exec", "ruby", script, type, user_id, opts.to_json].map(&:to_s)
 
-    Process.detach(child)
-
-    true
-  end
-
-  def self.after_fork
-    Discourse.after_fork
+    pid = spawn({ "RAILS_DB" => RailsMultisite::ConnectionManagement.current_db }, *command)
+    Process.detach(pid)
   end
 
   def self.backup_tables_count

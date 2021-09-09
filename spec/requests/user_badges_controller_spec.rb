@@ -15,7 +15,7 @@ describe UserBadgesController do
       get "/user_badges.json", params: { badge_id: badge.id }
       expect(response.status).to eq(200)
 
-      parsed = JSON.parse(response.body)
+      parsed = response.parsed_body
       expect(parsed["topics"]).to eq(nil)
       expect(parsed["badges"].length).to eq(1)
       expect(parsed["user_badge_info"]["user_badges"][0]["post_id"]).to eq(nil)
@@ -40,7 +40,7 @@ describe UserBadgesController do
       get "/user-badges/#{user.username}.json"
 
       expect(response.status).to eq(200)
-      parsed = JSON.parse(response.body)
+      parsed = response.parsed_body
       expect(parsed["user_badges"].length).to eq(1)
     end
 
@@ -49,7 +49,7 @@ describe UserBadgesController do
       get "/user-badges/#{user.username}", xhr: true
 
       expect(response.status).to eq(200)
-      parsed = JSON.parse(response.body)
+      parsed = response.parsed_body
       expect(parsed["user_badges"].length).to eq(1)
     end
 
@@ -57,7 +57,7 @@ describe UserBadgesController do
       get "/user_badges.json", params: { badge_id: badge.id }
 
       expect(response.status).to eq(200)
-      parsed = JSON.parse(response.body)
+      parsed = response.parsed_body
       expect(parsed["user_badge_info"]["user_badges"].length).to eq(1)
     end
 
@@ -67,8 +67,26 @@ describe UserBadgesController do
       }
 
       expect(response.status).to eq(200)
-      parsed = JSON.parse(response.body)
+      parsed = response.parsed_body
       expect(parsed["user_badges"].first.has_key?('count')).to eq(true)
+    end
+
+    context 'hidden profiles' do
+      before do
+        user.user_option.update_columns(hide_profile_and_presence: true)
+      end
+
+      it "returns 404 if `hide_profile_and_presence` user option is checked" do
+        get "/user-badges/#{user.username}.json"
+        expect(response.status).to eq(404)
+      end
+
+      it "returns user_badges if `allow_users_to_hide_profile` is false" do
+        SiteSetting.allow_users_to_hide_profile = false
+
+        get "/user-badges/#{user.username}.json"
+        expect(response.status).to eq(200)
+      end
     end
   end
 
@@ -123,9 +141,13 @@ describe UserBadgesController do
     it 'grants badges from master api calls' do
       api_key = Fabricate(:api_key)
 
-      post "/user_badges.json", params: {
-        badge_id: badge.id, username: user.username, api_key: api_key.key, api_username: "system"
-      }
+      post "/user_badges.json",
+        params: {
+          badge_id: badge.id, username: user.username
+        },
+        headers: {
+          HTTP_API_KEY: api_key.key, HTTP_API_USERNAME: "system"
+        }
 
       expect(response.status).to eq(200)
       user_badge = UserBadge.find_by(user: user, badge: badge)
@@ -243,6 +265,75 @@ describe UserBadgesController do
       end.map { |event| event[:event_name] }
 
       expect(events).to include(:user_badge_removed)
+    end
+  end
+
+  context "favorite" do
+    let!(:user_badge) { UserBadge.create(badge: badge, user: user, granted_by: Discourse.system_user, granted_at: Time.now) }
+
+    it "checks that the user is authorized to favorite the badge" do
+      sign_in(Fabricate(:admin))
+      put "/user_badges/#{user_badge.id}/toggle_favorite.json"
+      expect(response.status).to eq(403)
+    end
+
+    it "checks that the user has less than max_favorites_badges favorited badges" do
+      sign_in(user)
+      UserBadge.create(badge: Fabricate(:badge), user: user, granted_by: Discourse.system_user, granted_at: Time.now, is_favorite: true)
+      UserBadge.create(badge: Fabricate(:badge), user: user, granted_by: Discourse.system_user, granted_at: Time.now, is_favorite: true)
+
+      put "/user_badges/#{user_badge.id}/toggle_favorite.json"
+      expect(response.status).to eq(400)
+
+      SiteSetting.max_favorite_badges = 3
+
+      put "/user_badges/#{user_badge.id}/toggle_favorite.json"
+      expect(response.status).to eq(204)
+    end
+
+    it "favorites a badge" do
+      sign_in(user)
+      put "/user_badges/#{user_badge.id}/toggle_favorite.json"
+
+      expect(response.status).to eq(204)
+      user_badge = UserBadge.find_by(user: user, badge: badge)
+      expect(user_badge.is_favorite).to eq(true)
+    end
+
+    it "unfavorites a badge" do
+      sign_in(user)
+      user_badge.toggle!(:is_favorite)
+      put "/user_badges/#{user_badge.id}/toggle_favorite.json"
+
+      expect(response.status).to eq(204)
+      user_badge = UserBadge.find_by(user: user, badge: badge)
+      expect(user_badge.is_favorite).to eq(false)
+    end
+
+    it "works with multiple grants" do
+      SiteSetting.max_favorite_badges = 2
+
+      sign_in(user)
+
+      badge = Fabricate(:badge, multiple_grant: true)
+      user_badge = UserBadge.create(badge: badge, user: user, granted_by: Discourse.system_user, granted_at: Time.now, seq: 0, is_favorite: true)
+      user_badge2 = UserBadge.create(badge: badge, user: user, granted_by: Discourse.system_user, granted_at: Time.now, seq: 1, is_favorite: true)
+      other_badge = Fabricate(:badge)
+      other_user_badge = UserBadge.create(badge: other_badge, user: user, granted_by: Discourse.system_user, granted_at: Time.now)
+
+      put "/user_badges/#{user_badge.id}/toggle_favorite.json"
+      expect(response.status).to eq(204)
+      expect(user_badge.reload.is_favorite).to eq(false)
+      expect(user_badge2.reload.is_favorite).to eq(false)
+
+      put "/user_badges/#{user_badge.id}/toggle_favorite.json"
+      expect(response.status).to eq(204)
+      expect(user_badge.reload.is_favorite).to eq(true)
+      expect(user_badge2.reload.is_favorite).to eq(true)
+
+      put "/user_badges/#{other_user_badge.id}/toggle_favorite.json"
+      expect(response.status).to eq(204)
+      expect(other_user_badge.reload.is_favorite).to eq(true)
     end
   end
 end

@@ -22,9 +22,9 @@ module Autospec
       ]
 
       command = begin
-        if ENV["PARALLEL_SPEC"] == '1' &&
-              !specs.split.any? { |s| puts s; s =~ /\:/ } # Parallel spec can't run specific groups
-
+        line_specified = specs.split.any? { |s| s =~ /\:/ } # Parallel spec can't run specific line
+        multiple_files = specs.split.count > 1 || specs == "spec" # Only parallelize multiple files
+        if ENV["PARALLEL_SPEC"] == '1' && multiple_files && !line_specified
           "bin/turbo_rspec #{args.join(" ")} #{specs.split.join(" ")}"
         else
           "bin/rspec #{args.join(" ")} #{specs.split.join(" ")}"
@@ -32,7 +32,7 @@ module Autospec
       end
 
       # launch rspec
-      Dir.chdir(Rails.root) do # rubocop:disable DiscourseCops/NoChdir because this is not part of the app
+      Dir.chdir(Rails.root) do # rubocop:disable Discourse/NoChdir because this is not part of the app
         env = { "RAILS_ENV" => "test" }
         if specs.split(' ').any? { |s| s =~ /^(.\/)?plugins/ }
           env["LOAD_PLUGINS"] = "1"

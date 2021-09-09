@@ -25,7 +25,7 @@ describe PostReadersController do
       it 'returns an empty list when nobody has read the topic' do
         get '/post_readers.json', params: { id: @post.id }
 
-        readers = JSON.parse(response.body)['post_readers']
+        readers = response.parsed_body['post_readers']
 
         expect(readers).to be_empty
       end
@@ -34,7 +34,7 @@ describe PostReadersController do
         TopicUser.create!(user: reader, topic: @group_message, last_read_post_number: 3)
 
         get '/post_readers.json', params: { id: @post.id }
-        reader_data = JSON.parse(response.body)['post_readers'].first
+        reader_data = response.parsed_body['post_readers'].first
 
         assert_reader_is_correctly_serialized(reader_data, reader, @post)
       end
@@ -43,16 +43,16 @@ describe PostReadersController do
         TopicUser.create!(user: reader, topic: @group_message, last_read_post_number: 4)
 
         get '/post_readers.json', params: { id: @post.id }
-        reader_data = JSON.parse(response.body)['post_readers'].first
+        reader_data = response.parsed_body['post_readers'].first
 
         assert_reader_is_correctly_serialized(reader_data, reader, @post)
       end
 
-      it 'return an empty list when nodobody read unti that post' do
+      it 'return an empty list when nodobody read until that post' do
         TopicUser.create!(user: reader, topic: @group_message, last_read_post_number: 1)
 
         get '/post_readers.json', params: { id: @post.id }
-        readers = JSON.parse(response.body)['post_readers']
+        readers = response.parsed_body['post_readers']
 
         expect(readers).to be_empty
       end
@@ -62,7 +62,7 @@ describe PostReadersController do
         TopicUser.create!(user: reader, topic: @group_message, last_read_post_number: nil)
 
         get '/post_readers.json', params: { id: @post.id }
-        readers = JSON.parse(response.body)['post_readers']
+        readers = response.parsed_body['post_readers']
 
         expect(readers).to be_empty
       end
@@ -72,28 +72,38 @@ describe PostReadersController do
         reader.update(staged: true)
 
         get '/post_readers.json', params: { id: @post.id }
-        readers = JSON.parse(response.body)['post_readers']
+        readers = response.parsed_body['post_readers']
 
         expect(readers).to be_empty
       end
 
-      it "doesn't include non-members when the post is a whisper" do
+      it "doesn't include non-staff users when the post is a whisper" do
         @post.update(post_type: Post.types[:whisper])
-        non_member_reader = Fabricate(:user)
-        @group_message.allowed_users << non_member_reader
-        TopicUser.create!(user: non_member_reader, topic: @group_message, last_read_post_number: 4)
+        non_staff_user = Fabricate(:user)
+        TopicUser.create!(user: non_staff_user, topic: @group_message, last_read_post_number: 4)
 
         get '/post_readers.json', params: { id: @post.id }
-        readers = JSON.parse(response.body)['post_readers']
+        readers = response.parsed_body['post_readers']
 
         expect(readers).to be_empty
+      end
+
+      it "includes staff users when the post is a whisper" do
+        @post.update(post_type: Post.types[:whisper])
+        admin = Fabricate(:admin)
+        TopicUser.create!(user: admin, topic: @group_message, last_read_post_number: 4)
+
+        get '/post_readers.json', params: { id: @post.id }
+        reader_data = response.parsed_body['post_readers'].first
+
+        assert_reader_is_correctly_serialized(reader_data, admin, @post)
       end
 
       it "doesn't include bots" do
         TopicUser.create!(user: Discourse.system_user, topic: @group_message, last_read_post_number: 4)
 
         get '/post_readers.json', params: { id: @post.id }
-        readers = JSON.parse(response.body)['post_readers']
+        readers = response.parsed_body['post_readers']
 
         expect(readers).to be_empty
       end

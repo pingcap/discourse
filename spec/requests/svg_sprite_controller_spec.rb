@@ -16,7 +16,7 @@ describe SvgSpriteController do
       theme = Fabricate(:theme)
       theme.set_field(target: :settings, name: :yaml, value: "custom_icon: dragon")
       theme.save!
-      get "/svg-sprite/#{Discourse.current_hostname}/svg-#{theme.id}-#{SvgSprite.version([theme.id])}.js"
+      get "/svg-sprite/#{Discourse.current_hostname}/svg-#{theme.id}-#{SvgSprite.version(theme.id)}.js"
       expect(response.status).to eq(200)
     end
 
@@ -24,8 +24,17 @@ describe SvgSpriteController do
       random_hash = Digest::SHA1.hexdigest("somerandomstring")
       get "/svg-sprite/#{Discourse.current_hostname}/svg--#{random_hash}.js"
 
-      expect(response.status).to eq(302)
-      expect(response.location).to include(SvgSprite.version)
+      expect(response).to redirect_to(
+        "/svg-sprite/test.localhost/svg--#{SvgSprite.version}.js"
+      )
+
+      set_cdn_url "//some-cdn.com/site"
+
+      get "/svg-sprite/#{Discourse.current_hostname}/svg--#{random_hash}.js"
+
+      expect(response).to redirect_to(
+        "https://some-cdn.com/site/svg-sprite/test.localhost/svg--#{SvgSprite.version}.js"
+      )
     end
   end
 
@@ -67,5 +76,67 @@ describe SvgSpriteController do
       expect(response.status).to eq(200)
       expect(response.body).to include('my-custom-theme-icon')
     end
+  end
+
+  context 'icon_picker_search' do
+    it 'should work with no filter and max out at 200 results' do
+      user = sign_in(Fabricate(:user))
+      get '/svg-sprite/picker-search'
+
+      expect(response.status).to eq(200)
+
+      data = response.parsed_body
+      expect(data.length).to eq(200)
+      expect(data[0]["id"]).to eq("ad")
+    end
+
+    it 'should filter' do
+      user = sign_in(Fabricate(:user))
+
+      get '/svg-sprite/picker-search', params: { filter: '500px' }
+
+      expect(response.status).to eq(200)
+
+      data = response.parsed_body
+      expect(data.length).to eq(1)
+      expect(data[0]["id"]).to eq("fab-500px")
+    end
+  end
+
+  context 'svg_icon' do
+    it "requires .svg extension" do
+      get "/svg-sprite/#{Discourse.current_hostname}/icon/bolt"
+      expect(response.status).to eq(404)
+    end
+
+    it "returns SVG given an icon name" do
+      get "/svg-sprite/#{Discourse.current_hostname}/icon/bolt.svg"
+      expect(response.status).to eq(200)
+      expect(response.body).to include('bolt')
+    end
+
+    it "returns SVG given an icon name and a color" do
+      get "/svg-sprite/#{Discourse.current_hostname}/icon/CC0000/fab-github.svg"
+      expect(response.status).to eq(200)
+
+      expect(response.body).to include('fab-github')
+      expect(response.body).to include('fill="#CC0000"')
+      expect(response.headers["Cache-Control"]).to eq("max-age=86400, public, immutable")
+    end
+
+    it "returns SVG given an icon name and a 3-character HEX color" do
+      get "/svg-sprite/#{Discourse.current_hostname}/icon/C00/fab-github.svg"
+      expect(response.status).to eq(200)
+
+      expect(response.body).to include('fab-github')
+      expect(response.body).to include('fill="#CC0000"')
+      expect(response.headers["Cache-Control"]).to eq("max-age=86400, public, immutable")
+    end
+
+    it "ignores non-HEX colors" do
+      get "/svg-sprite/#{Discourse.current_hostname}/icon/orange/fab-github.svg"
+      expect(response.status).to eq(404)
+    end
+
   end
 end

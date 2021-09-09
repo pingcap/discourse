@@ -9,9 +9,12 @@ module RetrieveTitle
     # If there was a connection error, do nothing
   end
 
-  def self.extract_title(html)
+  def self.extract_title(html, encoding = nil)
     title = nil
-    if doc = Nokogiri::HTML(html)
+    if html =~ /<title>/ && html !~ /<\/title>/
+      return nil
+    end
+    if doc = Nokogiri::HTML5(html, nil, encoding)
 
       title = doc.at('title')&.inner_text
 
@@ -44,8 +47,8 @@ module RetrieveTitle
     return 500 if uri.host =~ /amazon\.(com|ca|co\.uk|es|fr|de|it|com\.au|com\.br|cn|in|co\.jp|com\.mx)$/
     return 300 if uri.host =~ /youtube\.com$/ || uri.host =~ /youtu.be/
 
-    # default is 10k
-    10
+    # default is 20k
+    20
   end
 
   # Fetch the beginning of a HTML document at a url
@@ -54,18 +57,29 @@ module RetrieveTitle
 
     current = nil
     title = nil
+    encoding = nil
 
     fd.get do |_response, chunk, uri|
+      unless Net::HTTPRedirection === _response
+        if current
+          current << chunk
+        else
+          current = chunk
+        end
 
-      if current
-        current << chunk
-      else
-        current = chunk
+        if !encoding && content_type = _response['content-type']&.strip&.downcase
+          if content_type =~ /charset="?([a-z0-9_-]+)"?/
+            encoding = Regexp.last_match(1)
+            if !Encoding.list.map(&:name).map(&:downcase).include?(encoding)
+              encoding = nil
+            end
+          end
+        end
+
+        max_size = max_chunk_size(uri) * 1024
+        title = extract_title(current, encoding)
+        throw :done if title || max_size < current.length
       end
-
-      max_size = max_chunk_size(uri) * 1024
-      title = extract_title(current)
-      throw :done if title || max_size < current.length
     end
     title
   end
