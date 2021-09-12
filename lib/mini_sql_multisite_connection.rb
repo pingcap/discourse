@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class MiniSqlMultisiteConnection < MiniSql::Postgres::Connection
+class MiniSqlMultisiteConnection < MiniSql::Mysql::Connection
 
   class CustomBuilder < MiniSql::Builder
 

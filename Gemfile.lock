@@ -5,6 +5,12 @@ GIT
     mail (2.8.0.edge)
       mini_mime (>= 0.1.1)
 
+GIT
+  remote: https://github.com/hooopo/mini_sql.git
+  revision: 2f7eb6bf3513bd8fc2d341baff24b565e082fb60
+  specs:
+    mini_sql (0.2.2)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -234,7 +240,6 @@ GEM
       libv8-node (~> 15.14.0.0)
     mini_scheduler (0.13.0)
       sidekiq (>= 4.2.3)
-    mini_sql (1.1.3)
     mini_suffix (0.3.2)
       ffi (~> 1.9)
     minitest (5.14.4)
@@ -547,7 +552,7 @@ DEPENDENCIES
   mini_mime
   mini_racer
   mini_scheduler
-  mini_sql
+  mini_sql!
   mini_suffix
   minitest
   mocha
