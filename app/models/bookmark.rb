@@ -26,8 +26,9 @@ class Bookmark < ActiveRecord::Base
     )
   end
 
+  # TODO use I18n.t after migration completed.
   validates :reminder_at, presence: {
-    message: I18n.t("bookmarks.errors.time_must_be_provided"),
+    message: '', #I18n.t("bookmarks.errors.time_must_be_provided"),
     if: -> { reminder_type.present? }
   }
 
