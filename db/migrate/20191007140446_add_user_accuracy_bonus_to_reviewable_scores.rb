@@ -8,9 +8,8 @@ class AddUserAccuracyBonusToReviewableScores < ActiveRecord::Migration[6.0]
     # Set user_accuracy_bonus = score - user.trust_level - 1
     execute <<~SQL
     UPDATE reviewable_scores
+    LEFT JOIN users ON users.id = reviewable_scores.user_id
     SET user_accuracy_bonus = score - users.trust_level - 1
-    FROM users
-    WHERE reviewable_scores.user_id = users.id
     SQL
   end
 
