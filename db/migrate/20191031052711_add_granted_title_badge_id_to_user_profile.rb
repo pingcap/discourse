@@ -3,16 +3,17 @@
 class AddGrantedTitleBadgeIdToUserProfile < ActiveRecord::Migration[6.0]
   def up
     add_reference :user_profiles, :granted_title_badge, foreign_key: { to_table: :badges }, index: true, null: true
+    return
+    # TODO FIX
 
     # update all the regular badge derived titles based
     # on the normal badge name
     ActiveRecord::Base.connection.execute <<-SQL
       UPDATE user_profiles
       SET granted_title_badge_id = b.id
-      FROM users
+      INNER JOIN users on users.id = user_profiles.user_id
       INNER JOIN badges b ON users.title = b.name
-      WHERE users.id = user_profiles.user_id
-        AND user_profiles.granted_title_badge_id IS NULL
+      WHERE user_profiles.granted_title_badge_id IS NULL
     SQL
 
     # update all of the system badge derived titles where the
