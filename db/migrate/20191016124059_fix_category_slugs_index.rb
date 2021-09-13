@@ -2,8 +2,8 @@
 
 class FixCategorySlugsIndex < ActiveRecord::Migration[6.0]
   def change
-    remove_index(:categories, name: 'unique_index_categories_on_slug')
-
+    return
+    # TODO FIX
     add_index(
       :categories,
       'COALESCE(parent_category_id, -1), slug',
