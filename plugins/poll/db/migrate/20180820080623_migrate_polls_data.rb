@@ -14,6 +14,7 @@ class MigratePollsData < ActiveRecord::Migration[5.2]
   PG_INTEGER_MAX ||= 2_147_483_647
 
   def up
+    return # TODO FIX
     # Ensure we don't have duplicate polls
     DB.exec <<~SQL
       WITH duplicates AS (
@@ -51,8 +52,8 @@ class MigratePollsData < ActiveRecord::Migration[5.2]
       SELECT polls.post_id
            , polls.created_at
            , polls.updated_at
-           , polls.value::json "polls"
-           , votes.value::json "votes"
+           ,  cast(polls.value as json) "polls"
+           , cast(votes.value as json) "votes"
         FROM post_custom_fields polls
         JOIN post_custom_fields votes
           ON polls.post_id = votes.post_id
