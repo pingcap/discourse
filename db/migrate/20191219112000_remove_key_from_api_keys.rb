@@ -6,7 +6,9 @@ class RemoveKeyFromApiKeys < ActiveRecord::Migration[6.0]
 
   def up
     DROPPED_COLUMNS.each do |table, columns|
-      Migration::ColumnDropper.execute_drop(table, columns)
+      columns.each do |column|
+        remove_column table, column
+      end
     end
   end
 

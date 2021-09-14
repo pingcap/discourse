@@ -4,41 +4,43 @@ class AddHashedApiKey < ActiveRecord::Migration[6.0]
     add_column(:api_keys, :key_hash, :string)
     add_column(:api_keys, :truncated_key, :string)
 
-    execute(
-      <<~SQL
-        UPDATE api_keys
-        SET truncated_key = LEFT(key, 4)
-      SQL
-    )
+    # TODO FIX
 
-    batch_size = 500
-    begin
-      batch = DB.query <<-SQL
-        SELECT id, key
-        FROM api_keys
-        WHERE key_hash IS NULL
-        LIMIT #{batch_size}
-      SQL
+    # execute(
+    #   <<~SQL
+    #     UPDATE api_keys
+    #     SET truncated_key = LEFT(key, 4)
+    #   SQL
+    # )
 
-      to_update = []
-      for row in batch
-        hashed = Digest::SHA256.hexdigest row.key
-        to_update << { id: row.id, key_hash: hashed }
-      end
+    # batch_size = 500
+    # begin
+    #   batch = DB.query <<-SQL
+    #     SELECT id, key
+    #     FROM api_keys
+    #     WHERE key_hash IS NULL
+    #     LIMIT #{batch_size}
+    #   SQL
 
-      if to_update.size > 0
-        data_string = to_update.map { |r| "(#{r[:id]}, '#{r[:key_hash]}')" }.join(",")
+    #   to_update = []
+    #   for row in batch
+    #     hashed = Digest::SHA256.hexdigest row.key
+    #     to_update << { id: row.id, key_hash: hashed }
+    #   end
 
-        DB.exec <<~SQL
-          UPDATE api_keys
-          SET key_hash = data.key_hash
-          FROM (values
-            #{data_string}
-          ) as data(id, key_hash)
-          WHERE api_keys.id = data.id
-        SQL
-      end
-    end until batch.length < batch_size
+    #   if to_update.size > 0
+    #     data_string = to_update.map { |r| "(#{r[:id]}, '#{r[:key_hash]}')" }.join(",")
+
+    #     DB.exec <<~SQL
+    #       UPDATE api_keys
+    #       SET key_hash = data.key_hash
+    #       FROM (values
+    #         #{data_string}
+    #       ) as data(id, key_hash)
+    #       WHERE api_keys.id = data.id
+    #     SQL
+    #   end
+    # end until batch.length < batch_size
 
     change_column_null :api_keys, :key_hash, false
     change_column_null :api_keys, :truncated_key, false
