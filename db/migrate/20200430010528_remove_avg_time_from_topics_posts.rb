@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 class RemoveAvgTimeFromTopicsPosts < ActiveRecord::Migration[6.0]
-  disable_ddl_transaction!
 
   def up
     # this makes it re-runnable and also works if it was not created initially
