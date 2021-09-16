@@ -2,6 +2,8 @@
 
 class MigrateUserTopicTimersToBookmarkReminders < ActiveRecord::Migration[6.0]
   def up
+    # TODO FIX
+    return
     topic_timers_to_migrate = DB.query(<<~SQL, reminder_type: 5)
       SELECT topic_timers.id, topic_timers.topic_id, topic_timers.user_id, execute_at,
       posts.id AS first_post_id

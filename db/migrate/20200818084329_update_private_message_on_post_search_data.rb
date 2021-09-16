@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 class UpdatePrivateMessageOnPostSearchData < ActiveRecord::Migration[6.0]
-  # this is a very big change ... avoid an enormous transaction here
-  disable_ddl_transaction!
 
   def update_private_message_flag
 
@@ -56,10 +54,11 @@ class UpdatePrivateMessageOnPostSearchData < ActiveRecord::Migration[6.0]
     )
     SQL
 
-    update_private_message_flag
+    #update_private_message_flag
 
     ActiveRecord::Base.transaction do
-      update_private_message_flag
+      # TODO FIX
+      # update_private_message_flag
       change_column_null(:post_search_data, :private_message, false)
     end
   end

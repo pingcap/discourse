@@ -5,8 +5,8 @@ class AddIndexToUploadsVerificationStatus < ActiveRecord::Migration[6.0]
 
   def up
     execute <<~SQL
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS
-      idx_uploads_on_verification_status ON uploads USING btree (verification_status)
+      CREATE INDEX IF NOT EXISTS
+      idx_uploads_on_verification_status ON uploads (verification_status)
     SQL
   end
 

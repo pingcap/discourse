@@ -28,12 +28,8 @@ class AddUserApiKeyScopes < ActiveRecord::Migration[6.0]
           FROM user_api_keys
         SQL
 
-        Migration::SafeMigrate.disable!
         change_column_null :user_api_keys, :scopes, true
         change_column_default :user_api_keys, :scopes, nil
-        Migration::SafeMigrate.enable!
-
-        Migration::ColumnDropper.mark_readonly(:user_api_keys, :scopes)
       end
 
       dir.down do
