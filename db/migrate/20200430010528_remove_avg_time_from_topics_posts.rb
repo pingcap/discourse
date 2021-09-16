@@ -9,7 +9,7 @@ class RemoveAvgTimeFromTopicsPosts < ActiveRecord::Migration[6.0]
     SQL
 
     ActiveRecord::Base.transaction do
-      execute "DROP VIEW badge_posts"
+      execute "DROP VIEW if exists badge_posts"
 
       execute <<~SQL
         ALTER TABLE posts DROP COLUMN IF EXISTS avg_time

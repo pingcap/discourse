@@ -9,8 +9,8 @@
 
 class CreateMissingBadgeIndexes < ActiveRecord::Migration[6.0]
   def up
-    execute "CREATE INDEX IF NOT EXISTS index_user_badges_on_user_id ON public.user_badges USING btree (user_id)"
-    execute "CREATE INDEX IF NOT EXISTS index_badges_on_badge_type_id ON public.badges USING btree (badge_type_id)"
+    execute "CREATE INDEX IF NOT EXISTS index_user_badges_on_user_id ON user_badges (user_id)"
+    execute "CREATE INDEX IF NOT EXISTS index_badges_on_badge_type_id ON badges (badge_type_id)"
   end
 
   def down

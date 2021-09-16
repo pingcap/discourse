@@ -22,7 +22,7 @@ class UpdateDeprecatedIconNames < ActiveRecord::Migration[6.0]
       SQL
 
       execute <<~SQL
-        UPDATE groups
+        UPDATE `groups`
         SET flair_icon = '#{to}'
         WHERE flair_icon = '#{from}' OR flair_icon = 'fa-#{from}'
       SQL

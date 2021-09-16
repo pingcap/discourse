@@ -4,9 +4,6 @@ require 'migration/column_dropper'
 
 class MigrateInviteRedeemedDataToInvitedUsers < ActiveRecord::Migration[6.0]
   def up
-    %i{user_id redeemed_at}.each do |column|
-      Migration::ColumnDropper.mark_readonly(:invites, column)
-    end
 
     execute <<~SQL
       INSERT INTO invited_users (
