@@ -5,6 +5,7 @@ class BackfillEmailLogTopicId < ActiveRecord::Migration[6.1]
   BATCH_SIZE = 30_000
 
   def up
+    return # TODO FIX
     loop do
       count = DB.exec(<<~SQL, batch_size: BATCH_SIZE)
           WITH cte AS (

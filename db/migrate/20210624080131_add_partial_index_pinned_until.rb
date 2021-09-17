@@ -8,14 +8,14 @@ class AddPartialIndexPinnedUntil < ActiveRecord::Migration[6.1]
 
   def up
     execute <<~SQL
-      CREATE INDEX IF NOT EXISTS "index_topics_on_pinned_until"
-      ON "topics" ("pinned_until")
+      CREATE INDEX IF NOT EXISTS index_topics_on_pinned_until
+      ON topics (pinned_until)
     SQL
   end
 
   def down
     execute <<~SQL
-      DROP INDEX IF EXISTS "index_topics_on_pinned_until"
+      DROP INDEX IF EXISTS index_topics_on_pinned_until
     SQL
   end
 end
