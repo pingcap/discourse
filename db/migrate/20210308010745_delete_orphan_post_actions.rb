@@ -2,6 +2,8 @@
 
 class DeleteOrphanPostActions < ActiveRecord::Migration[6.0]
   def up
+    return
+    # TODO FIX
     sql = <<~SQL
       DELETE FROM post_actions
       USING post_actions pa

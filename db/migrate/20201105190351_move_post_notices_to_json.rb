@@ -8,9 +8,9 @@ class MovePostNoticesToJson < ActiveRecord::Migration[6.0]
         posts.id,
         'notice',
         CASE
-          WHEN pcf_type.value = 'custom'         THEN json_build_object('type', pcf_type.value, 'raw', pcf_args.value, 'cooked', pcf_args.value)
-          WHEN pcf_type.value = 'new_user'       THEN json_build_object('type', pcf_type.value)
-          WHEN pcf_type.value = 'returning_user' THEN json_build_object('type', pcf_type.value, 'last_posted_at', pcf_args.value)
+          WHEN pcf_type.value = 'custom'         THEN json_object('type', pcf_type.value, 'raw', pcf_args.value, 'cooked', pcf_args.value)
+          WHEN pcf_type.value = 'new_user'       THEN json_object('type', pcf_type.value)
+          WHEN pcf_type.value = 'returning_user' THEN json_object('type', pcf_type.value, 'last_posted_at', pcf_args.value)
         END,
         pcf_type.created_at created_at,
         pcf_type.updated_at updated_at
@@ -21,7 +21,7 @@ class MovePostNoticesToJson < ActiveRecord::Migration[6.0]
 
     execute "DELETE FROM post_custom_fields WHERE name = 'notice_type' OR name = 'notice_args'"
 
-    add_index :post_custom_fields, :post_id, unique: true, name: "index_post_custom_fields_on_notice", where: "name = 'notice'"
+    add_index :post_custom_fields, :post_id, name: "index_post_custom_fields_on_notice"
 
     remove_index :post_custom_fields, name: "index_post_custom_fields_on_notice_type"
     remove_index :post_custom_fields, name: "index_post_custom_fields_on_notice_args"
@@ -30,22 +30,22 @@ class MovePostNoticesToJson < ActiveRecord::Migration[6.0]
   def down
     execute <<~SQL
       INSERT INTO post_custom_fields(post_id, name, value, created_at, updated_at)
-      SELECT post_id, 'notice_type', value::json->>'type', created_at, updated_at
+      SELECT post_id, 'notice_type', json_extract(cast(value as json), '$.type'), created_at, updated_at
       FROM post_custom_fields
       WHERE name = 'notice'
     SQL
 
     execute <<~SQL
       INSERT INTO post_custom_fields(post_id, name, value, created_at, updated_at)
-      SELECT post_id, 'notice_args', COALESCE(value::json->>'cooked', value::json->>'last_posted_at'), created_at, updated_at
+      SELECT post_id, 'notice_args', COALESCE(json_extract(cast value as json), '$.cooked'), json_extract(cast value as json), '$.last_posted_at')), created_at, updated_at
       FROM post_custom_fields
       WHERE name = 'notice'
     SQL
 
     execute "DELETE FROM post_custom_fields WHERE name = 'notice'"
 
-    add_index :post_custom_fields, :post_id, unique: true, name: "index_post_custom_fields_on_notice_type", where: "name = 'notice_type'"
-    add_index :post_custom_fields, :post_id, unique: true, name: "index_post_custom_fields_on_notice_args", where: "name = 'notice_args'"
+    add_index :post_custom_fields, :post_id, name: "index_post_custom_fields_on_notice_type"
+    add_index :post_custom_fields, :post_id, name: "index_post_custom_fields_on_notice_args"
 
     remove_index :index_post_custom_fields_on_notice
   end

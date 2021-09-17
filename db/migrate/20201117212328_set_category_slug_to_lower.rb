@@ -64,10 +64,8 @@ class SetCategorySlugToLower < ActiveRecord::Migration[6.0]
 
     add_index(
       :categories,
-      'COALESCE(parent_category_id, -1), LOWER(slug)',
-      name: 'unique_index_categories_on_slug',
-      where: "slug != ''",
-      unique: true
+      '(COALESCE(parent_category_id, -1)), (LOWER(slug))',
+      name: 'unique_index_categories_on_slug'
     )
   end
 
@@ -76,10 +74,8 @@ class SetCategorySlugToLower < ActiveRecord::Migration[6.0]
 
     add_index(
       :categories,
-      'COALESCE(parent_category_id, -1), slug',
-      name: 'unique_index_categories_on_slug',
-      where: "slug != ''",
-      unique: true
+      '(COALESCE(parent_category_id, -1), slug)',
+      name: 'unique_index_categories_on_slug'
     )
   end
 end

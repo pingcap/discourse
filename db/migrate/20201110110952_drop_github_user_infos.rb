@@ -7,7 +7,7 @@ class DropGithubUserInfos < ActiveRecord::Migration[6.0]
 
   def up
     DROPPED_TABLES.each do |table|
-      Migration::TableDropper.execute_drop(table)
+      drop_table table
     end
   end
 

@@ -12,21 +12,22 @@ class AddUserApiKeyScopes < ActiveRecord::Migration[6.0]
 
     reversible do |dir|
       dir.up do
-        execute <<~SQL
-          INSERT INTO user_api_key_scopes
-          (
-            user_api_key_id,
-            name,
-            created_at,
-            updated_at
-          )
-          SELECT
-            user_api_keys.id,
-            unnest(user_api_keys.scopes),
-            created_at,
-            updated_at
-          FROM user_api_keys
-        SQL
+        # TODO FIX
+        # execute <<~SQL
+        #   INSERT INTO user_api_key_scopes
+        #   (
+        #     user_api_key_id,
+        #     name,
+        #     created_at,
+        #     updated_at
+        #   )
+        #   SELECT
+        #     user_api_keys.id,
+        #     unnest(user_api_keys.scopes),
+        #     created_at,
+        #     updated_at
+        #   FROM user_api_keys
+        # SQL
 
         change_column_null :user_api_keys, :scopes, true
         change_column_default :user_api_keys, :scopes, nil
@@ -35,7 +36,6 @@ class AddUserApiKeyScopes < ActiveRecord::Migration[6.0]
       dir.down do
         change_column_null :user_api_keys, :scopes, false
         change_column_default :user_api_keys, :scopes, []
-        Migration::ColumnDropper.drop_readonly(:user_api_keys, :scopes)
       end
     end
   end

@@ -2,6 +2,6 @@
 
 class AddAllowedParametersToUserApiKeyScope < ActiveRecord::Migration[6.0]
   def change
-    add_column :user_api_key_scopes, :allowed_parameters, :jsonb
+    add_column :user_api_key_scopes, :allowed_parameters, :json
   end
 end

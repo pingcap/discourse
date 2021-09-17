@@ -6,7 +6,7 @@ class FixGroupFlairAvatarUploadSecurityAndAcls < ActiveRecord::Migration[6.0]
   def up
     upload_ids = DB.query_single(<<~SQL
       SELECT flair_upload_id
-      FROM groups
+      FROM `groups`
       WHERE flair_upload_id IS NOT NULL
      SQL
     )

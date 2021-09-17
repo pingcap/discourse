@@ -2,6 +2,7 @@
 
 class DeleteOrphanPostRevisions < ActiveRecord::Migration[6.0]
   def up
+    return # TODO FIX
     sql = <<~SQL
         DELETE FROM post_revisions
         USING post_revisions pr

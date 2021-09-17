@@ -21,22 +21,23 @@ class MigrateGithubUserInfos < ActiveRecord::Migration[6.0]
         'github',
         github_user_id,
         user_id,
-        json_build_object('nickname', screen_name),
+        json_object('nickname', screen_name),
         updated_at,
         created_at,
         updated_at
         #{", id" if maintain_ids}
       FROM github_user_infos
     SQL
-
-    if maintain_ids
-      execute <<~SQL
-        SELECT setval(
-          pg_get_serial_sequence('user_associated_accounts', 'id'),
-          (select greatest(max(id), 1) from user_associated_accounts)
-        );
-      SQL
-    end
+    
+    # TODO FIX
+    # if maintain_ids
+    #   execute <<~SQL
+    #     SELECT setval(
+    #       pg_get_serial_sequence('user_associated_accounts', 'id'),
+    #       (select greatest(max(id), 1) from user_associated_accounts)
+    #     );
+    #   SQL
+    # end
   end
 
   def down

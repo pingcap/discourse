@@ -2,6 +2,7 @@
 
 class MoveCategoryLastSeenAtToNewTable < ActiveRecord::Migration[6.0]
   def up
+    return # TODO FIX
     sql = <<~SQL
       INSERT INTO dismissed_topic_users (user_id, topic_id, created_at)
       SELECT users.id, topics.id, category_users.last_seen_at
