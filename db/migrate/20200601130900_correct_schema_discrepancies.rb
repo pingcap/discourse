@@ -203,10 +203,7 @@ class CorrectSchemaDiscrepancies < ActiveRecord::Migration[6.0]
       current_value = schema_hash[ref]["character_maximum_length"]
       next if current_value == nil
       table, column = ref.split(".")
-
-      DB.exec <<~SQL
-        ALTER TABLE `#{table}` modify column `#{column}`  varchar(255)
-      SQL
+      change_column table, column, :string, limit: 255
     end
 
     # In the past, rails changed the default behavior for float columns
@@ -225,9 +222,7 @@ class CorrectSchemaDiscrepancies < ActiveRecord::Migration[6.0]
     # Category color default was changed in https://github.com/discourse/discourse/commit/faf09bb8c80fcb28b132a5a644ac689cc9abffc2
     # But should have been added in a new migration
     if schema_hash["categories.color"]["column_default"] != "'0088CC'"
-      DB.exec <<~SQL
-        ALTER TABLE categories modify COLUMN color varchar(255) DEFAULT '0088CC'
-      SQL
+      change_column :categories, :color, :string, default: '0088CC'
     end
 
     # Older sites have a default value like nextval('topic_search_data_topic_id_seq'::regclass)

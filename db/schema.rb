@@ -12,12 +12,7 @@
 
 ActiveRecord::Schema.define(version: 2021_08_24_203421) do
 
-  # These are extensions that must be enabled in order to support this database
-  enable_extension "hstore"
-  enable_extension "pg_trgm"
-  enable_extension "plpgsql"
-
-  create_table "allowed_pm_users", force: :cascade do |t|
+  create_table "allowed_pm_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "allowed_pm_user_id", null: false
     t.datetime "created_at", precision: 6, null: false
@@ -26,17 +21,17 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "allowed_pm_user_id"], name: "index_allowed_pm_users_on_user_id_and_allowed_pm_user_id", unique: true
   end
 
-  create_table "anonymous_users", force: :cascade do |t|
+  create_table "anonymous_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "master_user_id", null: false
     t.boolean "active", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["master_user_id"], name: "index_anonymous_users_on_master_user_id", unique: true, where: "active"
+    t.index ["master_user_id"], name: "index_anonymous_users_on_master_user_id", unique: true
     t.index ["user_id"], name: "index_anonymous_users_on_user_id", unique: true
   end
 
-  create_table "api_key_scopes", force: :cascade do |t|
+  create_table "api_key_scopes", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "api_key_id", null: false
     t.string "resource", null: false
     t.string "action", null: false
@@ -46,12 +41,12 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["api_key_id"], name: "index_api_key_scopes_on_api_key_id"
   end
 
-  create_table "api_keys", id: :serial, force: :cascade do |t|
+  create_table "api_keys", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id"
     t.integer "created_by_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.inet "allowed_ips", array: true
+    t.json "allowed_ips"
     t.boolean "hidden", default: false, null: false
     t.datetime "last_used_at"
     t.datetime "revoked_at"
@@ -62,14 +57,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_api_keys_on_user_id"
   end
 
-  create_table "application_requests", id: :serial, force: :cascade do |t|
+  create_table "application_requests", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.date "date", null: false
     t.integer "req_type", null: false
     t.integer "count", default: 0, null: false
     t.index ["date", "req_type"], name: "index_application_requests_on_date_and_req_type", unique: true
   end
 
-  create_table "backup_draft_posts", force: :cascade do |t|
+  create_table "backup_draft_posts", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "post_id", null: false
     t.string "key", null: false
@@ -79,7 +74,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "key"], name: "index_backup_draft_posts_on_user_id_and_key", unique: true
   end
 
-  create_table "backup_draft_topics", force: :cascade do |t|
+  create_table "backup_draft_topics", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "topic_id", null: false
     t.datetime "created_at", precision: 6, null: false
@@ -88,12 +83,12 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_backup_draft_topics_on_user_id", unique: true
   end
 
-  create_table "backup_metadata", force: :cascade do |t|
+  create_table "backup_metadata", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.string "value"
   end
 
-  create_table "badge_groupings", id: :serial, force: :cascade do |t|
+  create_table "badge_groupings", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.text "description"
     t.integer "position", null: false
@@ -101,14 +96,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.datetime "updated_at", null: false
   end
 
-  create_table "badge_types", id: :serial, force: :cascade do |t|
+  create_table "badge_types", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_badge_types_on_name", unique: true
   end
 
-  create_table "badges", id: :serial, force: :cascade do |t|
+  create_table "badges", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.text "description"
     t.integer "badge_type_id", null: false
@@ -127,14 +122,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "trigger"
     t.boolean "show_posts", default: false, null: false
     t.boolean "system", default: false, null: false
-    t.string "image", limit: 255
+    t.string "image"
     t.text "long_description"
     t.integer "image_upload_id"
     t.index ["badge_type_id"], name: "index_badges_on_badge_type_id"
     t.index ["name"], name: "index_badges_on_name", unique: true
   end
 
-  create_table "bookmarks", force: :cascade do |t|
+  create_table "bookmarks", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "topic_id", null: false
     t.bigint "post_id", null: false
@@ -156,9 +151,9 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_bookmarks_on_user_id"
   end
 
-  create_table "categories", id: :serial, force: :cascade do |t|
+  create_table "categories", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", limit: 50, null: false
-    t.string "color", limit: 6, default: "0088CC", null: false
+    t.string "color", default: "0088CC", null: false
     t.integer "topic_id"
     t.integer "topic_count", default: 0, null: false
     t.datetime "created_at", null: false
@@ -206,27 +201,28 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "search_priority", default: 0
     t.boolean "allow_global_tags", default: false, null: false
     t.integer "reviewable_by_group_id"
+    t.virtual "virtual_parent_category_id", type: :string, as: "coalesce(`parent_category_id`, _utf8'-1')", stored: true
     t.integer "required_tag_group_id"
     t.integer "min_tags_from_required_group", default: 1, null: false
     t.string "read_only_banner"
     t.string "default_list_filter", limit: 20, default: "all"
     t.boolean "allow_unlimited_owner_edits_on_first_post", default: false, null: false
     t.integer "default_slow_mode_seconds"
-    t.index "COALESCE(parent_category_id, '-1'::integer), lower((slug)::text)", name: "unique_index_categories_on_slug", unique: true, where: "((slug)::text <> ''::text)"
-    t.index "COALESCE(parent_category_id, '-1'::integer), name", name: "unique_index_categories_on_name", unique: true
+    t.index "(coalesce(`parent_category_id`, -1)), (lower(`slug`))", name: "unique_index_categories_on_slug"
     t.index ["email_in"], name: "index_categories_on_email_in", unique: true
     t.index ["reviewable_by_group_id"], name: "index_categories_on_reviewable_by_group_id"
     t.index ["search_priority"], name: "index_categories_on_search_priority"
     t.index ["topic_count"], name: "index_categories_on_topic_count"
+    t.index ["virtual_parent_category_id", "name"], name: "unique_index_categories_on_name", unique: true
   end
 
-  create_table "categories_web_hooks", id: false, force: :cascade do |t|
+  create_table "categories_web_hooks", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "web_hook_id", null: false
     t.integer "category_id", null: false
     t.index ["web_hook_id", "category_id"], name: "index_categories_web_hooks_on_web_hook_id_and_category_id", unique: true
   end
 
-  create_table "category_custom_fields", id: :serial, force: :cascade do |t|
+  create_table "category_custom_fields", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "category_id", null: false
     t.string "name", limit: 256, null: false
     t.text "value"
@@ -235,7 +231,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["category_id", "name"], name: "index_category_custom_fields_on_category_id_and_name"
   end
 
-  create_table "category_featured_topics", id: :serial, force: :cascade do |t|
+  create_table "category_featured_topics", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "category_id", null: false
     t.integer "topic_id", null: false
     t.datetime "created_at", null: false
@@ -245,7 +241,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["category_id", "topic_id"], name: "cat_featured_threads", unique: true
   end
 
-  create_table "category_groups", id: :serial, force: :cascade do |t|
+  create_table "category_groups", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "category_id", null: false
     t.integer "group_id", null: false
     t.datetime "created_at", null: false
@@ -254,15 +250,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["group_id"], name: "index_category_groups_on_group_id"
   end
 
-  create_table "category_search_data", primary_key: "category_id", id: :integer, default: nil, force: :cascade do |t|
-    t.tsvector "search_data"
+  create_table "category_search_data", primary_key: "category_id", id: :integer, default: nil, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
+    t.text "search_data"
     t.text "raw_data"
     t.text "locale"
     t.integer "version", default: 0
-    t.index ["search_data"], name: "idx_search_category", using: :gin
   end
 
-  create_table "category_tag_groups", id: :serial, force: :cascade do |t|
+  create_table "category_tag_groups", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "category_id", null: false
     t.integer "tag_group_id", null: false
     t.datetime "created_at", null: false
@@ -270,7 +265,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["category_id", "tag_group_id"], name: "idx_category_tag_groups_ix1", unique: true
   end
 
-  create_table "category_tag_stats", force: :cascade do |t|
+  create_table "category_tag_stats", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "category_id", null: false
     t.bigint "tag_id", null: false
     t.integer "topic_count", default: 0, null: false
@@ -280,7 +275,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["tag_id"], name: "index_category_tag_stats_on_tag_id"
   end
 
-  create_table "category_tags", id: :serial, force: :cascade do |t|
+  create_table "category_tags", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "category_id", null: false
     t.integer "tag_id", null: false
     t.datetime "created_at", null: false
@@ -289,7 +284,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["tag_id", "category_id"], name: "idx_category_tags_ix2", unique: true
   end
 
-  create_table "category_users", id: :serial, force: :cascade do |t|
+  create_table "category_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "category_id", null: false
     t.integer "user_id", null: false
     t.integer "notification_level"
@@ -299,7 +294,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "last_seen_at"], name: "index_category_users_on_user_id_and_last_seen_at"
   end
 
-  create_table "child_themes", id: :serial, force: :cascade do |t|
+  create_table "child_themes", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "parent_theme_id"
     t.integer "child_theme_id"
     t.datetime "created_at", null: false
@@ -308,7 +303,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["parent_theme_id", "child_theme_id"], name: "index_child_themes_on_parent_theme_id_and_child_theme_id", unique: true
   end
 
-  create_table "color_scheme_colors", id: :serial, force: :cascade do |t|
+  create_table "color_scheme_colors", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.string "hex", null: false
     t.integer "color_scheme_id", null: false
@@ -317,7 +312,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["color_scheme_id"], name: "index_color_scheme_colors_on_color_scheme_id"
   end
 
-  create_table "color_schemes", id: :serial, force: :cascade do |t|
+  create_table "color_schemes", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.integer "version", default: 1, null: false
     t.datetime "created_at", null: false
@@ -328,7 +323,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.boolean "user_selectable", default: false, null: false
   end
 
-  create_table "custom_emojis", id: :serial, force: :cascade do |t|
+  create_table "custom_emojis", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.integer "upload_id", null: false
     t.datetime "created_at", null: false
@@ -337,12 +332,12 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["name"], name: "index_custom_emojis_on_name", unique: true
   end
 
-  create_table "developers", id: :serial, force: :cascade do |t|
+  create_table "developers", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.index ["user_id"], name: "index_developers_on_user_id", unique: true
   end
 
-  create_table "directory_columns", force: :cascade do |t|
+  create_table "directory_columns", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name"
     t.integer "automatic_position"
     t.string "icon"
@@ -355,7 +350,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["enabled", "position", "user_field_id"], name: "directory_column_index"
   end
 
-  create_table "directory_items", id: :serial, force: :cascade do |t|
+  create_table "directory_items", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "period_type", null: false
     t.integer "user_id", null: false
     t.integer "likes_received", null: false
@@ -377,14 +372,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["topics_entered"], name: "index_directory_items_on_topics_entered"
   end
 
-  create_table "dismissed_topic_users", force: :cascade do |t|
+  create_table "dismissed_topic_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id"
     t.integer "topic_id"
     t.datetime "created_at"
     t.index ["user_id", "topic_id"], name: "index_dismissed_topic_users_on_user_id_and_topic_id", unique: true
   end
 
-  create_table "do_not_disturb_timings", force: :cascade do |t|
+  create_table "do_not_disturb_timings", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.datetime "starts_at", null: false
     t.datetime "ends_at", null: false
@@ -395,14 +390,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_do_not_disturb_timings_on_user_id"
   end
 
-  create_table "draft_sequences", id: :serial, force: :cascade do |t|
+  create_table "draft_sequences", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "draft_key", null: false
     t.bigint "sequence", null: false
     t.index ["user_id", "draft_key"], name: "index_draft_sequences_on_user_id_and_draft_key", unique: true
   end
 
-  create_table "drafts", id: :serial, force: :cascade do |t|
+  create_table "drafts", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "draft_key", null: false
     t.text "data", null: false
@@ -414,7 +409,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "draft_key"], name: "index_drafts_on_user_id_and_draft_key", unique: true
   end
 
-  create_table "email_change_requests", id: :serial, force: :cascade do |t|
+  create_table "email_change_requests", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "old_email"
     t.string "new_email", null: false
@@ -428,31 +423,31 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_email_change_requests_on_user_id"
   end
 
-  create_table "email_logs", id: :serial, force: :cascade do |t|
+  create_table "email_logs", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "to_address", null: false
     t.string "email_type", null: false
     t.integer "user_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "post_id"
-    t.uuid "bounce_key"
+    t.string "bounce_key"
     t.boolean "bounced", default: false, null: false
     t.string "message_id"
     t.integer "smtp_group_id"
     t.text "cc_addresses"
-    t.integer "cc_user_ids", array: true
+    t.json "cc_user_ids"
     t.text "raw"
     t.integer "topic_id"
-    t.index ["bounce_key"], name: "index_email_logs_on_bounce_key", unique: true, where: "(bounce_key IS NOT NULL)"
+    t.index ["bounce_key"], name: "index_email_logs_on_bounce_key", unique: true
     t.index ["bounced"], name: "index_email_logs_on_bounced"
-    t.index ["created_at"], name: "index_email_logs_on_created_at", order: :desc
+    t.index ["created_at"], name: "index_email_logs_on_created_at"
     t.index ["message_id"], name: "index_email_logs_on_message_id"
     t.index ["post_id"], name: "index_email_logs_on_post_id"
-    t.index ["topic_id"], name: "index_email_logs_on_topic_id", where: "(topic_id IS NOT NULL)"
+    t.index ["topic_id"], name: "index_email_logs_on_topic_id"
     t.index ["user_id"], name: "index_email_logs_on_user_id"
   end
 
-  create_table "email_tokens", id: :serial, force: :cascade do |t|
+  create_table "email_tokens", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "email", null: false
     t.string "token", null: false
@@ -464,7 +459,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_email_tokens_on_user_id"
   end
 
-  create_table "embeddable_hosts", id: :serial, force: :cascade do |t|
+  create_table "embeddable_hosts", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "host", null: false
     t.integer "category_id", null: false
     t.datetime "created_at", null: false
@@ -473,11 +468,11 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.string "allowed_paths"
   end
 
-  create_table "external_upload_stubs", force: :cascade do |t|
+  create_table "external_upload_stubs", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "key", null: false
     t.string "original_filename", null: false
     t.integer "status", default: 1, null: false
-    t.uuid "unique_identifier", null: false
+    t.string "unique_identifier", null: false
     t.integer "created_by_id", null: false
     t.string "upload_type", null: false
     t.datetime "created_at", precision: 6, null: false
@@ -491,7 +486,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["status"], name: "index_external_upload_stubs_on_status"
   end
 
-  create_table "given_daily_likes", id: false, force: :cascade do |t|
+  create_table "given_daily_likes", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "likes_given", null: false
     t.date "given_date", null: false
@@ -500,7 +495,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "given_date"], name: "index_given_daily_likes_on_user_id_and_given_date", unique: true
   end
 
-  create_table "group_archived_messages", id: :serial, force: :cascade do |t|
+  create_table "group_archived_messages", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id", null: false
     t.integer "topic_id", null: false
     t.datetime "created_at", null: false
@@ -508,14 +503,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["group_id", "topic_id"], name: "index_group_archived_messages_on_group_id_and_topic_id", unique: true
   end
 
-  create_table "group_category_notification_defaults", force: :cascade do |t|
+  create_table "group_category_notification_defaults", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id", null: false
     t.integer "category_id", null: false
     t.integer "notification_level", null: false
     t.index ["group_id", "category_id"], name: "idx_group_category_notification_defaults_unique", unique: true
   end
 
-  create_table "group_custom_fields", id: :serial, force: :cascade do |t|
+  create_table "group_custom_fields", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id", null: false
     t.string "name", limit: 256, null: false
     t.text "value"
@@ -524,7 +519,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["group_id", "name"], name: "index_group_custom_fields_on_group_id_and_name"
   end
 
-  create_table "group_histories", id: :serial, force: :cascade do |t|
+  create_table "group_histories", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id", null: false
     t.integer "acting_user_id", null: false
     t.integer "target_user_id"
@@ -540,7 +535,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["target_user_id"], name: "index_group_histories_on_target_user_id"
   end
 
-  create_table "group_mentions", id: :serial, force: :cascade do |t|
+  create_table "group_mentions", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "post_id"
     t.integer "group_id"
     t.datetime "created_at", null: false
@@ -549,7 +544,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["post_id", "group_id"], name: "index_group_mentions_on_post_id_and_group_id", unique: true
   end
 
-  create_table "group_requests", force: :cascade do |t|
+  create_table "group_requests", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id"
     t.integer "user_id"
     t.text "reason"
@@ -560,14 +555,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_group_requests_on_user_id"
   end
 
-  create_table "group_tag_notification_defaults", force: :cascade do |t|
+  create_table "group_tag_notification_defaults", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id", null: false
     t.integer "tag_id", null: false
     t.integer "notification_level", null: false
     t.index ["group_id", "tag_id"], name: "idx_group_tag_notification_defaults_unique", unique: true
   end
 
-  create_table "group_users", id: :serial, force: :cascade do |t|
+  create_table "group_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id", null: false
     t.integer "user_id", null: false
     t.datetime "created_at", null: false
@@ -579,7 +574,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "group_id"], name: "index_group_users_on_user_id_and_group_id", unique: true
   end
 
-  create_table "groups", id: :serial, force: :cascade do |t|
+  create_table "groups", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -634,13 +629,13 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["name"], name: "index_groups_on_name", unique: true
   end
 
-  create_table "groups_web_hooks", id: false, force: :cascade do |t|
+  create_table "groups_web_hooks", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "web_hook_id", null: false
     t.integer "group_id", null: false
     t.index ["web_hook_id", "group_id"], name: "index_groups_web_hooks_on_web_hook_id_and_group_id", unique: true
   end
 
-  create_table "ignored_users", force: :cascade do |t|
+  create_table "ignored_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "ignored_user_id", null: false
     t.datetime "created_at", null: false
@@ -651,7 +646,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "ignored_user_id"], name: "index_ignored_users_on_user_id_and_ignored_user_id", unique: true
   end
 
-  create_table "imap_sync_logs", force: :cascade do |t|
+  create_table "imap_sync_logs", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "level", null: false
     t.string "message", null: false
     t.bigint "group_id"
@@ -661,14 +656,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["level"], name: "index_imap_sync_logs_on_level"
   end
 
-  create_table "incoming_domains", id: :serial, force: :cascade do |t|
+  create_table "incoming_domains", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", limit: 100, null: false
     t.boolean "https", default: false, null: false
     t.integer "port", null: false
     t.index ["name", "https", "port"], name: "index_incoming_domains_on_name_and_https_and_port", unique: true
   end
 
-  create_table "incoming_emails", id: :serial, force: :cascade do |t|
+  create_table "incoming_emails", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id"
     t.integer "topic_id"
     t.integer "post_id"
@@ -691,18 +686,18 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.boolean "imap_missing", default: false, null: false
     t.integer "created_via", default: 0, null: false
     t.index ["created_at"], name: "index_incoming_emails_on_created_at"
-    t.index ["error"], name: "index_incoming_emails_on_error"
+    t.index ["error"], name: "index_incoming_emails_on_error", length: 100
     t.index ["imap_group_id"], name: "index_incoming_emails_on_imap_group_id"
     t.index ["imap_sync"], name: "index_incoming_emails_on_imap_sync"
-    t.index ["message_id"], name: "index_incoming_emails_on_message_id"
+    t.index ["message_id"], name: "index_incoming_emails_on_message_id", length: 100
     t.index ["post_id"], name: "index_incoming_emails_on_post_id"
-    t.index ["user_id"], name: "index_incoming_emails_on_user_id", where: "(user_id IS NOT NULL)"
+    t.index ["user_id"], name: "index_incoming_emails_on_user_id"
   end
 
-  create_table "incoming_links", id: :serial, force: :cascade do |t|
+  create_table "incoming_links", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "user_id"
-    t.inet "ip_address"
+    t.string "ip_address"
     t.integer "current_user_id"
     t.integer "post_id", null: false
     t.integer "incoming_referer_id"
@@ -710,13 +705,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["post_id"], name: "index_incoming_links_on_post_id"
   end
 
-  create_table "incoming_referers", id: :serial, force: :cascade do |t|
-    t.string "path", limit: 1000, null: false
+  create_table "incoming_referers", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
+    t.text "path", null: false
     t.integer "incoming_domain_id", null: false
-    t.index ["path", "incoming_domain_id"], name: "index_incoming_referers_on_path_and_incoming_domain_id", unique: true
+    t.virtual "md5_path", type: :string, as: "md5(`path`)", stored: true
+    t.index ["md5_path", "incoming_domain_id"], name: "index_incoming_referers_on_path_and_incoming_domain_id", unique: true
   end
 
-  create_table "invited_groups", id: :serial, force: :cascade do |t|
+  create_table "invited_groups", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id"
     t.integer "invite_id"
     t.datetime "created_at", null: false
@@ -724,17 +720,17 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["group_id", "invite_id"], name: "index_invited_groups_on_group_id_and_invite_id", unique: true
   end
 
-  create_table "invited_users", force: :cascade do |t|
+  create_table "invited_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id"
     t.integer "invite_id", null: false
     t.datetime "redeemed_at"
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
     t.index ["invite_id"], name: "index_invited_users_on_invite_id"
-    t.index ["user_id", "invite_id"], name: "index_invited_users_on_user_id_and_invite_id", unique: true, where: "(user_id IS NOT NULL)"
+    t.index ["user_id", "invite_id"], name: "index_invited_users_on_user_id_and_invite_id"
   end
 
-  create_table "invites", id: :serial, force: :cascade do |t|
+  create_table "invites", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "invite_key", limit: 32, null: false
     t.string "email"
     t.integer "invited_by_id", null: false
@@ -758,7 +754,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["invited_by_id"], name: "index_invites_on_invited_by_id"
   end
 
-  create_table "javascript_caches", force: :cascade do |t|
+  create_table "javascript_caches", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "theme_field_id"
     t.string "digest"
     t.text "content", null: false
@@ -768,10 +764,9 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["digest"], name: "index_javascript_caches_on_digest"
     t.index ["theme_field_id"], name: "index_javascript_caches_on_theme_field_id"
     t.index ["theme_id"], name: "index_javascript_caches_on_theme_id"
-    t.check_constraint "((theme_id IS NOT NULL) AND (theme_field_id IS NULL)) OR ((theme_id IS NULL) AND (theme_field_id IS NOT NULL))", name: "enforce_theme_or_theme_field"
   end
 
-  create_table "linked_topics", force: :cascade do |t|
+  create_table "linked_topics", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "topic_id", null: false
     t.bigint "original_topic_id", null: false
     t.integer "sequence", null: false
@@ -781,7 +776,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["topic_id", "sequence"], name: "index_linked_topics_on_topic_id_and_sequence", unique: true
   end
 
-  create_table "message_bus", id: :serial, force: :cascade do |t|
+  create_table "message_bus", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name"
     t.string "context"
     t.text "data"
@@ -789,7 +784,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["created_at"], name: "index_message_bus_on_created_at"
   end
 
-  create_table "muted_users", id: :serial, force: :cascade do |t|
+  create_table "muted_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "muted_user_id", null: false
     t.datetime "created_at", null: false
@@ -798,7 +793,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "muted_user_id"], name: "index_muted_users_on_user_id_and_muted_user_id", unique: true
   end
 
-  create_table "notifications", id: :serial, force: :cascade do |t|
+  create_table "notifications", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "notification_type", null: false
     t.integer "user_id", null: false
     t.string "data", limit: 1000, null: false
@@ -808,17 +803,15 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "topic_id"
     t.integer "post_number"
     t.integer "post_action_id"
-    t.boolean "high_priority", default: false, null: false
+    t.boolean "high_priority"
     t.index ["post_action_id"], name: "index_notifications_on_post_action_id"
     t.index ["topic_id", "post_number"], name: "index_notifications_on_topic_id_and_post_number"
     t.index ["user_id", "created_at"], name: "index_notifications_on_user_id_and_created_at"
-    t.index ["user_id", "id", "read", "topic_id"], name: "index_notifications_read_or_not_high_priority", order: { id: :desc }, where: "(read OR (high_priority = false))"
-    t.index ["user_id", "id"], name: "index_notifications_unique_unread_high_priority", unique: true, where: "((NOT read) AND (high_priority = true))"
-    t.index ["user_id", "notification_type"], name: "idx_notifications_speedup_unread_count", where: "(NOT read)"
+    t.index ["user_id", "notification_type"], name: "idx_notifications_speedup_unread_count"
     t.index ["user_id", "topic_id", "post_number"], name: "index_notifications_on_user_id_and_topic_id_and_post_number"
   end
 
-  create_table "oauth2_user_infos", id: :serial, force: :cascade do |t|
+  create_table "oauth2_user_infos", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "uid", null: false
     t.string "provider", null: false
@@ -830,14 +823,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "provider"], name: "index_oauth2_user_infos_on_user_id_and_provider"
   end
 
-  create_table "onceoff_logs", id: :serial, force: :cascade do |t|
+  create_table "onceoff_logs", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "job_name"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["job_name"], name: "index_onceoff_logs_on_job_name"
   end
 
-  create_table "optimized_images", id: :serial, force: :cascade do |t|
+  create_table "optimized_images", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "sha1", limit: 40, null: false
     t.string "extension", limit: 10, null: false
     t.integer "width", null: false
@@ -854,19 +847,20 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["upload_id"], name: "index_optimized_images_on_upload_id"
   end
 
-  create_table "permalinks", id: :serial, force: :cascade do |t|
-    t.string "url", limit: 1000, null: false
+  create_table "permalinks", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
+    t.text "url", null: false
     t.integer "topic_id"
     t.integer "post_id"
     t.integer "category_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "external_url", limit: 1000
+    t.text "external_url"
+    t.virtual "md5_url", type: :string, as: "md5(`url`)", stored: true
     t.integer "tag_id"
-    t.index ["url"], name: "index_permalinks_on_url", unique: true
+    t.index ["md5_url"], name: "index_permalinks_on_url", unique: true
   end
 
-  create_table "plugin_store_rows", id: :serial, force: :cascade do |t|
+  create_table "plugin_store_rows", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "plugin_name", null: false
     t.string "key", null: false
     t.string "type_name", null: false
@@ -874,7 +868,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["plugin_name", "key"], name: "index_plugin_store_rows_on_plugin_name_and_key", unique: true
   end
 
-  create_table "poll_options", force: :cascade do |t|
+  create_table "poll_options", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "poll_id"
     t.string "digest", null: false
     t.text "html", null: false
@@ -885,7 +879,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["poll_id"], name: "index_poll_options_on_poll_id"
   end
 
-  create_table "poll_votes", id: false, force: :cascade do |t|
+  create_table "poll_votes", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "poll_id"
     t.bigint "poll_option_id"
     t.bigint "user_id"
@@ -897,7 +891,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_poll_votes_on_user_id"
   end
 
-  create_table "polls", force: :cascade do |t|
+  create_table "polls", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "post_id"
     t.string "name", default: "poll", null: false
     t.datetime "close_at"
@@ -918,7 +912,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["post_id"], name: "index_polls_on_post_id"
   end
 
-  create_table "post_action_types", id: :serial, force: :cascade do |t|
+  create_table "post_action_types", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name_key", limit: 50, null: false
     t.boolean "is_flag", default: false, null: false
     t.string "icon", limit: 20
@@ -929,7 +923,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "reviewable_priority", default: 0, null: false
   end
 
-  create_table "post_actions", id: :serial, force: :cascade do |t|
+  create_table "post_actions", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "post_id", null: false
     t.integer "user_id", null: false
     t.integer "post_action_type_id", null: false
@@ -946,32 +940,33 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.datetime "deferred_at"
     t.datetime "disagreed_at"
     t.integer "disagreed_by_id"
-    t.index ["post_action_type_id", "disagreed_at"], name: "index_post_actions_on_post_action_type_id_and_disagreed_at", where: "(disagreed_at IS NULL)"
+    t.index ["post_action_type_id", "disagreed_at"], name: "index_post_actions_on_post_action_type_id_and_disagreed_at"
     t.index ["post_id"], name: "index_post_actions_on_post_id"
-    t.index ["user_id", "post_action_type_id", "post_id", "targets_topic"], name: "idx_unique_actions", unique: true, where: "((deleted_at IS NULL) AND (disagreed_at IS NULL) AND (deferred_at IS NULL))"
-    t.index ["user_id", "post_action_type_id"], name: "index_post_actions_on_user_id_and_post_action_type_id", where: "(deleted_at IS NULL)"
-    t.index ["user_id", "post_id", "targets_topic"], name: "idx_unique_flags", unique: true, where: "((deleted_at IS NULL) AND (disagreed_at IS NULL) AND (deferred_at IS NULL) AND (post_action_type_id = ANY (ARRAY[3, 4, 7, 8])))"
+    t.index ["user_id", "post_action_type_id", "post_id", "targets_topic"], name: "idx_unique_actions", unique: true
+    t.index ["user_id", "post_action_type_id"], name: "index_post_actions_on_user_id_and_post_action_type_id"
+    t.index ["user_id", "post_id", "targets_topic"], name: "idx_unique_flags", unique: true
     t.index ["user_id"], name: "index_post_actions_on_user_id"
   end
 
-  create_table "post_custom_fields", id: :serial, force: :cascade do |t|
+  create_table "post_custom_fields", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "post_id", null: false
     t.string "name", limit: 256, null: false
     t.text "value"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index "name, \"left\"(value, 200)", name: "index_post_custom_fields_on_name_and_value"
+    t.virtual "left_value_200", type: :string, as: "left(`value`, 200)", stored: true
+    t.index ["name", "left_value_200"], name: "index_post_custom_fields_on_name_and_value"
     t.index ["post_id", "name"], name: "index_post_custom_fields_on_post_id_and_name"
-    t.index ["post_id"], name: "idx_post_custom_fields_akismet", where: "(((name)::text = 'AKISMET_STATE'::text) AND (value = 'needs_review'::text))"
-    t.index ["post_id"], name: "index_post_custom_fields_on_notice", unique: true, where: "((name)::text = 'notice'::text)"
-    t.index ["post_id"], name: "index_post_custom_fields_on_post_id", unique: true, where: "((name)::text = 'missing uploads'::text)"
-    t.index ["post_id"], name: "index_post_id_where_missing_uploads_ignored", unique: true, where: "((name)::text = 'missing uploads ignored'::text)"
-    t.index ["post_id"], name: "post_custom_field_broken_images_idx", unique: true, where: "((name)::text = 'broken_images'::text)"
-    t.index ["post_id"], name: "post_custom_field_downloaded_images_idx", unique: true, where: "((name)::text = 'downloaded_images'::text)"
-    t.index ["post_id"], name: "post_custom_field_large_images_idx", unique: true, where: "((name)::text = 'large_images'::text)"
+    t.index ["post_id"], name: "idx_post_custom_fields_akismet"
+    t.index ["post_id"], name: "index_post_custom_fields_on_notice"
+    t.index ["post_id"], name: "index_post_custom_fields_on_post_id"
+    t.index ["post_id"], name: "index_post_id_where_missing_uploads_ignored"
+    t.index ["post_id"], name: "post_custom_field_broken_images_idx"
+    t.index ["post_id"], name: "post_custom_field_downloaded_images_idx"
+    t.index ["post_id"], name: "post_custom_field_large_images_idx"
   end
 
-  create_table "post_details", id: :serial, force: :cascade do |t|
+  create_table "post_details", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "post_id"
     t.string "key"
     t.string "value"
@@ -981,7 +976,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["post_id", "key"], name: "index_post_details_on_post_id_and_key", unique: true
   end
 
-  create_table "post_replies", id: false, force: :cascade do |t|
+  create_table "post_replies", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "post_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -990,17 +985,17 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["reply_post_id"], name: "index_post_replies_on_reply_post_id"
   end
 
-  create_table "post_reply_keys", force: :cascade do |t|
+  create_table "post_reply_keys", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "post_id", null: false
-    t.uuid "reply_key", null: false
+    t.string "reply_key", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["reply_key"], name: "index_post_reply_keys_on_reply_key", unique: true
     t.index ["user_id", "post_id"], name: "index_post_reply_keys_on_user_id_and_post_id", unique: true
   end
 
-  create_table "post_revisions", id: :serial, force: :cascade do |t|
+  create_table "post_revisions", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id"
     t.integer "post_id"
     t.text "modifications"
@@ -1013,17 +1008,16 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_post_revisions_on_user_id"
   end
 
-  create_table "post_search_data", primary_key: "post_id", id: :integer, default: nil, force: :cascade do |t|
-    t.tsvector "search_data"
+  create_table "post_search_data", primary_key: "post_id", id: :integer, default: nil, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
+    t.text "search_data"
     t.text "raw_data"
     t.string "locale"
     t.integer "version", default: 0
     t.boolean "private_message", null: false
     t.index ["post_id", "version", "locale"], name: "index_post_search_data_on_post_id_and_version_and_locale"
-    t.index ["search_data"], name: "idx_search_post", using: :gin
   end
 
-  create_table "post_stats", id: :serial, force: :cascade do |t|
+  create_table "post_stats", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "post_id"
     t.integer "drafts_saved"
     t.integer "typing_duration_msecs"
@@ -1033,7 +1027,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["post_id"], name: "index_post_stats_on_post_id"
   end
 
-  create_table "post_timings", id: false, force: :cascade do |t|
+  create_table "post_timings", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id", null: false
     t.integer "post_number", null: false
     t.integer "user_id", null: false
@@ -1042,7 +1036,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_post_timings_on_user_id"
   end
 
-  create_table "post_uploads", id: :serial, force: :cascade do |t|
+  create_table "post_uploads", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "post_id", null: false
     t.integer "upload_id", null: false
     t.index ["post_id", "upload_id"], name: "idx_unique_post_uploads", unique: true
@@ -1050,7 +1044,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["upload_id"], name: "index_post_uploads_on_upload_id"
   end
 
-  create_table "posts", id: :serial, comment: "If you want to query public posts only, use the badge_posts view.", force: :cascade do |t|
+  create_table "posts", charset: "utf8mb4", collation: "utf8mb4_bin", comment: "If you want to query public posts only, use the badge_posts view.", force: :cascade do |t|
     t.integer "user_id"
     t.integer "topic_id", null: false
     t.integer "post_number", null: false, comment: "The position of this post in the topic. The pair (topic_id, post_number) forms a natural key on the posts table."
@@ -1100,21 +1094,21 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.string "action_code"
     t.integer "locked_by_id"
     t.bigint "image_upload_id"
-    t.index ["created_at", "topic_id"], name: "idx_posts_created_at_topic_id", where: "(deleted_at IS NULL)"
-    t.index ["id", "baked_version"], name: "index_posts_on_id_and_baked_version", order: { id: :desc }, where: "(deleted_at IS NULL)"
-    t.index ["id"], name: "index_for_rebake_old", order: :desc, where: "(((baked_version IS NULL) OR (baked_version < 2)) AND (deleted_at IS NULL))"
+    t.index ["created_at", "topic_id"], name: "idx_posts_created_at_topic_id"
+    t.index ["id", "baked_version"], name: "index_posts_on_id_and_baked_version"
+    t.index ["id"], name: "index_for_rebake_old"
     t.index ["image_upload_id"], name: "index_posts_on_image_upload_id"
     t.index ["reply_to_post_number"], name: "index_posts_on_reply_to_post_number"
     t.index ["topic_id", "percent_rank"], name: "index_posts_on_topic_id_and_percent_rank"
-    t.index ["topic_id", "post_number"], name: "idx_posts_deleted_posts", where: "(deleted_at IS NOT NULL)"
+    t.index ["topic_id", "post_number"], name: "idx_posts_deleted_posts"
     t.index ["topic_id", "post_number"], name: "index_posts_on_topic_id_and_post_number", unique: true
     t.index ["topic_id", "sort_order"], name: "index_posts_on_topic_id_and_sort_order"
     t.index ["user_id", "created_at"], name: "index_posts_on_user_id_and_created_at"
-    t.index ["user_id", "like_count", "created_at"], name: "index_posts_user_and_likes", order: { like_count: :desc, created_at: :desc }, where: "(post_number > 1)"
-    t.index ["user_id"], name: "idx_posts_user_id_deleted_at", where: "(deleted_at IS NULL)"
+    t.index ["user_id", "like_count", "created_at"], name: "index_posts_user_and_likes"
+    t.index ["user_id"], name: "idx_posts_user_id_deleted_at"
   end
 
-  create_table "published_pages", force: :cascade do |t|
+  create_table "published_pages", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "topic_id", null: false
     t.string "slug", null: false
     t.datetime "created_at", precision: 6, null: false
@@ -1124,7 +1118,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["topic_id"], name: "index_published_pages_on_topic_id", unique: true
   end
 
-  create_table "push_subscriptions", force: :cascade do |t|
+  create_table "push_subscriptions", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "data", null: false
     t.datetime "created_at", null: false
@@ -1133,7 +1127,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.datetime "first_error_at"
   end
 
-  create_table "quoted_posts", id: :serial, force: :cascade do |t|
+  create_table "quoted_posts", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "post_id", null: false
     t.integer "quoted_post_id", null: false
     t.datetime "created_at", null: false
@@ -1142,7 +1136,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["quoted_post_id", "post_id"], name: "index_quoted_posts_on_quoted_post_id_and_post_id", unique: true
   end
 
-  create_table "remote_themes", id: :serial, force: :cascade do |t|
+  create_table "remote_themes", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "remote_url", null: false
     t.string "remote_version"
     t.string "local_version"
@@ -1161,7 +1155,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.string "maximum_discourse_version"
   end
 
-  create_table "reviewable_claimed_topics", force: :cascade do |t|
+  create_table "reviewable_claimed_topics", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "topic_id", null: false
     t.datetime "created_at", null: false
@@ -1169,7 +1163,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["topic_id"], name: "index_reviewable_claimed_topics_on_topic_id", unique: true
   end
 
-  create_table "reviewable_histories", force: :cascade do |t|
+  create_table "reviewable_histories", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "reviewable_id", null: false
     t.integer "reviewable_history_type", null: false
     t.integer "status", null: false
@@ -1181,7 +1175,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["reviewable_id"], name: "index_reviewable_histories_on_reviewable_id"
   end
 
-  create_table "reviewable_scores", force: :cascade do |t|
+  create_table "reviewable_scores", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "reviewable_id", null: false
     t.integer "user_id", null: false
     t.integer "reviewable_score_type", null: false
@@ -1199,7 +1193,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_reviewable_scores_on_user_id"
   end
 
-  create_table "reviewables", force: :cascade do |t|
+  create_table "reviewables", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "type", null: false
     t.integer "status", default: 0, null: false
     t.integer "created_by_id", null: false
@@ -1223,12 +1217,12 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["status", "created_at"], name: "index_reviewables_on_status_and_created_at"
     t.index ["status", "score"], name: "index_reviewables_on_status_and_score"
     t.index ["status", "type"], name: "index_reviewables_on_status_and_type"
-    t.index ["target_id"], name: "index_reviewables_on_target_id_where_post_type_eq_post", where: "((target_type)::text = 'Post'::text)"
+    t.index ["target_id"], name: "index_reviewables_on_target_id_where_post_type_eq_post"
     t.index ["topic_id", "status", "created_by_id"], name: "index_reviewables_on_topic_id_and_status_and_created_by_id"
     t.index ["type", "target_id"], name: "index_reviewables_on_type_and_target_id", unique: true
   end
 
-  create_table "scheduler_stats", id: :serial, force: :cascade do |t|
+  create_table "scheduler_stats", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.string "hostname", null: false
     t.integer "pid", null: false
@@ -1240,7 +1234,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.text "error"
   end
 
-  create_table "schema_migration_details", id: :serial, force: :cascade do |t|
+  create_table "schema_migration_details", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "version", null: false
     t.string "name"
     t.string "hostname"
@@ -1252,20 +1246,20 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["version"], name: "index_schema_migration_details_on_version"
   end
 
-  create_table "screened_emails", id: :serial, force: :cascade do |t|
+  create_table "screened_emails", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "email", null: false
     t.integer "action_type", null: false
     t.integer "match_count", default: 0, null: false
     t.datetime "last_match_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.inet "ip_address"
+    t.string "ip_address"
     t.index ["email"], name: "index_screened_emails_on_email", unique: true
     t.index ["last_match_at"], name: "index_screened_emails_on_last_match_at"
   end
 
-  create_table "screened_ip_addresses", id: :serial, force: :cascade do |t|
-    t.inet "ip_address", null: false
+  create_table "screened_ip_addresses", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
+    t.string "ip_address", null: false
     t.integer "action_type", null: false
     t.integer "match_count", default: 0, null: false
     t.datetime "last_match_at"
@@ -1275,7 +1269,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["last_match_at"], name: "index_screened_ip_addresses_on_last_match_at"
   end
 
-  create_table "screened_urls", id: :serial, force: :cascade do |t|
+  create_table "screened_urls", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "url", null: false
     t.string "domain", null: false
     t.integer "action_type", null: false
@@ -1283,15 +1277,15 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.datetime "last_match_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.inet "ip_address"
+    t.string "ip_address"
     t.index ["last_match_at"], name: "index_screened_urls_on_last_match_at"
     t.index ["url"], name: "index_screened_urls_on_url", unique: true
   end
 
-  create_table "search_logs", id: :serial, force: :cascade do |t|
+  create_table "search_logs", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "term", null: false
     t.integer "user_id"
-    t.inet "ip_address"
+    t.string "ip_address"
     t.integer "search_result_id"
     t.integer "search_type", null: false
     t.datetime "created_at", null: false
@@ -1299,7 +1293,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["created_at"], name: "index_search_logs_on_created_at"
   end
 
-  create_table "shared_drafts", force: :cascade do |t|
+  create_table "shared_drafts", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id", null: false
     t.integer "category_id", null: false
     t.datetime "created_at", null: false
@@ -1308,12 +1302,12 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["topic_id"], name: "index_shared_drafts_on_topic_id", unique: true
   end
 
-  create_table "shelved_notifications", force: :cascade do |t|
+  create_table "shelved_notifications", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "notification_id", null: false
     t.index ["notification_id"], name: "index_shelved_notifications_on_notification_id"
   end
 
-  create_table "single_sign_on_records", id: :serial, force: :cascade do |t|
+  create_table "single_sign_on_records", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "external_id", null: false
     t.text "last_payload", null: false
@@ -1329,7 +1323,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_single_sign_on_records_on_user_id"
   end
 
-  create_table "site_settings", id: :serial, force: :cascade do |t|
+  create_table "site_settings", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.integer "data_type", null: false
     t.text "value"
@@ -1338,7 +1332,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["name"], name: "index_site_settings_on_name", unique: true
   end
 
-  create_table "skipped_email_logs", force: :cascade do |t|
+  create_table "skipped_email_logs", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "email_type", null: false
     t.string "to_address", null: false
     t.integer "user_id"
@@ -1353,7 +1347,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_skipped_email_logs_on_user_id"
   end
 
-  create_table "stylesheet_cache", id: :serial, force: :cascade do |t|
+  create_table "stylesheet_cache", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "target", null: false
     t.string "digest", null: false
     t.text "content", null: false
@@ -1364,7 +1358,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["target", "digest"], name: "index_stylesheet_cache_on_target_and_digest", unique: true
   end
 
-  create_table "tag_group_memberships", id: :serial, force: :cascade do |t|
+  create_table "tag_group_memberships", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "tag_id", null: false
     t.integer "tag_group_id", null: false
     t.datetime "created_at", null: false
@@ -1372,7 +1366,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["tag_group_id", "tag_id"], name: "index_tag_group_memberships_on_tag_group_id_and_tag_id", unique: true
   end
 
-  create_table "tag_group_permissions", force: :cascade do |t|
+  create_table "tag_group_permissions", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "tag_group_id", null: false
     t.bigint "group_id", null: false
     t.integer "permission_type", default: 1, null: false
@@ -1382,7 +1376,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["tag_group_id"], name: "index_tag_group_permissions_on_tag_group_id"
   end
 
-  create_table "tag_groups", id: :serial, force: :cascade do |t|
+  create_table "tag_groups", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -1390,15 +1384,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.boolean "one_per_topic", default: false
   end
 
-  create_table "tag_search_data", primary_key: "tag_id", id: :serial, force: :cascade do |t|
-    t.tsvector "search_data"
+  create_table "tag_search_data", primary_key: "tag_id", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
+    t.text "search_data"
     t.text "raw_data"
     t.text "locale"
     t.integer "version", default: 0
-    t.index ["search_data"], name: "idx_search_tag", using: :gin
   end
 
-  create_table "tag_users", id: :serial, force: :cascade do |t|
+  create_table "tag_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "tag_id", null: false
     t.integer "user_id", null: false
     t.integer "notification_level", null: false
@@ -1408,27 +1401,28 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "tag_id", "notification_level"], name: "idx_tag_users_ix1", unique: true
   end
 
-  create_table "tags", id: :serial, force: :cascade do |t|
+  create_table "tags", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.integer "topic_count", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "pm_topic_count", default: 0, null: false
+    t.virtual "lower_tag_name", type: :string, as: "lower(`name`)", stored: true
     t.integer "target_tag_id"
-    t.index "lower((name)::text)", name: "index_tags_on_lower_name", unique: true
+    t.index ["lower_tag_name"], name: "index_tags_on_lower_name", unique: true
     t.index ["name"], name: "index_tags_on_name", unique: true
   end
 
-  create_table "tags_web_hooks", id: false, force: :cascade do |t|
+  create_table "tags_web_hooks", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "web_hook_id", null: false
     t.bigint "tag_id", null: false
     t.index ["web_hook_id", "tag_id"], name: "web_hooks_tags", unique: true
   end
 
-  create_table "theme_fields", id: :serial, force: :cascade do |t|
+  create_table "theme_fields", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "theme_id", null: false
     t.integer "target_id", null: false
-    t.string "name", limit: 255, null: false
+    t.string "name", null: false
     t.text "value", null: false
     t.text "value_baked"
     t.datetime "created_at", null: false
@@ -1440,17 +1434,17 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["theme_id", "target_id", "type_id", "name"], name: "theme_field_unique_index", unique: true
   end
 
-  create_table "theme_modifier_sets", force: :cascade do |t|
+  create_table "theme_modifier_sets", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "theme_id", null: false
     t.boolean "serialize_topic_excerpts"
-    t.string "csp_extensions", array: true
-    t.string "svg_icons", array: true
-    t.string "topic_thumbnail_sizes", array: true
+    t.json "csp_extensions"
+    t.json "svg_icons"
+    t.json "topic_thumbnail_sizes"
     t.index ["theme_id"], name: "index_theme_modifier_sets_on_theme_id", unique: true
   end
 
-  create_table "theme_settings", force: :cascade do |t|
-    t.string "name", limit: 255, null: false
+  create_table "theme_settings", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
+    t.string "name", null: false
     t.integer "data_type", null: false
     t.text "value"
     t.integer "theme_id", null: false
@@ -1458,7 +1452,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.datetime "updated_at", null: false
   end
 
-  create_table "theme_translation_overrides", force: :cascade do |t|
+  create_table "theme_translation_overrides", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "theme_id", null: false
     t.string "locale", null: false
     t.string "translation_key", null: false
@@ -1469,7 +1463,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["theme_id"], name: "index_theme_translation_overrides_on_theme_id"
   end
 
-  create_table "themes", id: :serial, force: :cascade do |t|
+  create_table "themes", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.integer "user_id", null: false
     t.datetime "created_at", null: false
@@ -1485,7 +1479,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["remote_theme_id"], name: "index_themes_on_remote_theme_id", unique: true
   end
 
-  create_table "top_topics", id: :serial, force: :cascade do |t|
+  create_table "top_topics", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id"
     t.integer "yearly_posts_count", default: 0, null: false
     t.integer "yearly_views_count", default: 0, null: false
@@ -1514,41 +1508,41 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.float "quarterly_score", default: 0.0
     t.integer "quarterly_op_likes_count", default: 0, null: false
     t.index ["all_score"], name: "index_top_topics_on_all_score"
-    t.index ["daily_likes_count"], name: "index_top_topics_on_daily_likes_count", order: :desc
+    t.index ["daily_likes_count"], name: "index_top_topics_on_daily_likes_count"
     t.index ["daily_op_likes_count"], name: "index_top_topics_on_daily_op_likes_count"
-    t.index ["daily_posts_count"], name: "index_top_topics_on_daily_posts_count", order: :desc
+    t.index ["daily_posts_count"], name: "index_top_topics_on_daily_posts_count"
     t.index ["daily_score"], name: "index_top_topics_on_daily_score"
-    t.index ["daily_views_count"], name: "index_top_topics_on_daily_views_count", order: :desc
-    t.index ["monthly_likes_count"], name: "index_top_topics_on_monthly_likes_count", order: :desc
+    t.index ["daily_views_count"], name: "index_top_topics_on_daily_views_count"
+    t.index ["monthly_likes_count"], name: "index_top_topics_on_monthly_likes_count"
     t.index ["monthly_op_likes_count"], name: "index_top_topics_on_monthly_op_likes_count"
-    t.index ["monthly_posts_count"], name: "index_top_topics_on_monthly_posts_count", order: :desc
+    t.index ["monthly_posts_count"], name: "index_top_topics_on_monthly_posts_count"
     t.index ["monthly_score"], name: "index_top_topics_on_monthly_score"
-    t.index ["monthly_views_count"], name: "index_top_topics_on_monthly_views_count", order: :desc
+    t.index ["monthly_views_count"], name: "index_top_topics_on_monthly_views_count"
     t.index ["quarterly_likes_count"], name: "index_top_topics_on_quarterly_likes_count"
     t.index ["quarterly_op_likes_count"], name: "index_top_topics_on_quarterly_op_likes_count"
     t.index ["quarterly_posts_count"], name: "index_top_topics_on_quarterly_posts_count"
     t.index ["quarterly_views_count"], name: "index_top_topics_on_quarterly_views_count"
     t.index ["topic_id"], name: "index_top_topics_on_topic_id", unique: true
-    t.index ["weekly_likes_count"], name: "index_top_topics_on_weekly_likes_count", order: :desc
+    t.index ["weekly_likes_count"], name: "index_top_topics_on_weekly_likes_count"
     t.index ["weekly_op_likes_count"], name: "index_top_topics_on_weekly_op_likes_count"
-    t.index ["weekly_posts_count"], name: "index_top_topics_on_weekly_posts_count", order: :desc
+    t.index ["weekly_posts_count"], name: "index_top_topics_on_weekly_posts_count"
     t.index ["weekly_score"], name: "index_top_topics_on_weekly_score"
-    t.index ["weekly_views_count"], name: "index_top_topics_on_weekly_views_count", order: :desc
-    t.index ["yearly_likes_count"], name: "index_top_topics_on_yearly_likes_count", order: :desc
+    t.index ["weekly_views_count"], name: "index_top_topics_on_weekly_views_count"
+    t.index ["yearly_likes_count"], name: "index_top_topics_on_yearly_likes_count"
     t.index ["yearly_op_likes_count"], name: "index_top_topics_on_yearly_op_likes_count"
-    t.index ["yearly_posts_count"], name: "index_top_topics_on_yearly_posts_count", order: :desc
+    t.index ["yearly_posts_count"], name: "index_top_topics_on_yearly_posts_count"
     t.index ["yearly_score"], name: "index_top_topics_on_yearly_score"
-    t.index ["yearly_views_count"], name: "index_top_topics_on_yearly_views_count", order: :desc
+    t.index ["yearly_views_count"], name: "index_top_topics_on_yearly_views_count"
   end
 
-  create_table "topic_allowed_groups", id: :serial, force: :cascade do |t|
+  create_table "topic_allowed_groups", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id", null: false
     t.integer "topic_id", null: false
     t.index ["group_id", "topic_id"], name: "index_topic_allowed_groups_on_group_id_and_topic_id", unique: true
     t.index ["topic_id", "group_id"], name: "index_topic_allowed_groups_on_topic_id_and_group_id", unique: true
   end
 
-  create_table "topic_allowed_users", id: :serial, force: :cascade do |t|
+  create_table "topic_allowed_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "topic_id", null: false
     t.datetime "created_at", null: false
@@ -1557,17 +1551,16 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "topic_id"], name: "index_topic_allowed_users_on_user_id_and_topic_id", unique: true
   end
 
-  create_table "topic_custom_fields", id: :serial, force: :cascade do |t|
+  create_table "topic_custom_fields", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id", null: false
     t.string "name", limit: 256, null: false
     t.text "value"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["topic_id", "name"], name: "index_topic_custom_fields_on_topic_id_and_name"
-    t.index ["value", "name"], name: "topic_custom_fields_value_key_idx", where: "((value IS NOT NULL) AND (char_length(value) < 400))"
   end
 
-  create_table "topic_embeds", id: :serial, force: :cascade do |t|
+  create_table "topic_embeds", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id", null: false
     t.integer "post_id", null: false
     t.string "embed_url", limit: 1000, null: false
@@ -1576,10 +1569,11 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
     t.integer "deleted_by_id"
-    t.index ["embed_url"], name: "index_topic_embeds_on_embed_url", unique: true
+    t.virtual "md5_embed_url", type: :string, as: "md5(`embed_url`)", stored: true
+    t.index ["md5_embed_url"], name: "index_topic_embeds_on_embed_url", unique: true
   end
 
-  create_table "topic_groups", force: :cascade do |t|
+  create_table "topic_groups", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "group_id", null: false
     t.integer "topic_id", null: false
     t.integer "last_read_post_number", default: 0, null: false
@@ -1588,7 +1582,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["group_id", "topic_id"], name: "index_topic_groups_on_group_id_and_topic_id", unique: true
   end
 
-  create_table "topic_invites", id: :serial, force: :cascade do |t|
+  create_table "topic_invites", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id", null: false
     t.integer "invite_id", null: false
     t.datetime "created_at", null: false
@@ -1597,16 +1591,16 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["topic_id", "invite_id"], name: "index_topic_invites_on_topic_id_and_invite_id", unique: true
   end
 
-  create_table "topic_link_clicks", id: :serial, force: :cascade do |t|
+  create_table "topic_link_clicks", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_link_id", null: false
     t.integer "user_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.inet "ip_address"
+    t.string "ip_address"
     t.index ["topic_link_id"], name: "by_link"
   end
 
-  create_table "topic_links", id: :serial, force: :cascade do |t|
+  create_table "topic_links", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id", null: false
     t.integer "post_id"
     t.integer "user_id", null: false
@@ -1628,20 +1622,19 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["post_id"], name: "index_topic_links_on_post_id"
     t.index ["topic_id", "post_id", "url"], name: "unique_post_links", unique: true
     t.index ["topic_id"], name: "index_topic_links_on_topic_id"
-    t.index ["user_id", "clicks", "created_at"], name: "index_topic_links_on_user_and_clicks", order: { clicks: :desc, created_at: :desc }, where: "((NOT reflection) AND (NOT quote) AND (NOT internal))"
+    t.index ["user_id", "clicks", "created_at"], name: "index_topic_links_on_user_and_clicks"
     t.index ["user_id"], name: "index_topic_links_on_user_id"
   end
 
-  create_table "topic_search_data", primary_key: "topic_id", id: :integer, default: nil, force: :cascade do |t|
+  create_table "topic_search_data", primary_key: "topic_id", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.text "raw_data"
     t.string "locale", null: false
-    t.tsvector "search_data"
+    t.text "search_data"
     t.integer "version", default: 0
-    t.index ["search_data"], name: "idx_search_topic", using: :gin
     t.index ["topic_id", "version", "locale"], name: "index_topic_search_data_on_topic_id_and_version_and_locale"
   end
 
-  create_table "topic_tags", id: :serial, force: :cascade do |t|
+  create_table "topic_tags", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id", null: false
     t.integer "tag_id", null: false
     t.datetime "created_at", null: false
@@ -1649,7 +1642,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["topic_id", "tag_id"], name: "index_topic_tags_on_topic_id_and_tag_id", unique: true
   end
 
-  create_table "topic_thumbnails", force: :cascade do |t|
+  create_table "topic_thumbnails", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "upload_id", null: false
     t.bigint "optimized_image_id"
     t.integer "max_width", null: false
@@ -1659,7 +1652,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["upload_id"], name: "index_topic_thumbnails_on_upload_id"
   end
 
-  create_table "topic_timers", id: :serial, force: :cascade do |t|
+  create_table "topic_timers", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.datetime "execute_at", null: false
     t.integer "status_type", null: false
     t.integer "user_id", null: false
@@ -1672,11 +1665,11 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "category_id"
     t.boolean "public_type", default: true
     t.integer "duration_minutes"
-    t.index ["topic_id"], name: "idx_topic_id_public_type_deleted_at", unique: true, where: "((public_type = true) AND (deleted_at IS NULL))"
+    t.index ["topic_id"], name: "idx_topic_id_public_type_deleted_at", unique: true
     t.index ["user_id"], name: "index_topic_timers_on_user_id"
   end
 
-  create_table "topic_users", id: :serial, force: :cascade do |t|
+  create_table "topic_users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "topic_id", null: false
     t.boolean "posted", default: false, null: false
@@ -1696,18 +1689,18 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "topic_id"], name: "index_topic_users_on_user_id_and_topic_id", unique: true
   end
 
-  create_table "topic_views", id: false, force: :cascade do |t|
+  create_table "topic_views", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id", null: false
     t.date "viewed_at", null: false
     t.integer "user_id"
-    t.inet "ip_address"
+    t.string "ip_address"
     t.index ["topic_id", "viewed_at"], name: "index_topic_views_on_topic_id_and_viewed_at"
     t.index ["user_id", "ip_address", "topic_id"], name: "uniq_ip_or_user_id_topic_views", unique: true
     t.index ["user_id", "viewed_at"], name: "index_topic_views_on_user_id_and_viewed_at"
     t.index ["viewed_at", "topic_id"], name: "index_topic_views_on_viewed_at_and_topic_id"
   end
 
-  create_table "topics", id: :serial, comment: "To query public topics only: SELECT ... FROM topics t LEFT INNER JOIN categories c ON (t.category_id = c.id AND c.read_restricted = false)", force: :cascade do |t|
+  create_table "topics", charset: "utf8mb4", collation: "utf8mb4_bin", comment: "To query public topics only: SELECT ... FROM topics t LEFT INNER JOIN categories c ON (t.category_id = c.id AND c.read_restricted = false)", force: :cascade do |t|
     t.string "title", null: false
     t.datetime "last_posted_at"
     t.datetime "created_at", null: false
@@ -1753,26 +1746,23 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.bigint "image_upload_id"
     t.integer "slow_mode_seconds", default: 0, null: false
     t.datetime "bannered_until"
-    t.index "lower((title)::text)", name: "index_topics_on_lower_title"
-    t.index ["bannered_until"], name: "index_topics_on_bannered_until", where: "(bannered_until IS NOT NULL)"
-    t.index ["bumped_at", "created_at", "updated_at"], name: "index_topics_on_timestamps_private", where: "((deleted_at IS NULL) AND ((archetype)::text = 'private_message'::text))"
-    t.index ["bumped_at"], name: "index_topics_on_bumped_at", order: :desc
-    t.index ["created_at", "visible"], name: "index_topics_on_created_at_and_visible", where: "((deleted_at IS NULL) AND ((archetype)::text <> 'private_message'::text))"
+    t.index ["bannered_until"], name: "index_topics_on_bannered_until"
+    t.index ["bumped_at", "created_at", "updated_at"], name: "index_topics_on_timestamps_private"
+    t.index ["bumped_at"], name: "index_topics_on_bumped_at"
+    t.index ["created_at", "visible"], name: "index_topics_on_created_at_and_visible"
     t.index ["deleted_at", "visible", "archetype", "category_id", "id"], name: "idx_topics_front_page"
     t.index ["id", "deleted_at"], name: "index_topics_on_id_and_deleted_at"
-    t.index ["id"], name: "index_topics_on_id_filtered_banner", unique: true, where: "(((archetype)::text = 'banner'::text) AND (deleted_at IS NULL))"
+    t.index ["id"], name: "index_topics_on_id_filtered_banner", unique: true
     t.index ["image_upload_id"], name: "index_topics_on_image_upload_id"
-    t.index ["pinned_at"], name: "index_topics_on_pinned_at", where: "(pinned_at IS NOT NULL)"
-    t.index ["pinned_globally"], name: "index_topics_on_pinned_globally", where: "pinned_globally"
-    t.index ["pinned_until"], name: "index_topics_on_pinned_until", where: "(pinned_until IS NOT NULL)"
-    t.index ["slug"], name: "idxtopicslug", where: "((deleted_at IS NULL) AND (slug IS NOT NULL))"
-    t.index ["updated_at", "visible", "highest_staff_post_number", "highest_post_number", "category_id", "created_at", "id"], name: "index_topics_on_updated_at_public", where: "(((archetype)::text <> 'private_message'::text) AND (deleted_at IS NULL))"
-    t.index ["user_id"], name: "idx_topics_user_id_deleted_at", where: "(deleted_at IS NULL)"
-    t.check_constraint "(category_id IS NOT NULL) OR ((archetype)::text <> 'regular'::text)", name: "has_category_id"
-    t.check_constraint "(category_id IS NULL) OR ((archetype)::text <> 'private_message'::text)", name: "pm_has_no_category"
+    t.index ["pinned_at"], name: "index_topics_on_pinned_at"
+    t.index ["pinned_globally"], name: "index_topics_on_pinned_globally"
+    t.index ["pinned_until"], name: "index_topics_on_pinned_until"
+    t.index ["slug"], name: "idxtopicslug"
+    t.index ["updated_at", "visible", "highest_staff_post_number", "highest_post_number", "category_id", "created_at", "id"], name: "index_topics_on_updated_at_public"
+    t.index ["user_id"], name: "idx_topics_user_id_deleted_at"
   end
 
-  create_table "translation_overrides", id: :serial, force: :cascade do |t|
+  create_table "translation_overrides", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "locale", null: false
     t.string "translation_key", null: false
     t.string "value", null: false
@@ -1782,7 +1772,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["locale", "translation_key"], name: "index_translation_overrides_on_locale_and_translation_key", unique: true
   end
 
-  create_table "unsubscribe_keys", primary_key: "key", id: { type: :string, limit: 64 }, force: :cascade do |t|
+  create_table "unsubscribe_keys", primary_key: "key", id: { type: :string, limit: 64 }, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -1792,7 +1782,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["created_at"], name: "index_unsubscribe_keys_on_created_at"
   end
 
-  create_table "uploads", id: :serial, force: :cascade do |t|
+  create_table "uploads", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "original_filename", null: false
     t.integer "filesize", null: false
@@ -1815,7 +1805,6 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "verification_status", default: 1, null: false
     t.datetime "security_last_changed_at"
     t.string "security_last_changed_reason"
-    t.index "lower((extension)::text)", name: "index_uploads_on_extension"
     t.index ["access_control_post_id"], name: "index_uploads_on_access_control_post_id"
     t.index ["etag"], name: "index_uploads_on_etag"
     t.index ["id", "url"], name: "index_uploads_on_id_and_url"
@@ -1826,7 +1815,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["verification_status"], name: "idx_uploads_on_verification_status"
   end
 
-  create_table "user_actions", id: :serial, force: :cascade do |t|
+  create_table "user_actions", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "action_type", null: false
     t.integer "user_id", null: false
     t.integer "target_topic_id"
@@ -1839,21 +1828,21 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["action_type", "created_at"], name: "index_user_actions_on_action_type_and_created_at"
     t.index ["action_type", "user_id", "target_topic_id", "target_post_id", "acting_user_id"], name: "idx_unique_rows", unique: true
     t.index ["target_post_id"], name: "index_user_actions_on_target_post_id"
-    t.index ["target_user_id"], name: "index_user_actions_on_target_user_id", where: "(target_user_id IS NOT NULL)"
+    t.index ["target_user_id"], name: "index_user_actions_on_target_user_id"
     t.index ["user_id", "action_type"], name: "index_user_actions_on_user_id_and_action_type"
     t.index ["user_id", "created_at", "action_type"], name: "idx_user_actions_speed_up_user_all"
   end
 
-  create_table "user_api_key_scopes", force: :cascade do |t|
+  create_table "user_api_key_scopes", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_api_key_id", null: false
     t.string "name", null: false
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
-    t.jsonb "allowed_parameters"
+    t.json "allowed_parameters"
     t.index ["user_api_key_id"], name: "index_user_api_key_scopes_on_user_api_key_id"
   end
 
-  create_table "user_api_keys", id: :serial, force: :cascade do |t|
+  create_table "user_api_keys", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "client_id", null: false
     t.string "application_name", null: false
@@ -1861,7 +1850,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "revoked_at"
-    t.text "scopes", array: true
+    t.json "scopes"
     t.datetime "last_used_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
     t.string "key_hash", null: false
     t.index ["client_id"], name: "index_user_api_keys_on_client_id", unique: true
@@ -1869,7 +1858,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_user_api_keys_on_user_id"
   end
 
-  create_table "user_archived_messages", id: :serial, force: :cascade do |t|
+  create_table "user_archived_messages", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "topic_id", null: false
     t.datetime "created_at", null: false
@@ -1877,25 +1866,25 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "topic_id"], name: "index_user_archived_messages_on_user_id_and_topic_id", unique: true
   end
 
-  create_table "user_associated_accounts", force: :cascade do |t|
+  create_table "user_associated_accounts", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "provider_name", null: false
     t.string "provider_uid", null: false
     t.integer "user_id"
     t.datetime "last_used", default: -> { "CURRENT_TIMESTAMP" }, null: false
-    t.jsonb "info", default: {}, null: false
-    t.jsonb "credentials", default: {}, null: false
-    t.jsonb "extra", default: {}, null: false
+    t.json "info", null: false
+    t.json "credentials", null: false
+    t.json "extra", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["provider_name", "provider_uid"], name: "associated_accounts_provider_uid", unique: true
     t.index ["provider_name", "user_id"], name: "associated_accounts_provider_user", unique: true
   end
 
-  create_table "user_auth_token_logs", id: :serial, force: :cascade do |t|
+  create_table "user_auth_token_logs", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "action", null: false
     t.integer "user_auth_token_id"
     t.integer "user_id"
-    t.inet "client_ip"
+    t.string "client_ip"
     t.string "user_agent"
     t.string "auth_token"
     t.datetime "created_at"
@@ -1903,13 +1892,13 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_user_auth_token_logs_on_user_id"
   end
 
-  create_table "user_auth_tokens", id: :serial, force: :cascade do |t|
+  create_table "user_auth_tokens", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "auth_token", null: false
     t.string "prev_auth_token", null: false
     t.string "user_agent"
     t.boolean "auth_token_seen", default: false, null: false
-    t.inet "client_ip"
+    t.string "client_ip"
     t.datetime "rotated_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -1919,7 +1908,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_user_auth_tokens_on_user_id"
   end
 
-  create_table "user_avatars", id: :serial, force: :cascade do |t|
+  create_table "user_avatars", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "custom_upload_id"
     t.integer "gravatar_upload_id"
@@ -1931,7 +1920,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_user_avatars_on_user_id"
   end
 
-  create_table "user_badges", id: :serial, force: :cascade do |t|
+  create_table "user_badges", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "badge_id", null: false
     t.integer "user_id", null: false
     t.datetime "granted_at", null: false
@@ -1940,15 +1929,15 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "notification_id"
     t.integer "seq", default: 0, null: false
     t.integer "featured_rank"
-    t.datetime "created_at", null: false
+    t.datetime "created_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
     t.boolean "is_favorite"
-    t.index ["badge_id", "user_id", "post_id"], name: "index_user_badges_on_badge_id_and_user_id_and_post_id", unique: true, where: "(post_id IS NOT NULL)"
-    t.index ["badge_id", "user_id", "seq"], name: "index_user_badges_on_badge_id_and_user_id_and_seq", unique: true, where: "(post_id IS NULL)"
+    t.index ["badge_id", "user_id", "post_id"], name: "index_user_badges_on_badge_id_and_user_id_and_post_id", unique: true
+    t.index ["badge_id", "user_id", "seq"], name: "index_user_badges_on_badge_id_and_user_id_and_seq", unique: true
     t.index ["badge_id", "user_id"], name: "index_user_badges_on_badge_id_and_user_id"
     t.index ["user_id"], name: "index_user_badges_on_user_id"
   end
 
-  create_table "user_custom_fields", id: :serial, force: :cascade do |t|
+  create_table "user_custom_fields", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "name", limit: 256, null: false
     t.text "value"
@@ -1957,18 +1946,20 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "name"], name: "index_user_custom_fields_on_user_id_and_name"
   end
 
-  create_table "user_emails", id: :serial, force: :cascade do |t|
+  create_table "user_emails", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "email", limit: 513, null: false
     t.boolean "primary", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index "lower((email)::text)", name: "index_user_emails_on_email", unique: true
-    t.index ["user_id", "primary"], name: "index_user_emails_on_user_id_and_primary", unique: true, where: "\"primary\""
+    t.virtual "lower_email", type: :string, as: "lower(`email`)", stored: true
+    t.index ["email"], name: "index_user_emails_on_email", unique: true
+    t.index ["lower_email"], name: "index_user_emails_on_lower_email", unique: true
+    t.index ["user_id", "primary"], name: "index_user_emails_on_user_id_and_primary", unique: true
     t.index ["user_id"], name: "index_user_emails_on_user_id"
   end
 
-  create_table "user_exports", id: :serial, force: :cascade do |t|
+  create_table "user_exports", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "file_name", null: false
     t.integer "user_id", null: false
     t.datetime "created_at", null: false
@@ -1977,14 +1968,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "topic_id"
   end
 
-  create_table "user_field_options", id: :serial, force: :cascade do |t|
+  create_table "user_field_options", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_field_id", null: false
     t.string "value", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
   end
 
-  create_table "user_fields", id: :serial, force: :cascade do |t|
+  create_table "user_fields", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
     t.string "field_type", null: false
     t.datetime "created_at", null: false
@@ -2000,7 +1991,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.boolean "searchable", default: false, null: false
   end
 
-  create_table "user_histories", id: :serial, force: :cascade do |t|
+  create_table "user_histories", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "action", null: false
     t.integer "acting_user_id"
     t.integer "target_user_id"
@@ -2021,20 +2012,19 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["acting_user_id", "action", "id"], name: "index_user_histories_on_acting_user_id_and_action_and_id"
     t.index ["action", "id"], name: "index_user_histories_on_action_and_id"
     t.index ["category_id"], name: "index_user_histories_on_category_id"
-    t.index ["subject", "id"], name: "index_user_histories_on_subject_and_id"
     t.index ["target_user_id", "id"], name: "index_user_histories_on_target_user_id_and_id"
     t.index ["topic_id", "target_user_id", "action"], name: "index_user_histories_on_topic_id_and_target_user_id_and_action"
   end
 
-  create_table "user_ip_address_histories", force: :cascade do |t|
+  create_table "user_ip_address_histories", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
-    t.inet "ip_address", null: false
+    t.string "ip_address", null: false
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
     t.index ["user_id", "ip_address"], name: "index_user_ip_address_histories_on_user_id_and_ip_address", unique: true
   end
 
-  create_table "user_notification_schedules", force: :cascade do |t|
+  create_table "user_notification_schedules", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.boolean "enabled", default: false, null: false
     t.integer "day_0_start_time", null: false
@@ -2055,7 +2045,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_user_notification_schedules_on_user_id"
   end
 
-  create_table "user_open_ids", id: :serial, force: :cascade do |t|
+  create_table "user_open_ids", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.string "email", null: false
     t.string "url", null: false
@@ -2065,7 +2055,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["url"], name: "index_user_open_ids_on_url"
   end
 
-  create_table "user_options", id: false, force: :cascade do |t|
+  create_table "user_options", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.boolean "mailing_list_mode", default: false, null: false
     t.boolean "email_digests"
@@ -2086,7 +2076,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "theme_key_seq", default: 0, null: false
     t.boolean "allow_private_messages", default: true, null: false
     t.integer "homepage_id"
-    t.integer "theme_ids", default: [], null: false, array: true
+    t.text "theme_ids", null: false
     t.boolean "hide_profile_and_presence", default: false, null: false
     t.integer "text_size_key", default: 0, null: false
     t.integer "text_size_seq", default: 0, null: false
@@ -2102,17 +2092,17 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_user_options_on_user_id", unique: true
   end
 
-  create_table "user_profile_views", id: :serial, force: :cascade do |t|
+  create_table "user_profile_views", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_profile_id", null: false
     t.datetime "viewed_at", null: false
-    t.inet "ip_address"
+    t.string "ip_address"
     t.integer "user_id"
     t.index ["user_id"], name: "index_user_profile_views_on_user_id"
     t.index ["user_profile_id"], name: "index_user_profile_views_on_user_profile_id"
     t.index ["viewed_at", "user_id", "ip_address", "user_profile_id"], name: "unique_profile_view_user_or_ip", unique: true
   end
 
-  create_table "user_profiles", primary_key: "user_id", id: :integer, default: nil, force: :cascade do |t|
+  create_table "user_profiles", primary_key: "user_id", id: :integer, default: nil, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "location"
     t.string "website"
     t.text "bio_raw"
@@ -2131,15 +2121,14 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["profile_background_upload_id"], name: "index_user_profiles_on_profile_background_upload_id"
   end
 
-  create_table "user_search_data", primary_key: "user_id", id: :integer, default: nil, force: :cascade do |t|
-    t.tsvector "search_data"
+  create_table "user_search_data", primary_key: "user_id", id: :integer, default: nil, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
+    t.text "search_data"
     t.text "raw_data"
     t.text "locale"
     t.integer "version", default: 0
-    t.index ["search_data"], name: "idx_search_user", using: :gin
   end
 
-  create_table "user_second_factors", force: :cascade do |t|
+  create_table "user_second_factors", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "method", null: false
     t.string "data", null: false
@@ -2152,7 +2141,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_user_second_factors_on_user_id"
   end
 
-  create_table "user_security_keys", force: :cascade do |t|
+  create_table "user_security_keys", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "credential_id", null: false
     t.string "public_key", null: false
@@ -2170,7 +2159,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_user_security_keys_on_user_id"
   end
 
-  create_table "user_stats", primary_key: "user_id", id: :integer, default: nil, force: :cascade do |t|
+  create_table "user_stats", primary_key: "user_id", id: :integer, default: nil, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topics_entered", default: 0, null: false
     t.integer "time_read", default: 0, null: false
     t.integer "days_visited", default: 0, null: false
@@ -2195,7 +2184,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "draft_count", default: 0, null: false
   end
 
-  create_table "user_uploads", force: :cascade do |t|
+  create_table "user_uploads", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "upload_id", null: false
     t.integer "user_id", null: false
     t.datetime "created_at", null: false
@@ -2203,7 +2192,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id", "upload_id"], name: "index_user_uploads_on_user_id_and_upload_id"
   end
 
-  create_table "user_visits", id: :serial, force: :cascade do |t|
+  create_table "user_visits", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "user_id", null: false
     t.date "visited_at", null: false
     t.integer "posts_read", default: 0
@@ -2214,7 +2203,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["visited_at", "mobile"], name: "index_user_visits_on_visited_at_and_mobile"
   end
 
-  create_table "user_warnings", id: :serial, force: :cascade do |t|
+  create_table "user_warnings", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "topic_id", null: false
     t.integer "user_id", null: false
     t.integer "created_by_id", null: false
@@ -2224,7 +2213,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["user_id"], name: "index_user_warnings_on_user_id"
   end
 
-  create_table "users", id: :serial, force: :cascade do |t|
+  create_table "users", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "username", limit: 60, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -2248,13 +2237,13 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.date "date_of_birth"
     t.integer "views", default: 0, null: false
     t.integer "flag_level", default: 0, null: false
-    t.inet "ip_address"
+    t.string "ip_address"
     t.boolean "moderator", default: false
     t.string "title"
     t.integer "uploaded_avatar_id"
     t.string "locale", limit: 10
     t.integer "primary_group_id"
-    t.inet "registration_ip_address"
+    t.string "registration_ip_address"
     t.boolean "staged", default: false, null: false
     t.datetime "first_seen_at"
     t.datetime "silenced_till"
@@ -2262,8 +2251,8 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.integer "manual_locked_trust_level"
     t.string "secure_identifier"
     t.integer "flair_group_id"
-    t.index ["id"], name: "idx_users_admin", where: "admin"
-    t.index ["id"], name: "idx_users_moderator", where: "moderator"
+    t.index ["id"], name: "idx_users_admin"
+    t.index ["id"], name: "idx_users_moderator"
     t.index ["last_posted_at"], name: "index_users_on_last_posted_at"
     t.index ["last_seen_at"], name: "index_users_on_last_seen_at"
     t.index ["secure_identifier"], name: "index_users_on_secure_identifier", unique: true
@@ -2272,7 +2261,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["username_lower"], name: "index_users_on_username_lower", unique: true
   end
 
-  create_table "watched_words", id: :serial, force: :cascade do |t|
+  create_table "watched_words", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "word", null: false
     t.integer "action", null: false
     t.datetime "created_at", null: false
@@ -2281,24 +2270,24 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["action", "word"], name: "index_watched_words_on_action_and_word", unique: true
   end
 
-  create_table "web_crawler_requests", force: :cascade do |t|
+  create_table "web_crawler_requests", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.date "date", null: false
     t.string "user_agent", null: false
     t.integer "count", default: 0, null: false
     t.index ["date", "user_agent"], name: "index_web_crawler_requests_on_date_and_user_agent", unique: true
   end
 
-  create_table "web_hook_event_types", id: :serial, force: :cascade do |t|
+  create_table "web_hook_event_types", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "name", null: false
   end
 
-  create_table "web_hook_event_types_hooks", id: false, force: :cascade do |t|
+  create_table "web_hook_event_types_hooks", id: false, charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "web_hook_id", null: false
     t.integer "web_hook_event_type_id", null: false
     t.index ["web_hook_event_type_id", "web_hook_id"], name: "idx_web_hook_event_types_hooks_on_ids", unique: true
   end
 
-  create_table "web_hook_events", id: :serial, force: :cascade do |t|
+  create_table "web_hook_events", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.integer "web_hook_id", null: false
     t.string "headers"
     t.text "payload"
@@ -2311,7 +2300,7 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.index ["web_hook_id"], name: "index_web_hook_events_on_web_hook_id"
   end
 
-  create_table "web_hooks", id: :serial, force: :cascade do |t|
+  create_table "web_hooks", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "payload_url", null: false
     t.integer "content_type", default: 1, null: false
     t.integer "last_delivery_status", default: 1, null: false
@@ -2324,15 +2313,4 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
     t.datetime "updated_at", null: false
   end
 
-  add_foreign_key "javascript_caches", "theme_fields", on_delete: :cascade
-  add_foreign_key "javascript_caches", "themes", on_delete: :cascade
-  add_foreign_key "poll_options", "polls"
-  add_foreign_key "poll_votes", "poll_options"
-  add_foreign_key "poll_votes", "polls"
-  add_foreign_key "poll_votes", "users"
-  add_foreign_key "polls", "posts"
-  add_foreign_key "user_profiles", "badges", column: "granted_title_badge_id"
-  add_foreign_key "user_profiles", "uploads", column: "card_background_upload_id"
-  add_foreign_key "user_profiles", "uploads", column: "profile_background_upload_id"
-  add_foreign_key "user_security_keys", "users"
 end

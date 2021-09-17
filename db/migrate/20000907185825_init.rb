@@ -709,13 +709,13 @@ class Init < ActiveRecord::Migration[5.2]
       t.index "name, left_value_200", name: "index_post_custom_fields_on_name_and_value"
       t.index ["post_id", "name"], name: "index_post_custom_fields_on_post_id_and_name"
       t.index ["post_id"], name: "idx_post_custom_fields_akismet"
-      t.index ["post_id"], name: "index_post_custom_fields_on_notice_args", unique: true
-      t.index ["post_id"], name: "index_post_custom_fields_on_notice_type", unique: true
-      t.index ["post_id"], name: "index_post_custom_fields_on_post_id", unique: true
-      t.index ["post_id"], name: "index_post_id_where_missing_uploads_ignored", unique: true
-      t.index ["post_id"], name: "post_custom_field_broken_images_idx", unique: true
-      t.index ["post_id"], name: "post_custom_field_downloaded_images_idx", unique: true
-      t.index ["post_id"], name: "post_custom_field_large_images_idx", unique: true
+      t.index ["post_id"], name: "index_post_custom_fields_on_notice_args"
+      t.index ["post_id"], name: "index_post_custom_fields_on_notice_type"
+      t.index ["post_id"], name: "index_post_custom_fields_on_post_id"
+      t.index ["post_id"], name: "index_post_id_where_missing_uploads_ignored"
+      t.index ["post_id"], name: "post_custom_field_broken_images_idx"
+      t.index ["post_id"], name: "post_custom_field_downloaded_images_idx"
+      t.index ["post_id"], name: "post_custom_field_large_images_idx"
     end
 
     create_table "post_details", force: :cascade do |t|
