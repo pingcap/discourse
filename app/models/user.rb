@@ -1521,8 +1521,8 @@ class User < ActiveRecord::Base
 
     UNION ALL
 
-    (SELECT groups.id, false as is_user FROM groups
-    WHERE lower(groups.name) = :username)
+    (SELECT `groups`.id, false as is_user FROM `groups`
+    WHERE lower(`groups`.name) = :username)
   SQL
 
   def self.username_exists?(username)
