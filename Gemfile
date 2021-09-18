@@ -256,3 +256,5 @@ gem 'rails_failover', require: false
 
 gem "activerecord-tidb-adapter", "~> 6.1"
 gem 'mini_sql', github: 'hooopo/mini_sql'
+
+gem "default_value_for", "~> 3.4"
