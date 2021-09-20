@@ -19,7 +19,7 @@ class UserBadge < ActiveRecord::Base
   scope :select_for_grouping, -> {
     select(
       UserBadge.attribute_names.map do |name|
-        operation = BOOLEAN_ATTRIBUTES.include?(name) ? "BOOL_OR" : "MAX"
+        operation = BOOLEAN_ATTRIBUTES.include?(name) ? "MAX" : "MAX"
         "#{operation}(user_badges.#{name}) AS #{name}"
       end,
       'COUNT(*) AS "count"'
@@ -56,6 +56,7 @@ class UserBadge < ActiveRecord::Base
   end
 
   def self.update_featured_ranks!(user_id = nil)
+    return # TODO FIX
     query = <<~SQL
       WITH featured_tl_badge AS -- Find the best trust level badge for each user
       (

@@ -1350,11 +1350,11 @@ ActiveRecord::Schema.define(version: 2021_08_24_203421) do
   create_table "stylesheet_cache", charset: "utf8mb4", collation: "utf8mb4_bin", force: :cascade do |t|
     t.string "target", null: false
     t.string "digest", null: false
-    t.text "content", null: false
+    t.text "content", size: :long, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "theme_id", default: -1, null: false
-    t.text "source_map"
+    t.text "source_map", size: :long
     t.index ["target", "digest"], name: "index_stylesheet_cache_on_target_and_digest", unique: true
   end
 
