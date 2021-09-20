@@ -31,9 +31,8 @@ class PostTiming < ActiveRecord::Base
   end
 
   def self.record_new_timing(args)
-    row_count = DB.exec("INSERT INTO post_timings (topic_id, user_id, post_number, msecs)
-              SELECT :topic_id, :user_id, :post_number, :msecs
-              ON CONFLICT DO NOTHING",
+    row_count = DB.exec("INSERT IGNORE INTO post_timings (topic_id, user_id, post_number, msecs)
+              SELECT :topic_id, :user_id, :post_number, :msecs",
             args)
 
     # concurrency is hard, we are not running serialized so this can possibly
