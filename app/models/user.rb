@@ -490,7 +490,7 @@ class User < ActiveRecord::Base
          WHERE t.deleted_at IS NULL
            AND n.notification_type = :notification_type
            AND n.user_id = :user_id
-           AND NOT read
+           AND NOT `read`
     SQL
 
     # to avoid coalesce we do to_i
@@ -506,7 +506,7 @@ class User < ActiveRecord::Base
          WHERE t.deleted_at IS NULL
            AND n.high_priority = :high_priority
            AND n.user_id = :user_id
-           AND NOT read
+           AND NOT `read`
     SQL
 
     # to avoid coalesce we do to_i
@@ -550,7 +550,7 @@ class User < ActiveRecord::Base
             n.high_priority = FALSE AND
             n.user_id = :user_id AND
             n.id > :seen_notification_id AND
-            NOT read
+            NOT `read`
           LIMIT :limit
         ) AS X
       SQL
