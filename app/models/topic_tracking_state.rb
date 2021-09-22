@@ -264,7 +264,7 @@ class TopicTrackingState
     User.where("GREATEST(CASE
                   WHEN COALESCE(uo.new_topic_duration_minutes, :default_duration) = :always THEN u.created_at
                   WHEN COALESCE(uo.new_topic_duration_minutes, :default_duration) = :last_visit THEN COALESCE(u.previous_visit_at,u.created_at)
-                  ELSE (:now::timestamp - INTERVAL '1 MINUTE' * COALESCE(uo.new_topic_duration_minutes, :default_duration))
+                  ELSE (:now - INTERVAL 1 * (COALESCE(uo.new_topic_duration_minutes, :default_duration)) MINUTE )
                END, u.created_at, :min_date)",
                treat_as_new_topic_params
               ).where_clause.ast.to_sql
@@ -300,7 +300,7 @@ class TopicTrackingState
     tag_ids = muted_tag_ids(user)
     sql = new_and_unread_sql(topic_id, user, tag_ids)
     sql = tags_included_wrapped_sql(sql)
-
+    
     report = DB.query(
       sql + "\n\n LIMIT :max_topics",
       {
@@ -413,7 +413,7 @@ class TopicTrackingState
               WHEN COALESCE(uo.new_topic_duration_minutes, :default_duration) = :last_visit THEN COALESCE(
                 u.previous_visit_at,u.created_at
               )
-              ELSE (:now::timestamp - INTERVAL '1 MINUTE' * COALESCE(uo.new_topic_duration_minutes, :default_duration))
+              ELSE (:now - INTERVAL 1 * (COALESCE(uo.new_topic_duration_minutes, :default_duration)) MINUTE )
               END, u.created_at, :min_date
            ) AS treat_as_new_topic_start_date"
 
