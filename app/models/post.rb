@@ -109,7 +109,7 @@ class Post < ActiveRecord::Base
 
     case type
     when 'string'
-      where('raw ILIKE ?', "%#{pattern}%")
+      where('raw LIKE ?', "%#{pattern}%")
     when 'regex'
       where('raw ~* ?', "(?n)#{pattern}")
     end

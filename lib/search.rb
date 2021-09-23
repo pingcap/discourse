@@ -419,7 +419,7 @@ class Search
   end
 
   advanced_filter(/^badge:(.*)$/i) do |posts, match|
-    badge_id = Badge.where('name ilike ? OR id = ?', match, match.to_i).pluck_first(:id)
+    badge_id = Badge.where('name like ? OR id = ?', match, match.to_i).pluck_first(:id)
     if badge_id
       posts.where('posts.user_id IN (SELECT ub.user_id FROM user_badges ub WHERE ub.badge_id = ?)', badge_id)
     else
@@ -508,7 +508,7 @@ class Search
       match = match[1..-1]
     end
 
-    category_ids = Category.where('slug ilike ? OR name ilike ? OR id = ?',
+    category_ids = Category.where('slug like ? OR name like ? OR id = ?',
                                   match, match, match.to_i).pluck(:id)
     if category_ids.present?
       category_ids += Category.subcategory_ids(category_ids.first) unless exact
@@ -586,7 +586,7 @@ class Search
   end
 
   advanced_filter(/^group:(.+)$/i) do |posts, match|
-    group_id = Group.where('name ilike ? OR (id = ? AND id > 0)', match, match.to_i).pluck_first(:id)
+    group_id = Group.where('name like ? OR (id = ? AND id > 0)', match, match.to_i).pluck_first(:id)
     if group_id
       posts.where("posts.user_id IN (select gu.user_id from group_users gu where gu.group_id = ?)", group_id)
     else
@@ -841,7 +841,7 @@ class Search
       INNER JOIN user_fields ON user_fields.id = REPLACE(user_custom_fields.name, 'user_field_', '')::INTEGER AND user_fields.searchable IS TRUE
       WHERE user_id IN (:user_ids)
       AND user_custom_fields.name LIKE 'user_field_%'
-      AND user_custom_fields.value ILIKE :term
+      AND user_custom_fields.value LIKE :term
     SQL
     users_custom_data = users_custom_data_query.reduce({}) do |acc, row|
       acc[row.user_id] =
@@ -861,7 +861,7 @@ class Search
   def groups_search
     groups = Group
       .visible_groups(@guardian.user, "name ASC", include_everyone: false)
-      .where("name ILIKE :term OR full_name ILIKE :term", term: "%#{@term}%")
+      .where("name LIKE :term OR full_name LIKE :term", term: "%#{@term}%")
 
     groups.each { |group| @results.add(group) }
   end
@@ -936,7 +936,7 @@ class Search
         end
 
         posts = posts.joins('JOIN users u ON u.id = posts.user_id')
-        posts = posts.where("posts.raw  || ' ' || u.username || ' ' || COALESCE(u.name, '') ilike ?", "%#{term_without_quote}%")
+        posts = posts.where("posts.raw  || ' ' || u.username || ' ' || COALESCE(u.name, '') like ?", "%#{term_without_quote}%")
       else
         # A is for title
         # B is for category
@@ -948,7 +948,7 @@ class Search
         exact_terms = @term.scan(Regexp.new(PHRASE_MATCH_REGEXP_PATTERN)).flatten
 
         exact_terms.each do |exact|
-          posts = posts.where("posts.raw ilike :exact OR topics.title ilike :exact", exact: "%#{exact}%")
+          posts = posts.where("posts.raw like :exact OR topics.title like :exact", exact: "%#{exact}%")
         end
       end
     end

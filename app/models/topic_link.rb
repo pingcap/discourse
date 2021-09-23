@@ -59,7 +59,7 @@ class TopicLink < ActiveRecord::Base
     builder.where('ftl.topic_id = :topic_id', topic_id: topic_id)
     builder.where('ft.deleted_at IS NULL')
     # note that ILIKE means "case insensitive LIKE"
-    builder.where("NOT(ftl.url ILIKE '%.png' OR ftl.url ILIKE '%.jpg' OR ftl.url ILIKE '%.gif')")
+    builder.where("NOT(ftl.url LIKE '%.png' OR ftl.url LIKE '%.jpg' OR ftl.url LIKE '%.gif')")
     builder.where("COALESCE(ft.archetype, 'regular') <> :archetype", archetype: Archetype.private_message)
     builder.where("clicks > 0")
 

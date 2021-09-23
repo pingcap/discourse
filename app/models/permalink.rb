@@ -92,7 +92,7 @@ class Permalink < ActiveRecord::Base
       .includes(:topic, :post, :category, :tag)
       .order('permalinks.created_at desc')
 
-    permalinks.where!('url ILIKE :url OR external_url ILIKE :url', url: "%#{url}%") if url.present?
+    permalinks.where!('url LIKE :url OR external_url LIKE :url', url: "%#{url}%") if url.present?
     permalinks.limit!(100)
     permalinks.to_a
   end

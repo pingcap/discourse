@@ -93,7 +93,7 @@ module Jobs
       user_fields = {}
 
       fields.each do |key, value|
-        @user_fields[key] ||= UserField.includes(:user_field_options).where('name ILIKE ?', key).first || :nil
+        @user_fields[key] ||= UserField.includes(:user_field_options).where('name LIKE ?', key).first || :nil
         next if @user_fields[key] == :nil
 
         # Automatically correct user field value

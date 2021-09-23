@@ -870,7 +870,7 @@ def fix_relative_links
   Post.where('raw like ?', '%](/uploads%').find_each do |post|
     inline_uploads(post)
   end
-  Post.where("raw ilike ?", '%<img%src=%/uploads/%>%').find_each do |post|
+  Post.where("raw like ?", '%<img%src=%/uploads/%>%').find_each do |post|
     inline_img_tags(post)
   end
 end

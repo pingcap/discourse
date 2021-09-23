@@ -584,7 +584,7 @@ class GroupsController < ApplicationController
       .order(:name)
 
     if (term = params[:term]).present?
-      groups = groups.where("name ILIKE :term OR full_name ILIKE :term", term: "%#{term}%")
+      groups = groups.where("name LIKE :term OR full_name LIKE :term", term: "%#{term}%")
     end
 
     if params[:ignore_automatic].to_s == "true"

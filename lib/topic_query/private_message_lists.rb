@@ -255,7 +255,7 @@ class TopicQuery
     def group
       @group ||= begin
         Group
-          .where('name ilike ?', @options[:group_name])
+          .where('name like ?', @options[:group_name])
           .select(:id, :publish_read_state)
           .first
       end

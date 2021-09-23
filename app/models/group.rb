@@ -559,7 +559,7 @@ class Group < ActiveRecord::Base
     groups ||= Group
 
     groups.where(
-      "name ILIKE :term_like OR full_name ILIKE :term_like", term_like: "%#{name}%"
+      "name LIKE :term_like OR full_name LIKE :term_like", term_like: "%#{name}%"
     )
   end
 

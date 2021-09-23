@@ -220,7 +220,7 @@ class User < ActiveRecord::Base
     if filter.is_a?(Array)
       where('username_lower ~* ?', "(#{filter.join('|')})")
     else
-      where('username_lower ILIKE ?', "%#{filter}%")
+      where('username_lower LIKE ?', "%#{filter}%")
     end
   end
 
@@ -241,7 +241,7 @@ class User < ActiveRecord::Base
       )
     else
       users.where(
-        'username_lower ILIKE :filter OR lower(user_emails.email) ILIKE :filter',
+        'username_lower LIKE :filter OR lower(user_emails.email) LIKE :filter',
         filter: "%#{filter}%"
       )
     end
