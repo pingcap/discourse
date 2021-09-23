@@ -1469,9 +1469,9 @@ class Topic < ActiveRecord::Base
   end
 
   TIME_TO_FIRST_RESPONSE_SQL ||= <<-SQL
-    SELECT AVG(t.hours)::float AS "hours", t.created_at AS "date"
+    SELECT AVG(t.hours) AS "hours", t.created_at AS "date"
     FROM (
-      SELECT t.id, t.created_at::date AS created_at, EXTRACT(EPOCH FROM MIN(p.created_at) - t.created_at)::float / 3600.0 AS "hours"
+      SELECT t.id, date(t.created_at) AS created_at, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id
       /*where*/
@@ -1482,9 +1482,9 @@ class Topic < ActiveRecord::Base
   SQL
 
   TIME_TO_FIRST_RESPONSE_TOTAL_SQL ||= <<-SQL
-    SELECT AVG(t.hours)::float AS "hours"
+    SELECT AVG(t.hours) AS "hours"
     FROM (
-      SELECT t.id, EXTRACT(EPOCH FROM MIN(p.created_at) - t.created_at)::float / 3600.0 AS "hours"
+      SELECT t.id, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id
       /*where*/

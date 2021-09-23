@@ -615,7 +615,7 @@ class TopicView
       columns = [:id]
 
       if !is_mega_topic?
-        columns << '(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP - posts.created_at) / 86400)::INT AS days_ago'
+        columns << 'CAST(datediff(CURRENT_TIMESTAMP, posts.created_at) AS UNSIGNED) AS days_ago'
       end
 
       posts.pluck(*columns)
