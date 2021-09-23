@@ -327,7 +327,7 @@ class Category < ActiveRecord::Base
     Group
       .joins(:category_groups)
       .where("category_groups.category_id = ?", self.id)
-      .where("groups.public_admission OR groups.allow_membership_requests")
+      .where("groups.public_admission OR `groups`.allow_membership_requests")
       .order(:allow_membership_requests)
       .first
   end
@@ -665,7 +665,7 @@ class Category < ActiveRecord::Base
 
   def secure_group_ids
     if self.read_restricted?
-      groups.pluck("groups.id")
+      groups.pluck("`groups`.id")
     end
   end
 

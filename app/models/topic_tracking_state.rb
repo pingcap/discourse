@@ -530,7 +530,7 @@ class TopicTrackingState
       .joins(:group_users)
       .where(publish_read_state: true)
       .select('ARRAY_AGG(group_users.user_id) AS members', :name, :id)
-      .group('groups.id')
+      .group('`groups`.id')
   end
 
   def self.update_topic_list_read_indicator(topic, groups, last_read_post_number, user_id, write_event)

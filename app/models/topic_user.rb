@@ -217,7 +217,7 @@ class TopicUser < ActiveRecord::Base
            ).exists?
 
           group_notification_level = Group
-            .joins("LEFT OUTER JOIN group_users gu ON gu.group_id = groups.id AND gu.user_id = #{user_id}")
+            .joins("LEFT OUTER JOIN group_users gu ON gu.group_id = `groups`.id AND gu.user_id = #{user_id}")
             .joins("LEFT OUTER JOIN topic_allowed_groups tag ON tag.topic_id = #{topic_id}")
             .where("gu.id IS NOT NULL AND tag.id IS NOT NULL")
             .pluck(:default_notification_level)

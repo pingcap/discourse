@@ -86,7 +86,7 @@ class Upload < ActiveRecord::Base
       .where("tf.upload_id IS NULL")
       .joins("LEFT JOIN user_exports ue ON ue.upload_id = uploads.id")
       .where("ue.upload_id IS NULL")
-      .joins("LEFT JOIN groups g ON g.flair_upload_id = uploads.id")
+      .joins("LEFT JOIN `groups` g ON g.flair_upload_id = uploads.id")
       .where("g.flair_upload_id IS NULL")
       .joins("LEFT JOIN badges b ON b.image_upload_id = uploads.id")
       .where("b.image_upload_id IS NULL")

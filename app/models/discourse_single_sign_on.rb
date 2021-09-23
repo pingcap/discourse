@@ -187,7 +187,7 @@ class DiscourseSingleSignOn < SingleSignOn
     ids = Group.where('LOWER(NAME) in (?) AND NOT automatic', names).pluck(:id)
 
     group_users = GroupUser
-      .where('group_id IN (SELECT id FROM groups WHERE NOT automatic)')
+      .where('group_id IN (SELECT id FROM `groups` WHERE NOT automatic)')
       .where(user_id: user.id)
 
     delete_group_users = group_users
@@ -225,7 +225,7 @@ class DiscourseSingleSignOn < SingleSignOn
       if split.length > 0
         GroupUser
           .where(user_id: user.id)
-          .where('group_id IN (SELECT id FROM groups WHERE LOWER(name) in (?))', split)
+          .where('group_id IN (SELECT id FROM `groups` WHERE LOWER(name) in (?))', split)
           .destroy_all
       end
     end

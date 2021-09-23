@@ -141,16 +141,16 @@ class Group < ActiveRecord::Base
     groups = self.order(order || "name ASC")
 
     if !opts || !opts[:include_everyone]
-      groups = groups.where("groups.id > 0")
+      groups = groups.where("`groups`.id > 0")
     end
 
     if !user&.admin
       is_staff = !!user&.staff?
 
       if user.blank?
-        sql = "groups.visibility_level = :public"
+        sql = "`groups`.visibility_level = :public"
       elsif is_staff
-        sql = "groups.visibility_level IN (:public, :logged_on_users, :members, :staff)"
+        sql = "`groups`.visibility_level IN (:public, :logged_on_users, :members, :staff)"
       else
         sql = <<~SQL
           groups.id IN (
@@ -186,34 +186,34 @@ class Group < ActiveRecord::Base
     groups = self.order(order || "name ASC")
 
     if !opts || !opts[:include_everyone]
-      groups = groups.where("groups.id > 0")
+      groups = groups.where("`groups`.id > 0")
     end
 
     if !user&.admin
       is_staff = !!user&.staff?
 
       if user.blank?
-        sql = "groups.members_visibility_level = :public"
+        sql = "`groups`.members_visibility_level = :public"
       elsif is_staff
-        sql = "groups.members_visibility_level IN (:public, :logged_on_users, :members, :staff)"
+        sql = "`groups`.members_visibility_level IN (:public, :logged_on_users, :members, :staff)"
       else
         sql = <<~SQL
           groups.id IN (
             SELECT id
-              FROM groups
+              FROM `groups`
             WHERE members_visibility_level IN (:public, :logged_on_users)
 
             UNION ALL
 
             SELECT g.id
-              FROM groups g
+              FROM `groups` g
               JOIN group_users gu ON gu.group_id = g.id AND gu.user_id = :user_id
             WHERE g.members_visibility_level = :members
 
             UNION ALL
 
             SELECT g.id
-              FROM groups g
+              FROM `groups` g
               JOIN group_users gu ON gu.group_id = g.id AND gu.user_id = :user_id AND gu.owner
             WHERE g.members_visibility_level IN (:staff, :owners)
           )
@@ -520,7 +520,7 @@ class Group < ActiveRecord::Base
             FROM group_users
         GROUP BY group_id
       )
-      UPDATE groups
+      UPDATE `groups`
          SET user_count = X.users
         FROM X
        WHERE id = X.group_id
@@ -535,7 +535,7 @@ class Group < ActiveRecord::Base
 
   def self.refresh_has_messages!
     DB.exec <<-SQL
-      UPDATE groups g SET has_messages = false
+      UPDATE `groups` g SET has_messages = false
       WHERE NOT EXISTS (SELECT tg.id
                           FROM topic_allowed_groups tg
                     INNER JOIN topics t ON t.id = tg.topic_id
@@ -753,7 +753,7 @@ class Group < ActiveRecord::Base
 
       # update group user count
       DB.exec <<~SQL
-        UPDATE groups g
+        UPDATE `groups` g
         SET user_count =
           (SELECT COUNT(gu.user_id)
            FROM group_users gu
@@ -778,7 +778,7 @@ class Group < ActiveRecord::Base
 
   def self.member_of(groups, user)
     groups
-      .joins("LEFT JOIN group_users gu ON gu.group_id = groups.id ")
+      .joins("LEFT JOIN group_users gu ON gu.group_id = `groups`.id ")
       .where("gu.user_id = ?", user.id)
   end
 

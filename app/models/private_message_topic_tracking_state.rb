@@ -81,12 +81,13 @@ class PrivateMessageTopicTrackingState
         last_read_post_number,
         tu.notification_level,
         #{TopicTrackingState.highest_post_number_column_select(user.staff?)},
-        ARRAY(SELECT group_id FROM topic_allowed_groups WHERE topic_allowed_groups.topic_id = topics.id) AS group_ids
+        group_ids
       FROM topics
       JOIN users u on u.id = #{user.id.to_i}
       JOIN user_stats AS us ON us.user_id = u.id
       JOIN user_options AS uo ON uo.user_id = u.id
       LEFT JOIN group_users gu ON gu.user_id = u.id
+      LEFT JOIN (SELECT topic_id, JSON_ARRAYAGG(group_id) AS group_ids FROM topic_allowed_groups GROUP BY topic_id) aggs ON aggs.topic_id = topics.id
       LEFT JOIN topic_allowed_groups tag ON tag.topic_id = topics.id AND tag.group_id = gu.group_id
       LEFT JOIN topic_users tu ON tu.topic_id = topics.id AND tu.user_id = u.id
       LEFT JOIN topic_allowed_users tau ON tau.topic_id = topics.id AND tau.user_id = u.id

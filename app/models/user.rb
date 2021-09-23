@@ -392,7 +392,7 @@ class User < ActiveRecord::Base
     GroupUser
       .where(user_id: id)
       .includes(:group)
-      .maximum("groups.grant_trust_level")
+      .maximum("`groups`.grant_trust_level")
   end
 
   def visible_groups
@@ -1353,9 +1353,9 @@ class User < ActiveRecord::Base
   end
 
   def next_best_title
-    group_titles_query = groups.where("groups.title <> ''")
-    group_titles_query = group_titles_query.order("groups.id = #{primary_group_id} DESC") if primary_group_id
-    group_titles_query = group_titles_query.order("groups.primary_group DESC").limit(1)
+    group_titles_query = groups.where("`groups`.title <> ''")
+    group_titles_query = group_titles_query.order("`groups`.id = #{primary_group_id} DESC") if primary_group_id
+    group_titles_query = group_titles_query.order("`groups`.primary_group DESC").limit(1)
 
     if next_best_group_title = group_titles_query.pluck_first(:title)
       return next_best_group_title
