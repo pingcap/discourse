@@ -56,7 +56,7 @@ class PrivateMessageTopicTrackingState
             MIN(group_users.first_unread_pm_at)
           )
         FROM group_users
-        JOIN groups ON groups.id = group_users.group_id
+        JOIN `groups` ON groups.id = group_users.group_id
         JOIN user_stats ON user_stats.user_id = :user_id
         WHERE group_users.user_id = :user_id;
         SQL

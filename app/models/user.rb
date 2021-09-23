@@ -602,7 +602,7 @@ class User < ActiveRecord::Base
           t.deleted_at IS NULL AND
           n.high_priority AND
           n.user_id = :user_id AND
-          NOT read
+          NOT `read`
         ORDER BY n.id DESC
         LIMIT 20
       ) AS x
@@ -612,7 +612,7 @@ class User < ActiveRecord::Base
        LEFT JOIN topics t ON n.topic_id = t.id
        WHERE
         t.deleted_at IS NULL AND
-        (n.high_priority = FALSE OR read) AND
+        (n.high_priority = FALSE OR `read`) AND
         n.user_id = :user_id
        ORDER BY n.id DESC
        LIMIT 20

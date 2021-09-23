@@ -239,7 +239,7 @@ class Notification < ActiveRecord::Base
          WHERE
            n.high_priority = TRUE AND
            n.user_id = #{user.id.to_i} AND
-           NOT read
+           NOT `read`
         ORDER BY n.id ASC
         LIMIT :limit
       SQL
