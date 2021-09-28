@@ -43,9 +43,8 @@ class GroupCategoryNotificationDefault < ActiveRecord::Base
       }
 
       sql = <<~SQL
-        INSERT INTO group_category_notification_defaults (group_id, category_id, notification_level)
+        INSERT IGNORE INTO group_category_notification_defaults (group_id, category_id, notification_level)
         SELECT :group_id, :category_id, :level_num
-        ON CONFLICT DO NOTHING
       SQL
 
       # we could use VALUES here but it would introduce a string

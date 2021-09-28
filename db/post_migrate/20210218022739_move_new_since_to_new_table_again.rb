@@ -22,7 +22,7 @@ class MoveNewSinceToNewTableAgain < ActiveRecord::Migration[6.0]
       break if !min_id
 
       sql = <<~SQL
-        INSERT INTO dismissed_topic_users (user_id, topic_id, created_at)
+        INSERT IGNORE INTO dismissed_topic_users (user_id, topic_id, created_at)
         SELECT users.id, topics.id, user_stats.new_since
         FROM user_stats
         JOIN users ON users.id = user_stats.user_id
@@ -44,7 +44,6 @@ class MoveNewSinceToNewTableAgain < ActiveRecord::Migration[6.0]
         AND topics.id IS NOT NULL
         AND dismissed_topic_users.id IS NULL
         ORDER BY topics.created_at DESC
-        ON CONFLICT DO NOTHING
       SQL
 
       DB.exec(sql,

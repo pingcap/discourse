@@ -52,9 +52,8 @@ class CreateBookmarksFromPostActionBookmarks < ActiveRecord::Migration[6.0]
     #
     DB.exec(
       <<~SQL
-      INSERT INTO bookmarks (topic_id, post_id, user_id, created_at, updated_at)
+      INSERT IGNORE INTO bookmarks (topic_id, post_id, user_id, created_at, updated_at)
       VALUES #{bookmarks_to_create.join(",\n")}
-      ON CONFLICT DO NOTHING
       SQL
     )
   end

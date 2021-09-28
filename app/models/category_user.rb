@@ -46,9 +46,8 @@ class CategoryUser < ActiveRecord::Base
       }
 
       sql = <<~SQL
-        INSERT INTO category_users (user_id, category_id, notification_level)
+        INSERT IGNORE INTO category_users (user_id, category_id, notification_level)
         SELECT :user_id, :category_id, :level_num
-        ON CONFLICT DO NOTHING
       SQL
 
       # we could use VALUES here but it would introduce a string

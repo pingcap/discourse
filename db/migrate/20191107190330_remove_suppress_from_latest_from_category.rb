@@ -19,7 +19,7 @@ class RemoveSuppressFromLatestFromCategory < ActiveRecord::Migration[6.0]
         if ids.count <= 10
           # CategoryUser.notification_levels[:muted] is 0, avoid reaching to object model
           DB.exec(<<~SQL, muted: 0)
-            INSERT INTO category_users (category_id, user_id, notification_level)
+            INSERT IGNORE INTO category_users (category_id, user_id, notification_level)
               SELECT c.id category_id, u.id user_id, :muted
               FROM users u
                 CROSS JOIN categories c
@@ -28,7 +28,6 @@ class RemoveSuppressFromLatestFromCategory < ActiveRecord::Migration[6.0]
                     AND c.id = cu.category_id
               WHERE c.suppress_from_latest = TRUE
                 AND cu.notification_level IS NULL
-            ON CONFLICT DO NOTHING
           SQL
 
           DB.exec(<<~SQL, value: ids.join("|"))

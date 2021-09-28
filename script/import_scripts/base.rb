@@ -762,12 +762,11 @@ class ImportScripts::Base
     puts "", "Updating topic users"
 
     DB.exec <<~SQL
-      INSERT INTO topic_users (user_id, topic_id, posted, last_read_post_number, first_visited_at, last_visited_at, total_msecs_viewed)
+      INSERT IGNORE INTO topic_users (user_id, topic_id, posted, last_read_post_number, first_visited_at, last_visited_at, total_msecs_viewed)
            SELECT user_id, topic_id, 't' , MAX(post_number), MIN(created_at), MAX(created_at), COUNT(id) * 5000
              FROM posts
             WHERE user_id > 0
          GROUP BY user_id, topic_id
-      ON CONFLICT DO NOTHING
     SQL
   end
 
@@ -775,11 +774,10 @@ class ImportScripts::Base
     puts "", "Updating post timings"
 
     DB.exec <<~SQL
-      INSERT INTO post_timings (topic_id, post_number, user_id, msecs)
+      INSERT IGNORE INTO post_timings (topic_id, post_number, user_id, msecs)
            SELECT topic_id, post_number, user_id, 5000
              FROM posts
             WHERE user_id > 0
-      ON CONFLICT DO NOTHING
     SQL
   end
 
