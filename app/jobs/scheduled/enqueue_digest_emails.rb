@@ -29,7 +29,7 @@ module Jobs
         .where("COALESCE(user_stats.digest_attempted_at, '2010-01-01') <= CURRENT_TIMESTAMP - ('1 MINUTE'::INTERVAL * user_options.digest_after_minutes)")
         .where("COALESCE(last_seen_at, '2010-01-01') <= CURRENT_TIMESTAMP - ('1 MINUTE'::INTERVAL * user_options.digest_after_minutes)")
         .where("COALESCE(last_seen_at, '2010-01-01') >= CURRENT_TIMESTAMP - ('1 DAY'::INTERVAL * #{SiteSetting.suppress_digest_email_after_days})")
-        .order("user_stats.digest_attempted_at ASC NULLS FIRST")
+        .order("user_stats.digest_attempted_at ASC")
 
       # If the site requires approval, make sure the user is approved
       query = query.where("approved OR moderator OR admin") if SiteSetting.must_approve_users?

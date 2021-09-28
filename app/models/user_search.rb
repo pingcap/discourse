@@ -90,7 +90,7 @@ class UserSearch
       end
 
       in_topic
-        .order('last_seen_at DESC NULLS LAST')
+        .order('last_seen_at DESC')
         .limit(@limit - users.size)
         .pluck(:id)
         .each { |id| users << id }
@@ -146,7 +146,7 @@ class UserSearch
       end
 
       in_category
-        .order('last_seen_at DESC NULLS LAST')
+        .order('last_seen_at DESC')
         .limit(@limit - users.size)
         .pluck(:id)
         .each { |id| users << id }
@@ -157,7 +157,7 @@ class UserSearch
     # 4. global matches
     if @term.present?
       filtered_by_term_users
-        .order('last_seen_at DESC NULLS LAST')
+        .order('last_seen_at DESC')
         .limit(@limit - users.size)
         .pluck(:id)
         .each { |id| users << id }
@@ -166,7 +166,7 @@ class UserSearch
     # 5. last seen users (for search auto-suggestions)
     if @last_seen_users
       scoped_users
-        .order('last_seen_at DESC NULLS LAST')
+        .order('last_seen_at DESC')
         .limit(@limit - users.size)
         .pluck(:id)
         .each { |id| users << id }
