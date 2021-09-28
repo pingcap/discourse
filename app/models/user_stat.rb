@@ -204,12 +204,13 @@ class UserStat < ActiveRecord::Base
 
   def self.update_draft_count(user_id = nil)
     if user_id.present?
-      draft_count = DB.query_single <<~SQL, user_id: user_id
+      DB.query_single <<~SQL, user_id: user_id
         UPDATE user_stats
         SET draft_count = (SELECT COUNT(*) FROM drafts WHERE user_id = :user_id)
         WHERE user_id = :user_id
-        RETURNING draft_count
       SQL
+
+      draft_count = DB.query_single("select draft_count from user_stats where user_id = :user_id limit 1", user_id: user_id)
 
       MessageBus.publish(
         '/user',
