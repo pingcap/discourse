@@ -36,7 +36,7 @@ WITH cte as (
         t.id,
         p.user_id,
         MAX(p.created_at) last_post_date,
-        ROW_NUMBER() OVER(PARTITION BY t.id ORDER BY COUNT(*) DESC, MAX(p.created_at) DESC) as rank
+        ROW_NUMBER() OVER(PARTITION BY t.id ORDER BY COUNT(*) DESC, MAX(p.created_at) DESC) as `rank`
     FROM topics t
     JOIN posts p ON p.topic_id = t.id
     WHERE p.deleted_at IS NULL AND
@@ -49,18 +49,13 @@ WITH cte as (
 ),
 
 cte2 as (
-  SELECT id, user_id, ROW_NUMBER() OVER(PARTITION BY id ORDER BY last_post_date ASC) as rank
+  SELECT id, user_id, ROW_NUMBER() OVER(PARTITION BY id ORDER BY last_post_date ASC) as `rank`
   FROM cte
-  WHERE rank <= #{count}
+  WHERE `rank` <= #{count}
 )
 
 UPDATE topics tt
-SET
-  featured_user1_id = x.featured_user1,
-  featured_user2_id = x.featured_user2,
-  featured_user3_id = x.featured_user3,
-  featured_user4_id = x.featured_user4
-FROM topics AS tt2
+INNER JOIN topics AS tt2 ON tt2.id = tt.id
 LEFT OUTER JOIN (
   SELECT
       c.id,
@@ -71,6 +66,13 @@ LEFT OUTER JOIN (
   FROM cte2 as c
   GROUP BY c.id
 ) x ON x.id = tt2.id
+
+SET
+  tt.featured_user1_id = x.featured_user1,
+  tt.featured_user2_id = x.featured_user2,
+  tt.featured_user3_id = x.featured_user3,
+  tt.featured_user4_id = x.featured_user4
+
 WHERE tt.id = tt2.id AND
 (
   COALESCE(tt.featured_user1_id,-99) <> COALESCE(x.featured_user1,-99) OR
