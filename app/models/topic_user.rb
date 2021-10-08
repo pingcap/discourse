@@ -420,8 +420,7 @@ class TopicUser < ActiveRecord::Base
 
     builder = DB.build <<~SQL
       UPDATE topic_users tu
-      SET #{action_type_name} = x.state
-      FROM (
+      INNER JOIN (
         SELECT CASE WHEN EXISTS (
           SELECT 1
           FROM post_actions pa
@@ -438,6 +437,7 @@ class TopicUser < ActiveRecord::Base
         FROM topic_users tu2
         /*where*/
       ) x
+      SET tu.#{action_type_name} = x.state
       WHERE x.topic_id = tu.topic_id AND x.user_id = tu.user_id AND x.state != tu.#{action_type_name}
     SQL
 
