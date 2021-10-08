@@ -672,19 +672,28 @@ protected
     version_result = nil
 
     if version
-      version_result = DB.query_single(
-        "UPDATE reviewables SET version = version + 1 WHERE id = :id AND version = :version RETURNING version",
+      count = DB.exec(
+        "UPDATE reviewables SET version = version + 1 WHERE id = :id AND version = :version",
         version: version,
         id: self.id
       )
+      version_result = DB.query_single(
+        "SELECT version FROM reviewables WHERE id = :id",
+        id: self.id
+      ) if count > 0
     else
       # We didn't supply a version to update safely, so just increase it
+      DB.exec(
+        "UPDATE reviewables SET version = version + 1 WHERE id = :id",
+        id: self.id
+      )
+
       version_result = DB.query_single(
-        "UPDATE reviewables SET version = version + 1 WHERE id = :id RETURNING version",
+        "SELECT version FROM reviewables WHERE id = :id",
         id: self.id
       )
     end
-
+    
     if version_result && version_result[0]
       self.version = version_result[0]
     else
