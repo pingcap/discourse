@@ -608,15 +608,18 @@ class Reviewable < ActiveRecord::Base
           AND rs.status IN (:pending, :agreed)
       ), 0.0)
       WHERE id = :id
-      RETURNING score
     SQL
 
-    result = DB.query(
+    DB.exec(
       sql,
       id: self.id,
       pending: ReviewableScore.statuses[:pending],
       agreed: ReviewableScore.statuses[:agreed]
     )
+
+    result = DB.query(<<~SQL, id: self.id)
+      SELECT score FROM reviewables WHERE id = :id
+    SQL
 
     # Update topic score
     sql = <<~SQL
@@ -630,7 +633,7 @@ class Reviewable < ActiveRecord::Base
       WHERE id = :topic_id
     SQL
 
-    DB.query(
+    DB.exec(
       sql,
       topic_id: topic_id,
       pending: Reviewable.statuses[:pending],
