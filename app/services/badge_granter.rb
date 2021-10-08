@@ -396,7 +396,7 @@ class BadgeGranter
       backfill: true,
       multiple_grant: true # cheat here, cause we only run on backfill and are deleting
     ) if badge.auto_revoke && full_backfill
-
+    # TODO FIX
     sql = <<~SQL
       WITH w as (
         INSERT INTO user_badges(badge_id, user_id, granted_at, granted_by_id, created_at, post_id)

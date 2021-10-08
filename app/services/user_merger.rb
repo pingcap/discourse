@@ -77,6 +77,7 @@ class UserMerger
     ).change_owner!
   end
 
+  # TODO FIX excluded
   def merge_given_daily_likes
     ::MessageBus.publish '/merge_user', { message: I18n.t("admin.user.merge_user.merging_given_daily_likes") }, user_ids: [@acting_user.id] if @acting_user
 
@@ -96,10 +97,9 @@ class UserMerger
                   WHERE g.user_id = :source_user_id AND date(a.created_at) = g.given_date
               )
         GROUP BY given_date
-      ON CONFLICT (user_id, given_date)
-        DO UPDATE
-          SET likes_given = EXCLUDED.likes_given,
-            limit_reached = EXCLUDED.limit_reached
+      ON DUPLICATE KEY UPDATE
+          likes_given = likes_given,
+          limit_reached = limit_reached
     SQL
 
     DB.exec(

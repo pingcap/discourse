@@ -59,8 +59,8 @@ class TopicGroup < ActiveRecord::Base
     query += 'AND NOT(tag.group_id IN (:already_updated_groups))' unless updated_group_ids.length.zero?
 
     query += <<~SQL
-      ON CONFLICT(topic_id, group_id)
-      DO UPDATE SET last_read_post_number = :post_number, created_at = :now, updated_at = :now
+      ON DUPLICATE KEY UPDATE
+      last_read_post_number = :post_number, created_at = :now, updated_at = :now
     SQL
 
     DB.exec(

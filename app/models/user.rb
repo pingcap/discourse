@@ -745,9 +745,8 @@ class User < ActiveRecord::Base
         DB.exec(<<~SQL, user_id: self.id, ip_address: new_ip_address, current_timestamp: Time.zone.now)
         INSERT INTO user_ip_address_histories (user_id, ip_address, created_at, updated_at)
         VALUES (:user_id, :ip_address, :current_timestamp, :current_timestamp)
-        ON CONFLICT (user_id, ip_address)
-        DO
-          UPDATE SET updated_at = :current_timestamp
+        ON DUPLICATE KEY UPDATE
+          updated_at = :current_timestamp
         SQL
 
         DB.exec(<<~SQL, user_id: self.id, offset: SiteSetting.keep_old_ip_address_count)

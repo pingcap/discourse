@@ -64,7 +64,7 @@ module Jobs
           new_topic_id: new_topic_id
         }
         DB.exec(<<~SQL, params)
-          INSERT INTO topic_users(user_id, topic_id, notification_level,
+          INSERT IGNORE INTO topic_users(user_id, topic_id, notification_level,
                                   notifications_reason_id)
           SELECT tu.user_id,
                  :new_topic_id AS topic_id,
@@ -74,7 +74,6 @@ module Jobs
                JOIN topics t ON (t.id = :new_topic_id)
           WHERE tu.topic_id = :old_topic_id
             AND tu.notification_level != 1
-          ON CONFLICT (topic_id, user_id) DO NOTHING
         SQL
 
         # update small action post on old topic to add new topic link
