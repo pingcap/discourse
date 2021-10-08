@@ -57,8 +57,7 @@ class Draft < ActiveRecord::Base
           sequence: sequence,
           draft_key: key,
           user_id: user.id,
-        },
-        unique_by: [:user_id, :draft_key]
+        }
       )
 
       DB.exec(<<~SQL, id: draft_id, sequence: sequence, data: data, owner: owner || current_owner)
