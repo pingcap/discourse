@@ -63,6 +63,7 @@ jobs:
 
       - name: Setup gems
         run: |
+          sudo apt-get install libmariadb-dev-compat libmariadb-dev -y
           bundle config --local path vendor/bundle
           bundle config --local deployment true
           bundle config --local without development
