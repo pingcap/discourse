@@ -92,7 +92,7 @@ jobs:
 
       - name: Create database
         run: |
-          bin/rake db:create
+          sleep 20 && bin/rake db:create
           bin/rake db:migrate
 
       - name: Create parallel databases
