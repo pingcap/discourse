@@ -56,7 +56,6 @@ class UserBadge < ActiveRecord::Base
   end
 
   def self.update_featured_ranks!(user_id = nil)
-    return # TODO FIX
     query = <<~SQL
       WITH featured_tl_badge AS -- Find the best trust level badge for each user
       (
@@ -72,9 +71,9 @@ class UserBadge < ActiveRecord::Base
           user_badges.badge_id,
           RANK() OVER (
             PARTITION BY user_badges.user_id -- Do a separate rank for each user
-            ORDER BY BOOL_OR(badges.enabled) DESC, -- Disabled badges last
-                    MAX(featured_tl_badge.user_id) NULLS LAST, -- Best tl badge first
-                    BOOL_OR(user_badges.is_favorite) DESC NULLS LAST, -- Favorite badges next
+            ORDER BY max(badges.enabled) DESC, -- Disabled badges last
+                    MAX(featured_tl_badge.user_id), -- Best tl badge first
+                    max(user_badges.is_favorite), -- Favorite badges next
                     CASE WHEN user_badges.badge_id IN (1,2,3,4) THEN 1 ELSE 0 END ASC, -- Non-featured tl badges last
                     MAX(badges.badge_type_id) ASC,
                     MAX(badges.grant_count) ASC,
@@ -87,8 +86,10 @@ class UserBadge < ActiveRecord::Base
         GROUP BY user_badges.user_id, user_badges.badge_id
       )
       -- Now use that data to update the featured_rank column
-      UPDATE user_badges SET featured_rank = rank_number
-      FROM ranks WHERE ranks.badge_id = user_badges.badge_id AND ranks.user_id = user_badges.user_id AND featured_rank IS DISTINCT FROM rank_number
+      UPDATE user_badges 
+      INNER JOIN ranks on ranks.badge_id = user_badges.badge_id AND ranks.user_id = user_badges.user_id
+      SET featured_rank = rank_number
+      WHERE not(featured_rank <=> rank_number)
     SQL
 
     DB.exec query
