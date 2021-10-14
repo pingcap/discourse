@@ -2,14 +2,13 @@
 
 class AddUniqueIndexToInvitedGroups < ActiveRecord::Migration[6.0]
   def change
-    # TODO FIX
-    # execute <<~SQL
-    #   DELETE FROM invited_groups a
-    #   USING invited_groups b
-    #   WHERE a.id < b.id
-    #     AND a.invite_id = b.invite_id
-    #     AND a.group_id = b.group_id
-    # SQL
+    execute <<~SQL
+      DELETE a FROM invited_groups a
+      INNER JOIN invited_groups b
+      WHERE a.id < b.id
+        AND a.invite_id = b.invite_id
+        AND a.group_id = b.group_id
+    SQL
 
     add_index :invited_groups, [:group_id, :invite_id], unique: true
   end
