@@ -5,38 +5,38 @@ class AddHighPriorityColumnToNotifications < ActiveRecord::Migration[6.0]
     if !column_exists?(:notifications, :high_priority)
       add_column :notifications, :high_priority, :boolean, default: nil
     end
-    # TODO FIX
-    # type 6 = private message, 24 = bookmark reminder
-    # priority 0 = low, 1 = normal, 2 = high
-    # if column_exists?(:notifications, :high_priority)
-    #   execute <<~SQL
-    #     UPDATE notifications SET high_priority = TRUE WHERE notification_type IN (6, 24);
-    #   SQL
 
-    #   execute <<~SQL
-    #     UPDATE notifications SET high_priority = FALSE WHERE notification_type NOT IN (6, 24);
-    #   SQL
+    type 6 = private message, 24 = bookmark reminder
+    priority 0 = low, 1 = normal, 2 = high
+    if column_exists?(:notifications, :high_priority)
+      execute <<~SQL
+        UPDATE notifications SET `high_priority` = TRUE WHERE notification_type IN (6, 24);
+      SQL
 
-    #   execute <<~SQL
-    #     ALTER TABLE notifications ALTER COLUMN high_priority SET DEFAULT FALSE;
-    #   SQL
+      execute <<~SQL
+        UPDATE notifications SET `high_priority` = FALSE WHERE notification_type NOT IN (6, 24);
+      SQL
 
-    #   execute <<~SQL
-    #     UPDATE notifications SET high_priority = FALSE WHERE high_priority IS NULL;
-    #   SQL
+      execute <<~SQL
+        ALTER TABLE notifications modify COLUMN `high_priority` tinyint(1)  DEFAULT FALSE;
+      SQL
 
-    #   execute <<~SQL
-    #     ALTER TABLE notifications ALTER COLUMN high_priority SET NOT NULL;
-    #   SQL
-    # end
+      execute <<~SQL
+        UPDATE notifications SET `high_priority` = FALSE WHERE `high_priority` IS NULL;
+      SQL
 
-    # execute <<~SQL
-    #   CREATE INDEX CONCURRENTLY IF NOT EXISTS index_notifications_read_or_not_high_priority ON notifications(user_id, id DESC, read, topic_id) WHERE (read OR (high_priority = FALSE));
-    # SQL
+      execute <<~SQL
+        ALTER TABLE `notifications` modify COLUMN `high_priority` tinyint(1) NOT NULL DEFAULT FALSE;
+      SQL
+    end
 
-    # execute <<~SQL
-    #   CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS index_notifications_unique_unread_high_priority ON notifications(user_id, id) WHERE NOT read AND high_priority = TRUE;
-    # SQL
+    execute <<~SQL
+      CREATE INDEX IF NOT EXISTS index_notifications_read_or_not_high_priority ON notifications(user_id, id DESC, `read`, topic_id);
+    SQL
+
+    execute <<~SQL
+      CREATE INDEX IF NOT EXISTS index_notifications_unique_unread_high_priority ON notifications(user_id, id);
+    SQL
   end
 
   def down
