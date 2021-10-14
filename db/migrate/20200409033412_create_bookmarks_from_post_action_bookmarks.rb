@@ -2,8 +2,6 @@
 
 class CreateBookmarksFromPostActionBookmarks < ActiveRecord::Migration[6.0]
   def up
-    # TODO FIX
-    return
     SiteSetting.enable_bookmarks_with_reminders = true
 
     bookmarks_to_create = []
