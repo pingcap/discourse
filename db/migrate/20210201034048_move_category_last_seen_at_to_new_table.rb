@@ -2,7 +2,6 @@
 
 class MoveCategoryLastSeenAtToNewTable < ActiveRecord::Migration[6.0]
   def up
-    return # TODO FIX
     sql = <<~SQL
       INSERT INTO dismissed_topic_users (user_id, topic_id, created_at)
       SELECT users.id, topics.id, category_users.last_seen_at
@@ -16,7 +15,7 @@ class MoveCategoryLastSeenAtToNewTable < ActiveRecord::Migration[6.0]
       AND topics.created_at >= GREATEST(CASE
                   WHEN COALESCE(user_options.new_topic_duration_minutes, :default_duration) = :always THEN users.created_at
                   WHEN COALESCE(user_options.new_topic_duration_minutes, :default_duration) = :last_visit THEN COALESCE(users.previous_visit_at,users.created_at)
-                  ELSE (:now::timestamp - INTERVAL '1 MINUTE' * COALESCE(user_options.new_topic_duration_minutes, :default_duration))
+                  ELSE (:now - INTERVAL 1 * (COALESCE(user_options.new_topic_duration_minutes, :default_duration)) MINUTE )
                END, user_stats.new_since, :min_date)
       AND topics.created_at <= category_users.last_seen_at
       ORDER BY topics.created_at DESC
