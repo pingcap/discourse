@@ -2,11 +2,9 @@
 
 class DeleteOrphanPostActions < ActiveRecord::Migration[6.0]
   def up
-    return
-    # TODO FIX
     sql = <<~SQL
-      DELETE FROM post_actions
-      USING post_actions pa
+      DELETE post_actions FROM post_actions
+      INNER JOIN post_actions pa ON post_actions.id = pa.id
       LEFT JOIN posts ON posts.id = pa.post_id
       WHERE posts.id IS NULL
       AND post_actions.id = pa.id
