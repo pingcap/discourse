@@ -12,22 +12,28 @@ class AddUserApiKeyScopes < ActiveRecord::Migration[6.0]
 
     reversible do |dir|
       dir.up do
-        # TODO FIX
-        # execute <<~SQL
-        #   INSERT INTO user_api_key_scopes
-        #   (
-        #     user_api_key_id,
-        #     name,
-        #     created_at,
-        #     updated_at
-        #   )
-        #   SELECT
-        #     user_api_keys.id,
-        #     unnest(user_api_keys.scopes),
-        #     created_at,
-        #     updated_at
-        #   FROM user_api_keys
-        # SQL
+        execute <<~SQL
+          INSERT INTO user_api_key_scopes
+          (
+            user_api_key_id,
+            name,
+            created_at,
+            updated_at
+          )
+          SELECT 
+            t.id,  
+            json_unquote(json_extract(t.scopes, concat('$[', n.i, ']'))) scope,
+            t.created_at,
+            t.updated_at
+          FROM user_api_keys t 
+               INNER JOIN (
+                 SELECT 0 i 
+                 union all 
+                 SELECT 1 
+                 union all 
+                 SELECT 2
+                ) n on n.i < json_length(t.scopes);
+        SQL
 
         change_column_null :user_api_keys, :scopes, true
         change_column_default :user_api_keys, :scopes, nil
