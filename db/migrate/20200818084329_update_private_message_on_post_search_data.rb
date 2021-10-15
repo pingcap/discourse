@@ -6,9 +6,7 @@ class UpdatePrivateMessageOnPostSearchData < ActiveRecord::Migration[6.0]
 
     sql = <<~SQL
       UPDATE post_search_data
-      SET private_message = X.private_message
-      FROM
-      (
+      JOIN (
         SELECT post_id,
           CASE WHEN t.archetype = 'private_message' THEN TRUE ELSE FALSE END private_message
         FROM posts p
@@ -17,12 +15,13 @@ class UpdatePrivateMessageOnPostSearchData < ActiveRecord::Migration[6.0]
         WHERE pd.private_message IS NULL OR
           pd.private_message <> CASE WHEN t.archetype = 'private_message' THEN TRUE ELSE FALSE END
         LIMIT 3000000
-      ) X
+      ) X ON X.post_id = post_search_data.post_id
+      SET post_search_data.private_message = X.private_message
       WHERE X.post_id = post_search_data.post_id
     SQL
 
     while true
-      count = execute(sql).cmd_tuples
+      count = DB.exec(sql)
       if count == 0
         break
       else
@@ -54,11 +53,10 @@ class UpdatePrivateMessageOnPostSearchData < ActiveRecord::Migration[6.0]
     )
     SQL
 
-    #update_private_message_flag
+    update_private_message_flag
 
     ActiveRecord::Base.transaction do
-      # TODO FIX
-      # update_private_message_flag
+      update_private_message_flag
       change_column_null(:post_search_data, :private_message, false)
     end
   end
