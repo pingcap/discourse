@@ -2,7 +2,6 @@
 
 class DeleteOrphanPostRevisions < ActiveRecord::Migration[6.0]
   def up
-    return # TODO FIX
     sql = <<~SQL
         DELETE post_revisions FROM post_revisions
         INNER JOIN post_revisions pr ON pr.id = post_revisions.id
