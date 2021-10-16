@@ -27,7 +27,7 @@ class AddHashedApiKey < ActiveRecord::Migration[6.0]
       end
 
       selects = batch.map do |row|
-        "SELECT #{row.id} AS id, '#{Digest::SHA256.hexdigest row.key}' AS `key`"
+        "SELECT #{row.id} AS id, '#{Digest::SHA256.hexdigest row.key}' AS key_hash"
       end.join(" UNION ")
 
       if to_update.size > 0
