@@ -19,7 +19,7 @@ class AddMoreFlairColumnsToGroup < ActiveRecord::Migration[6.0]
             UPDATE `groups` g1
             JOIN `groups` g2 ON g1.id = g2.id
             INNER JOIN uploads u ON g2.flair_url regexp CONCAT('\\/', u.sha1, '[\\.\\w]*')
-            SET flair_upload_id = u.id
+            SET g1.flair_upload_id = u.id
           SQL
         )
 

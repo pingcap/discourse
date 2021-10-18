@@ -23,8 +23,8 @@ class MovePostNoticesToJson < ActiveRecord::Migration[6.0]
 
     add_index :post_custom_fields, :post_id, name: "index_post_custom_fields_on_notice"
 
-    remove_index :post_custom_fields, name: "index_post_custom_fields_on_notice_type"
-    remove_index :post_custom_fields, name: "index_post_custom_fields_on_notice_args"
+    remove_index :post_custom_fields, name: "index_post_custom_fields_on_notice_type", if_exists: true
+    remove_index :post_custom_fields, name: "index_post_custom_fields_on_notice_args", if_exists: true
   end
 
   def down
