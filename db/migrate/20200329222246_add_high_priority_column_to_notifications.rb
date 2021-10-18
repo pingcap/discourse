@@ -6,8 +6,8 @@ class AddHighPriorityColumnToNotifications < ActiveRecord::Migration[6.0]
       add_column :notifications, :high_priority, :boolean, default: nil
     end
 
-    type 6 = private message, 24 = bookmark reminder
-    priority 0 = low, 1 = normal, 2 = high
+    # type 6 = private message, 24 = bookmark reminder
+    # priority 0 = low, 1 = normal, 2 = high
     if column_exists?(:notifications, :high_priority)
       execute <<~SQL
         UPDATE notifications SET `high_priority` = TRUE WHERE notification_type IN (6, 24);
