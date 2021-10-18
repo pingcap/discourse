@@ -14,7 +14,7 @@ class AddHashedApiKey < ActiveRecord::Migration[6.0]
     batch_size = 500
     begin
       batch = DB.query <<-SQL
-        SELECT id, key
+        SELECT id, `key`
         FROM api_keys
         WHERE key_hash IS NULL
         LIMIT #{batch_size}
