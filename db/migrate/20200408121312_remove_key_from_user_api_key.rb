@@ -6,6 +6,7 @@ class RemoveKeyFromUserApiKey < ActiveRecord::Migration[6.0]
   }
 
   def up
+    remove_index :user_api_keys, :key
     DROPPED_COLUMNS.each do |table, columns|
       columns.each do |column|
         remove_column table, column
