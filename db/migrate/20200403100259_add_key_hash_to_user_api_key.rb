@@ -18,7 +18,7 @@ class AddKeyHashToUserApiKey < ActiveRecord::Migration[6.0]
       execute <<~SQL
         UPDATE user_api_keys
         JOIN (#{selects}) AS data ON user_api_keys.id = data.id
-        SET key_hash = data.key_hash
+        SET user_api_keys.key_hash = data.key_hash
         WHERE user_api_keys.id = data.id
       SQL
 
