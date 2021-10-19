@@ -9,6 +9,8 @@ class MigrateGithubUserInfos < ActiveRecord::Migration[6.0]
 
     execute <<~SQL
       INSERT INTO user_associated_accounts (
+        extra,
+        credentials,
         provider_name,
         provider_uid,
         user_id,
@@ -18,6 +20,8 @@ class MigrateGithubUserInfos < ActiveRecord::Migration[6.0]
         updated_at
         #{", id" if maintain_ids}
       ) SELECT
+        '{}',
+        '{}',
         'github',
         github_user_id,
         user_id,

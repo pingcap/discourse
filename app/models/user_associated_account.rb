@@ -2,7 +2,10 @@
 
 class UserAssociatedAccount < ActiveRecord::Base
   belongs_to :user
-
+  default_value_for :info, {}
+  default_value_for :extra, {}
+  default_value_for :credentials, {} 
+  
   def self.cleanup!
     # This happens when a user starts the registration flow, but doesn't complete it
     # Keeping the rows doesn't cause any technical issue, but we shouldn't store PII unless it's attached to a user
