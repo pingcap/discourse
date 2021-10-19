@@ -23,7 +23,7 @@ module Jobs
         WHERE topics.created_at < GREATEST(CASE
                     WHEN COALESCE(user_options.new_topic_duration_minutes, :default_duration) = :always THEN users.created_at
                     WHEN COALESCE(user_options.new_topic_duration_minutes, :default_duration) = :last_visit THEN COALESCE(users.previous_visit_at,users.created_at)
-                    ELSE (:now::timestamp - INTERVAL '1 MINUTE' * COALESCE(user_options.new_topic_duration_minutes, :default_duration))
+                    ELSE (:now - INTERVAL 1 * COALESCE(user_options.new_topic_duration_minutes, :default_duration) MINUTE)
                  END, users.created_at, :min_date)
         AND dtu1.id = dtu2.id
       SQL
