@@ -20,6 +20,7 @@ class MoveNewSinceToNewTableAgain < ActiveRecord::Migration[6.0]
 
       # will return nil
       break if !min_id
+      topic_ids = DB.query_single("SELECT id FROM topics ORDER BY created_at DESC LIMIT #{SiteSetting.max_new_topics}")
 
       sql = <<~SQL
         INSERT IGNORE INTO dismissed_topic_users (user_id, topic_id, created_at)
@@ -32,9 +33,9 @@ class MoveNewSinceToNewTableAgain < ActiveRecord::Migration[6.0]
           AND topics.created_at >= GREATEST(CASE
                       WHEN COALESCE(user_options.new_topic_duration_minutes, :default_duration) = :always THEN users.created_at
                       WHEN COALESCE(user_options.new_topic_duration_minutes, :default_duration) = :last_visit THEN COALESCE(users.previous_visit_at,users.created_at)
-                      ELSE (:now::timestamp - INTERVAL '1 MINUTE' * COALESCE(user_options.new_topic_duration_minutes, :default_duration))
+                      ELSE (:now - INTERVAL 1 * COALESCE(user_options.new_topic_duration_minutes, :default_duration)  MINUTE)
                    END, :min_date)
-          AND topics.id IN(SELECT id FROM topics ORDER BY created_at DESC LIMIT :max_new_topics)
+          AND topics.id IN(#{topic_ids.join(",").presence || "NULL"})
         LEFT JOIN topic_users ON topics.id = topic_users.topic_id AND users.id = topic_users.user_id
         LEFT JOIN dismissed_topic_users ON dismissed_topic_users.topic_id = topics.id AND users.id = dismissed_topic_users.user_id
         WHERE user_stats.new_since IS NOT NULL
