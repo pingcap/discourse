@@ -68,7 +68,7 @@ class Upload < ActiveRecord::Base
     scope = self
       .joins(<<~SQL)
         LEFT JOIN site_settings ss
-        ON NULLIF(ss.value, '')::integer = uploads.id
+        ON cast(NULLIF(ss.value, '') as unsigned) = uploads.id
         AND ss.data_type = #{SiteSettings::TypeSupervisor.types[:upload].to_i}
       SQL
       .where("ss.value IS NULL")
