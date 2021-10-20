@@ -45,9 +45,9 @@ module Reports::UserFlaggingRatio
 
       statuses = ReviewableScore.statuses
 
-      agreed = "SUM(CASE WHEN rs.status = #{statuses[:agreed]} THEN 1 ELSE 0 END)::numeric"
-      disagreed = "SUM(CASE WHEN rs.status = #{statuses[:disagreed]} THEN 1 ELSE 0 END)::numeric"
-      ignored = "SUM(CASE WHEN rs.status = #{statuses[:ignored]} THEN 1 ELSE 0 END)::numeric"
+      agreed = "SUM(CASE WHEN rs.status = #{statuses[:agreed]} THEN 1 ELSE 0 END)"
+      disagreed = "SUM(CASE WHEN rs.status = #{statuses[:disagreed]} THEN 1 ELSE 0 END)"
+      ignored = "SUM(CASE WHEN rs.status = #{statuses[:ignored]} THEN 1 ELSE 0 END)"
 
       sql = <<~SQL
         SELECT u.id,
