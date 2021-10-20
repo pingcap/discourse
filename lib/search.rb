@@ -838,7 +838,7 @@ class Search
 
     users_custom_data_query = DB.query(<<~SQL, user_ids: users.pluck(:id), term: "%#{@original_term.downcase}%")
       SELECT user_custom_fields.user_id, user_fields.name, user_custom_fields.value FROM user_custom_fields
-      INNER JOIN user_fields ON user_fields.id = REPLACE(user_custom_fields.name, 'user_field_', '')::INTEGER AND user_fields.searchable IS TRUE
+      INNER JOIN user_fields ON user_fields.id = CAST(REPLACE(user_custom_fields.name, 'user_field_', '') AS UNSIGNED) AND user_fields.searchable IS TRUE
       WHERE user_id IN (:user_ids)
       AND user_custom_fields.name LIKE 'user_field_%'
       AND user_custom_fields.value LIKE :term
