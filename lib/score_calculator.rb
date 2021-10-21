@@ -34,13 +34,13 @@ class ScoreCalculator
 
     builder = DB.build <<SQL
        UPDATE posts p
-        SET score = x.score
-       FROM (
+       JOIN  (
         SELECT posts.id, #{components} as score FROM posts
         join topics on posts.topic_id = topics.id
         /*where*/
         limit #{limit}
-       ) AS x
+       ) AS x ON x.id = p.id
+        SET p.score = x.score
        WHERE x.id = p.id
 SQL
 
@@ -57,8 +57,7 @@ SQL
 
     builder = DB.build <<~SQL
       UPDATE posts
-      SET percent_rank = X.percent_rank
-      FROM (
+      JOIN (
         SELECT posts.id, Y.percent_rank
         FROM posts
         JOIN (
@@ -69,7 +68,8 @@ SQL
          JOIN topics ON posts.topic_id = topics.id
         /*where*/
         LIMIT #{limit}
-      ) AS X
+      ) AS X ON X.id = posts.id
+      SET posts.percent_rank = X.percent_rank
       WHERE posts.id = X.id
     SQL
 
@@ -85,15 +85,16 @@ SQL
   def update_topics_rank(opts)
     builder = DB.build <<~SQL
       UPDATE topics AS topics
-      SET has_summary = (topics.like_count >= :likes_required AND
-                         topics.posts_count >= :posts_required AND
-                         x.max_score >= :score_required),
-          score = x.avg_score
-      FROM (SELECT p.topic_id,
+      JOIN (SELECT p.topic_id,
                    MAX(p.score) AS max_score,
                    AVG(p.score) AS avg_score
             FROM posts AS p
             GROUP BY p.topic_id) AS x
+
+      SET has_summary = (topics.like_count >= :likes_required AND
+                         topics.posts_count >= :posts_required AND
+                         x.max_score >= :score_required),
+          score = x.avg_score
             /*where*/
     SQL
 
