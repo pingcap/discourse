@@ -58,22 +58,22 @@ SQL
     builder = DB.build <<~SQL
       UPDATE posts
       JOIN (
-        SELECT posts.id, Y.percent_rank
+        SELECT posts.id, Y.`percent_rank`
         FROM posts
         JOIN (
           SELECT id, percent_rank()
-                       OVER (PARTITION BY topic_id ORDER BY SCORE DESC) as percent_rank
+                       OVER (PARTITION BY topic_id ORDER BY SCORE DESC) as `percent_rank`
           FROM posts
          ) Y ON Y.id = posts.id
          JOIN topics ON posts.topic_id = topics.id
         /*where*/
         LIMIT #{limit}
       ) AS X ON X.id = posts.id
-      SET posts.percent_rank = X.percent_rank
+      SET posts.`percent_rank` = X.`percent_rank`
       WHERE posts.id = X.id
     SQL
 
-    builder.where("posts.percent_rank IS NULL OR Y.percent_rank <> posts.percent_rank")
+    builder.where("posts.`percent_rank` IS NULL OR Y.`percent_rank` <> posts.`percent_rank`")
 
     filter_topics(builder, opts)
 

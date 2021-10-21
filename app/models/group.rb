@@ -155,20 +155,20 @@ class Group < ActiveRecord::Base
         sql = <<~SQL
           groups.id IN (
             SELECT id
-              FROM groups
+              FROM `groups`
             WHERE visibility_level IN (:public, :logged_on_users)
 
             UNION ALL
 
             SELECT g.id
-              FROM groups g
+              FROM `groups` g
               JOIN group_users gu ON gu.group_id = g.id AND gu.user_id = :user_id
             WHERE g.visibility_level = :members
 
             UNION ALL
 
             SELECT g.id
-              FROM groups g
+              FROM `groups` g
               JOIN group_users gu ON gu.group_id = g.id AND gu.user_id = :user_id AND gu.owner
             WHERE g.visibility_level IN (:staff, :owners)
           )
