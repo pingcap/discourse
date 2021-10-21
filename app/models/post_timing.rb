@@ -166,7 +166,7 @@ class PostTiming < ActiveRecord::Base
       sql = <<~SQL
       UPDATE post_timings t
       INNER JOIN (#{join_table.join(" UNION ALL ")}) x
-      SET msecs = LEAST(t.msecs + x.msecs, 2^31 - 1)
+      SET t.msecs = LEAST(t.msecs + x.msecs, 2^31 - 1)
       WHERE x.topic_id = t.topic_id AND
             x.post_number = t.post_number AND
             x.user_id = t.user_id
