@@ -714,7 +714,7 @@ class TopicView
         SELECT posts.sort_order
         FROM posts
         WHERE posts.topic_id = #{@topic.id.to_i}
-        ORDER BY @(post_number - #{post_number.to_i})
+        ORDER BY abs(post_number - #{post_number.to_i})
         LIMIT 1
       SQL
 
