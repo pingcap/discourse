@@ -262,7 +262,7 @@ class TopicUser < ActiveRecord::Base
     UPDATE_TOPIC_USER_SQL = <<~SQL
       UPDATE topic_users
       SET
-        last_read_post_number = GREATEST(:post_number, tu.last_read_post_number),
+        last_read_post_number = GREATEST(:post_number, COALESCE(tu.last_read_post_number, 0)),
         total_msecs_viewed = LEAST(tu.total_msecs_viewed + :msecs,86400000),
         notification_level =
            case when tu.notifications_reason_id is null and (tu.total_msecs_viewed + :msecs) >
@@ -282,11 +282,6 @@ class TopicUser < ActiveRecord::Base
          tu.user_id = topic_users.user_id AND
          tu.topic_id = :topic_id AND
          tu.user_id = :user_id
-    RETURNING
-      topic_users.notification_level,
-      tu.notification_level old_level,
-      tu.last_read_post_number,
-      t.archetype
     SQL
 
     INSERT_TOPIC_USER_SQL = "INSERT INTO topic_users (user_id, topic_id, last_read_post_number, last_visited_at, first_visited_at, notification_level)
@@ -302,6 +297,8 @@ class TopicUser < ActiveRecord::Base
       return if post_number.blank?
       msecs = 0 if msecs.to_i < 0
 
+      old_tu = TopicUser.where(user_id: user.id, topic_id: topic_id).first
+
       args = {
         user_id: user.id,
         topic_id: topic_id,
@@ -312,12 +309,13 @@ class TopicUser < ActiveRecord::Base
         threshold: SiteSetting.default_other_auto_track_topics_after_msecs
       }
 
-      rows = DB.query(UPDATE_TOPIC_USER_SQL, args)
+      DB.exec(UPDATE_TOPIC_USER_SQL, args)
+      rows = DB.query("SELECT notification_level FROM topic_users WhERE user_id = :user_id AND topic_id = :topic_id", args)
 
       if rows.length == 1
-        before = rows[0].old_level.to_i
+        before = old_tu.notification_level.to_i
         after = rows[0].notification_level.to_i
-        before_last_read = rows[0].last_read_post_number.to_i
+        before_last_read = old_tu.last_read_post_number.to_i
         archetype = rows[0].archetype
 
         if before_last_read < post_number
@@ -362,7 +360,8 @@ class TopicUser < ActiveRecord::Base
 
         begin
           DB.exec(INSERT_TOPIC_USER_SQL, args)
-        rescue PG::UniqueViolation
+        rescue Mysql2::Error => e
+          Rails.logger.warn $!
           # if record is inserted between two statements this can happen
           # we retry once to avoid failing the req
           if opts[:retry]
@@ -494,7 +493,7 @@ SQL
     builder = DB.build <<~SQL
       UPDATE topic_users t
         SET
-          last_read_post_number = LEAST(GREATEST(last_read, last_read_post_number), max_post_number)
+          last_read_post_number = LEAST(GREATEST(last_read, COALESCE(last_read_post_number, 0)), max_post_number)
       FROM (
         SELECT topic_id, user_id, MAX(post_number) last_read
         FROM post_timings
@@ -511,7 +510,7 @@ SQL
       X.topic_id = t.topic_id AND
       X.user_id = t.user_id AND
       (
-        last_read_post_number <> LEAST(GREATEST(last_read, last_read_post_number), max_post_number)
+        last_read_post_number <> LEAST(GREATEST(last_read, COALESCE(last_read_post_number, 0)), max_post_number)
       )
     SQL
 
