@@ -261,6 +261,10 @@ class TopicUser < ActiveRecord::Base
     # This would be a lot easier if psql supported some kind of upsert
     UPDATE_TOPIC_USER_SQL = <<~SQL
       UPDATE topic_users
+      JOIN topic_users tu
+      join topics t on t.id = tu.topic_id
+      join users u on u.id = :user_id
+      join user_options uo on uo.user_id = :user_id
       SET
         last_read_post_number = GREATEST(:post_number, COALESCE(tu.last_read_post_number, 0)),
         total_msecs_viewed = LEAST(tu.total_msecs_viewed + :msecs,86400000),
@@ -273,10 +277,6 @@ class TopicUser < ActiveRecord::Base
            else
               tu.notification_level
            end
-    FROM topic_users tu
-    join topics t on t.id = tu.topic_id
-    join users u on u.id = :user_id
-    join user_options uo on uo.user_id = :user_id
     WHERE
          tu.topic_id = topic_users.topic_id AND
          tu.user_id = topic_users.user_id AND
