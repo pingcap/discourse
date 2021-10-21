@@ -347,7 +347,7 @@ class TopicTrackingState
           #{sql}
         )
         SELECT *, (
-          SELECT ARRAY_AGG(name) from topic_tags
+          SELECT JSON_ARRAYAGG(name) from topic_tags
              JOIN tags on tags.id = topic_tags.tag_id
              WHERE topic_id = tags_included_cte.topic_id
           ) tags
@@ -444,7 +444,7 @@ class TopicTrackingState
     tags_filter = ""
 
     if muted_tag_ids.present? && ['always', 'only_muted'].include?(SiteSetting.remove_muted_tags_from_latest)
-      existing_tags_sql = "(select array_agg(tag_id) from topic_tags where topic_tags.topic_id = topics.id)"
+      existing_tags_sql = "(select json_arrayagg(tag_id) from topic_tags where topic_tags.topic_id = topics.id)"
       muted_tags_array_sql = "ARRAY[#{muted_tag_ids.join(',')}]"
 
       if SiteSetting.remove_muted_tags_from_latest == 'always'
@@ -529,7 +529,7 @@ class TopicTrackingState
     topic.allowed_groups
       .joins(:group_users)
       .where(publish_read_state: true)
-      .select('ARRAY_AGG(group_users.user_id) AS members', :name, :id)
+      .select('JSON_ARRAYAGG(group_users.user_id) AS members', :name, :id)
       .group('`groups`.id')
   end
 
