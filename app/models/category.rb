@@ -409,7 +409,7 @@ class Category < ActiveRecord::Base
 
     DB.query(<<~SQL, id: id, parent_id: parent_id, max_height: max_height)[0].max
       WITH RECURSIVE ancestors(parent_category_id, height) AS (
-        SELECT :parent_id :: integer, 0
+        SELECT  cast(:parent_id as unsigned), 0
 
         UNION ALL
 
@@ -424,7 +424,7 @@ class Category < ActiveRecord::Base
         AND ancestors.height < :max_height
       )
 
-      SELECT max(height) FROM ancestors
+      SELECT max(height) as max FROM ancestors
     SQL
   end
 
@@ -437,7 +437,7 @@ class Category < ActiveRecord::Base
 
     DB.query(<<~SQL, id: id, parent_id: parent_id, max_depth: max_depth)[0].max
       WITH RECURSIVE descendants(id, depth) AS (
-        SELECT :id :: integer, 0
+        SELECT cast(:id as unsigned), 0
 
         UNION ALL
 
@@ -452,7 +452,7 @@ class Category < ActiveRecord::Base
         AND descendants.depth < :max_depth
       )
 
-      SELECT max(depth) FROM descendants
+      SELECT max(depth) as max FROM descendants
     SQL
   end
 
