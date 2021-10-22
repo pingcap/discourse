@@ -245,9 +245,11 @@ module DiscourseTagging
     outer_join = category.nil? || category.allow_global_tags || !category_has_restricted_tags
 
     distinct_clause = if opts[:order_popularity]
-      "DISTINCT ON (topic_count, name)"
+      ""
+      # "DISTINCT ON (topic_count, name)"
     elsif opts[:order_search_results] && opts[:term].present?
-      "DISTINCT ON (lower(name) = lower(:cleaned_term), topic_count, name)"
+      ""
+      # "DISTINCT ON (lower(name) = lower(:cleaned_term), topic_count, name)"
     else
       ""
     end
