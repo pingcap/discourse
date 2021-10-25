@@ -13,8 +13,8 @@ module Jobs
 
     def delete_overdue_dismissals!
       sql = <<~SQL
-        DELETE FROM dismissed_topic_users dtu1
-        USING dismissed_topic_users dtu2
+        DELETE dtu1 FROM dismissed_topic_users dtu1
+        JOIN dismissed_topic_users dtu2 ON dtu2.id = dtu1.id
         JOIN topics ON topics.id = dtu2.topic_id
         JOIN users ON users.id = dtu2.user_id
         JOIN categories ON categories.id = topics.category_id

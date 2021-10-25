@@ -53,9 +53,9 @@ class DirectoryItem < ActiveRecord::Base
 
     ActiveRecord::Base.transaction do
       # Delete records that belonged to users who have been deleted
-      DB.exec("DELETE FROM directory_items
+      DB.exec("DELETE directory_items FROM directory_items
                 JOIN directory_items di ON directory_items.id = di.id
-                LEFT JOIN users u ON (u.id = user_id AND u.active AND u.silenced_till IS NULL AND u.id > 0)
+                LEFT JOIN users u ON (u.id = directory_items.user_id AND u.active AND u.silenced_till IS NULL AND u.id > 0)
                 WHERE di.id = directory_items.id AND
                       u.id IS NULL AND
                       di.period_type = :period_type", period_type: period_types[period_type])
