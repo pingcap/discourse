@@ -10,7 +10,7 @@ module Jobs
       # always remove invalid upload records
       Upload
         .by_users
-        .where("retain_hours IS NULL OR created_at < current_timestamp - interval '1 hour' * retain_hours")
+        .where("retain_hours IS NULL OR created_at < current_timestamp - interval 1 * retain_hours hour")
         .where("created_at < ?", grace_period.hour.ago)
         .where(url: "")
         .find_each(&:destroy!)
@@ -26,7 +26,7 @@ module Jobs
       s3_cdn_hostname = URI.parse(SiteSetting.Upload.s3_cdn_url || "").hostname
 
       result = Upload.by_users
-        .where("uploads.retain_hours IS NULL OR uploads.created_at < current_timestamp - interval '1 hour' * uploads.retain_hours")
+        .where("uploads.retain_hours IS NULL OR uploads.created_at < current_timestamp - interval 1 * uploads.retain_hours hour")
         .where("uploads.created_at < ?", grace_period.hour.ago)
         .where("uploads.access_control_post_id IS NULL")
         .joins("LEFT JOIN post_uploads pu ON pu.upload_id = uploads.id")
