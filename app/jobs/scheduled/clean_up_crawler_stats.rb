@@ -11,7 +11,7 @@ module Jobs
       # keep count of only the top user agents
       DB.exec <<~SQL
         WITH ranked_requests AS (
-          SELECT row_number() OVER (ORDER BY count DESC) as row_number, id
+          SELECT row_number() OVER (ORDER BY count DESC) as `row_number`, id
             FROM web_crawler_requests
            WHERE date = '#{1.day.ago.strftime("%Y-%m-%d")}'
         )
@@ -19,7 +19,7 @@ module Jobs
         WHERE id IN (
           SELECT ranked_requests.id
             FROM ranked_requests
-           WHERE row_number > #{WebCrawlerRequest.max_records_per_day}
+           WHERE `row_number` > #{WebCrawlerRequest.max_records_per_day}
         )
       SQL
     end
