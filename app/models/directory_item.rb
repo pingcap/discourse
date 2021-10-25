@@ -113,13 +113,13 @@ class DirectoryItem < ActiveRecord::Base
       UPDATE directory_items di 
       JOIN x ON x.user_id = di.user_id
       SET
-               likes_received = x.likes_received,
-               likes_given = x.likes_given,
-               topics_entered = x.topics_entered,
-               days_visited = x.days_visited,
-               posts_read = x.posts_read,
-               topic_count = x.topic_count,
-               post_count = x.post_count
+               di.likes_received = x.likes_received,
+               di.likes_given = x.likes_given,
+               di.topics_entered = x.topics_entered,
+               di.days_visited = x.days_visited,
+               di.posts_read = x.posts_read,
+               di.topic_count = x.topic_count,
+               di.post_count = x.post_count
       
       WHERE
         x.user_id = di.user_id AND
