@@ -183,14 +183,14 @@ class UserStat < ActiveRecord::Base
     badge_ids = DB.query_single("SELECT id FROM badges WHERE enabled").join(",")
     sql = <<~SQL
       UPDATE user_stats
-      SET distinct_badge_count = x.distinct_badge_count
-      FROM (
+      JOIN (
         SELECT users.id user_id, COUNT(distinct user_badges.badge_id) distinct_badge_count
         FROM users
         LEFT JOIN user_badges ON user_badges.user_id = users.id
                               AND (user_badges.badge_id IN (#{badge_ids.presence || 'null'}))
         GROUP BY users.id
-      ) x
+      ) x ON x.user_id = user_stats.user_id
+      SET user_stats.distinct_badge_count = x.distinct_badge_count
       WHERE user_stats.user_id = x.user_id AND user_stats.distinct_badge_count <> x.distinct_badge_count
     SQL
 
