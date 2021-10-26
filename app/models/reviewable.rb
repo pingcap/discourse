@@ -723,11 +723,16 @@ private
     user_ids -= [post&.user_id]
     return if user_ids.blank?
 
-    result = DB.query(<<~SQL, user_ids: user_ids)
+    DB.exec(<<~SQL, user_ids: user_ids)
       UPDATE user_stats
       SET flags_#{status} = flags_#{status} + 1
       WHERE user_id IN (:user_ids)
-      RETURNING user_id, flags_agreed + flags_disagreed + flags_ignored AS total
+    SQL
+
+    result = DB.query(<<~SQL, user_ids: user_ids)
+     SELECT user_id, flags_agreed + flags_disagreed + flags_ignored AS total
+       FROM user_stats
+      WHERE user_id IN (:user_ids)
     SQL
 
     user_ids = result.select { |r| r.total > Jobs::TruncateUserFlagStats.truncate_to }.map(&:user_id)
