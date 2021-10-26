@@ -224,14 +224,14 @@ class Category < ActiveRecord::Base
 
     DB.exec <<~SQL
       UPDATE categories c
-         SET topic_count = COALESCE(x.topic_count, 0),
-             post_count = COALESCE(x.post_count, 0)
-        FROM (
+        JOIN (
               SELECT ccc.id as category_id, stats.topic_count, stats.post_count
               FROM categories ccc
               LEFT JOIN (#{topics_with_post_count}) stats
               ON stats.category_id = ccc.id
-             ) x
+             ) x ON x.category_id = c.id
+         SET c.topic_count = COALESCE(x.topic_count, 0),
+             c.post_count = COALESCE(x.post_count, 0)
        WHERE x.category_id = c.id
          AND (c.topic_count <> COALESCE(x.topic_count, 0) OR c.post_count <> COALESCE(x.post_count, 0))
     SQL
