@@ -34,7 +34,7 @@ class Admin::EmailController < Admin::AdminController
           email_logs.where("post_reply_keys.reply_key = ?", reply_key)
         else
           email_logs.where(
-            "replace(post_reply_keys.reply_key::VARCHAR, '-', '') LIKE ?",
+            "replace(cast(post_reply_keys.reply_key as char), '-', '') LIKE ?",
             "%#{reply_key}%"
           )
         end
@@ -54,7 +54,7 @@ class Admin::EmailController < Admin::AdminController
           "(post_id,user_id) IN (#{(['(?)'] * tuples.size).join(', ')})",
           *tuples
         )
-        .pluck(:post_id, :user_id, "reply_key::text")
+        .pluck(:post_id, :user_id, "cast(reply_key as char)")
         .each do |post_id, user_id, key|
           reply_keys[[post_id, user_id]] = key
         end
