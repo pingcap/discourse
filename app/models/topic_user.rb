@@ -310,7 +310,7 @@ class TopicUser < ActiveRecord::Base
       }
 
       DB.exec(UPDATE_TOPIC_USER_SQL, args)
-      rows = DB.query("SELECT notification_level FROM topic_users WhERE user_id = :user_id AND topic_id = :topic_id", args)
+      rows = DB.query("SELECT notification_level, topics.archetype FROM topic_users JOIN topics ON topics.id = topic_users.topic_id WHERE topic_users.user_id = :user_id AND topic_users.topic_id = :topic_id", args)
 
       if rows.length == 1
         before = old_tu.notification_level.to_i
