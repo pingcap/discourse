@@ -260,7 +260,7 @@ class UserAction < ActiveRecord::Base
 
     require_parameters(hash, *required_parameters)
 
-    transaction do
+    transaction(requires_new: true) do
       begin
         # TODO there are conditions when this is called and user_id was already rolled back and is invalid.
 
