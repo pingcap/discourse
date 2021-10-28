@@ -578,7 +578,8 @@ class Search
           posts.where <<~SQL
             posts.id IN (
               SELECT post_id FROM post_search_data pd1
-              WHERE pd1.search_data @@ #{Search.ts_query(term: "##{match}")})
+              WHERE #{Search.like_query(term: '#' + match, field: "pd1.search_data")}
+              )
           SQL
         end
       end
@@ -682,8 +683,8 @@ class Search
         FROM topic_tags tt, tags
         WHERE tt.tag_id = tags.id
         GROUP BY tt.topic_id
-        HAVING to_tsvector(#{default_ts_config}, array_to_string(array_agg(lower(tags.name)), ' ')) @@ to_tsquery(#{default_ts_config}, ?)
-      )", tags.join('&'))
+        HAVING #{Search.like_query(term: tags.join(' '), field: "group_concat(tags.name)", is_or: false) } 
+      )")
     else
       tags = match.split(",")
 
@@ -808,7 +809,7 @@ class Search
     secure_category_ids
 
     categories = Category.includes(:category_search_data)
-      .where("category_search_data.search_data @@ #{ts_query}")
+      .where(Search.like_query(term: term, field: "category_search_data.search_data"))
       .references(:category_search_data)
       .order("topics_month DESC")
       .secured(@guardian)
@@ -827,7 +828,7 @@ class Search
       .references(:user_search_data)
       .where(active: true)
       .where(staged: false)
-      .where("user_search_data.search_data @@ #{ts_query("simple")}")
+      .where(Search.like_query(term: term, field: "user_search_data.search_data"))
       .order("CASE WHEN username_lower = '#{@original_term.downcase}' THEN 0 ELSE 1 END")
       .order("last_posted_at DESC")
       .limit(limit)
@@ -870,7 +871,7 @@ class Search
     return unless SiteSetting.tagging_enabled
 
     tags = Tag.includes(:tag_search_data)
-      .where("tag_search_data.search_data @@ #{ts_query}")
+      .where(Search.like_query(term: term, field: "tag_search_data.search_data"))
       .references(:tag_search_data)
       .order("name asc")
       .limit(limit)
@@ -944,7 +945,7 @@ class Search
         # D is for cooked
         weights = @in_title ? 'A' : (SiteSetting.tagging_enabled ? 'ABCD' : 'ABD')
         posts = posts.where(post_number: 1) if @in_title
-        posts = posts.where("post_search_data.search_data @@ #{ts_query(weight_filter: weights)}")
+        posts = posts.where(Search.like_query(term: @term, field: "post_search_data.search_data"))
         exact_terms = @term.scan(Regexp.new(PHRASE_MATCH_REGEXP_PATTERN)).flatten
 
         exact_terms.each do |exact|
@@ -1020,56 +1021,6 @@ class Search
         posts = posts.order("posts.like_count DESC")
       end
     else
-      rank = <<~SQL
-      TS_RANK_CD(
-        post_search_data.search_data,
-        #{@term.blank? ? '' : ts_query(weight_filter: weights)},
-        #{SiteSetting.search_ranking_normalization}|32
-      )
-      SQL
-
-      category_search_priority = <<~SQL
-      (
-        CASE categories.search_priority
-        WHEN #{Searchable::PRIORITIES[:very_high]}
-        THEN 3
-        WHEN #{Searchable::PRIORITIES[:very_low]}
-        THEN 1
-        ELSE 2
-        END
-      )
-      SQL
-
-      category_priority_weights = <<~SQL
-      (
-        CASE categories.search_priority
-        WHEN #{Searchable::PRIORITIES[:low]}
-        THEN #{SiteSetting.category_search_priority_low_weight}
-        WHEN #{Searchable::PRIORITIES[:high]}
-        THEN #{SiteSetting.category_search_priority_high_weight}
-        ELSE
-          CASE WHEN topics.closed
-          THEN 0.9
-          ELSE 1
-          END
-        END
-      )
-      SQL
-
-      data_ranking =
-        if @term.blank?
-          "(#{category_priority_weights})"
-        else
-          "(#{rank} * #{category_priority_weights})"
-        end
-
-      posts =
-        if aggregate_search
-          posts.order("MAX(#{category_search_priority}) DESC", "MAX(#{data_ranking}) DESC")
-        else
-          posts.order("#{category_search_priority} DESC", "#{data_ranking} DESC")
-        end
-
       posts = posts.order("topics.bumped_at DESC")
     end
 
@@ -1111,11 +1062,12 @@ class Search
     )
   end
 
-  def self.like_query(term: , field:)
+  def self.like_query(term: , field:, is_or: true)
     tokens = term.to_s.split(/[^\p{han}a-zA-Z0-9]+/)
+    joiner = is_or ? " OR " : " AND "
     tokens.map do |token|
       "#{field} LIKE '#{EscapeLike.escape_like(token)}'"
-    end.join(' OR ')
+    end.join(joiner)
   end
 
   def self.to_tsquery(ts_config: nil, term:, joiner: nil)
@@ -1140,7 +1092,7 @@ class Search
   end
 
   def wrap_rows(query)
-    "SELECT *, row_number() over() row_number FROM (#{query.to_sql}) xxx"
+    "SELECT *, row_number() over() `row_number` FROM (#{query.to_sql}) xxx"
   end
 
   def aggregate_post_sql(opts)
@@ -1190,7 +1142,7 @@ class Search
 
     posts_scope(posts_eager_loads(Post))
       .joins("JOIN (#{post_sql}) x ON x.id = posts.topic_id AND x.post_number = posts.post_number")
-      .order('row_number')
+      .order('`row_number`')
   end
 
   def aggregate_search(opts = {})
