@@ -41,7 +41,7 @@ class UserSearch
       users = users
         .references(:categories)
         .includes(:secure_categories)
-        .where("users.admin OR categories.id = ?", @topic.category_id)
+        .where("users.`admin` OR categories.id = ?", @topic.category_id)
     end
 
     users
@@ -51,11 +51,10 @@ class UserSearch
     if @term.blank?
       scoped_users
     elsif SiteSetting.enable_names? && @term !~ /[_\.-]/
-      query = Search.ts_query(term: @term, ts_config: "simple")
 
       scoped_users
         .includes(:user_search_data)
-        .where("user_search_data.search_data @@ #{query}")
+        .where(Search.like_query(term: @term, field: "user_search_data.search_data"))
         .order(DB.sql_fragment("CASE WHEN username_lower LIKE ? THEN 0 ELSE 1 END ASC", @term_like))
     else
       scoped_users.where("username_lower LIKE :term_like", term_like: @term_like)
@@ -178,9 +177,10 @@ class UserSearch
   def search
     ids = search_ids
     return User.where("0=1") if ids.empty?
-
-    User.joins("JOIN (SELECT unnest uid, row_number() OVER () AS rn
-      FROM unnest('{#{ids.join(",")}}'::int[])
+    unions = ids.each_with_index.map do |id, idx|
+      "SELECT #{id} as uid, #{idx + 1} as rn"
+    end.join(" UNION ")
+    User.joins("JOIN (#{unions}
     ) x on uid = users.id")
       .order("rn")
   end

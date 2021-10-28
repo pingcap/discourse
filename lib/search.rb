@@ -1111,6 +1111,13 @@ class Search
     )
   end
 
+  def self.like_query(term: , field:)
+    tokens = term.to_s.split(/[^\p{han}a-zA-Z0-9]+/)
+    tokens.map do |token|
+      "#{field} LIKE '#{EscapeLike.escape_like(token)}'"
+    end.join(' OR ')
+  end
+
   def self.to_tsquery(ts_config: nil, term:, joiner: nil)
     ts_config = ActiveRecord::Base.connection.quote(ts_config) if ts_config
     tsquery = "TO_TSQUERY(#{ts_config || default_ts_config}, '#{self.escape_string(term)}')"
