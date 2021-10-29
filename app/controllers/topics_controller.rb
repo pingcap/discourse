@@ -262,14 +262,21 @@ class TopicsController < ApplicationController
     @posts = Post.where(hidden: false, deleted_at: nil, topic_id: @topic.id)
       .where('posts.id in (?)', post_ids)
       .joins("LEFT JOIN users u on u.id = posts.user_id")
-      .pluck(:id, :cooked, :username)
-      .map do |post_id, cooked, username|
-      {
-        post_id: post_id,
-        username: username,
-        excerpt: PrettyText.excerpt(cooked, 800, keep_emoji_images: true)
-      }
-    end
+      .pluck(:id, :cooked, :username, :action_code, :created_at)
+      .map do |post_id, cooked, username, action_code, created_at|
+        attrs = {
+          post_id: post_id,
+          username: username,
+          excerpt: PrettyText.excerpt(cooked, 800, keep_emoji_images: true),
+        }
+
+        if action_code
+          attrs[:action_code] = action_code
+          attrs[:created_at] = created_at
+        end
+
+        attrs
+      end
 
     render json: @posts.to_json
   end
@@ -380,8 +387,11 @@ class TopicsController < ApplicationController
     success = true
 
     if changes.length > 0
+
+      bypass_bump = changes[:category_id].present? && SiteSetting.disable_category_edit_notifications
+
       first_post = topic.ordered_posts.first
-      success = PostRevisor.new(first_post, topic).revise!(current_user, changes, validate_post: false)
+      success = PostRevisor.new(first_post, topic).revise!(current_user, changes, validate_post: false, bypass_bump: bypass_bump)
 
       if !success && topic.errors.blank?
         topic.errors.add(:base, :unable_to_update)
@@ -599,11 +609,21 @@ class TopicsController < ApplicationController
   end
 
   def destroy
-    topic = Topic.find_by(id: params[:id])
-    guardian.ensure_can_delete!(topic)
+    topic = Topic.with_deleted.find_by(id: params[:id])
 
-    first_post = topic.ordered_posts.first
-    PostDestroyer.new(current_user, first_post, context: params[:context]).destroy
+    force_destroy = false
+    if params[:force_destroy].present?
+      if !guardian.can_permanently_delete?(topic)
+        return render_json_error topic.cannot_permanently_delete_reason(current_user), status: 403
+      end
+
+      force_destroy = true
+    else
+      guardian.ensure_can_delete!(topic)
+    end
+
+    first_post = topic.posts.with_deleted.order(:post_number).first
+    PostDestroyer.new(current_user, first_post, context: params[:context], force_destroy: force_destroy).destroy
 
     render body: nil
   rescue Discourse::InvalidAccess
@@ -952,7 +972,7 @@ class TopicsController < ApplicationController
   end
 
   def private_message_reset_new
-    topic_query = TopicQuery.new(current_user)
+    topic_query = TopicQuery.new(current_user, limit: false)
 
     if params[:topic_ids].present?
       unless Array === params[:topic_ids]
@@ -968,7 +988,6 @@ class TopicsController < ApplicationController
       params.require(:inbox)
       inbox = params[:inbox].to_s
       filter = private_message_filter(topic_query, inbox)
-      topic_query.options[:limit] = false
       topic_scope = topic_query.filter_private_message_new(current_user, filter)
     end
 

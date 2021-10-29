@@ -698,9 +698,16 @@ export default Component.extend(
 
     _scrollToRow(rowItem, preventScroll = true) {
       const value = this.getValue(rowItem);
-      const rowContainer = this.element.querySelector(
-        `.select-kit-row[data-value="${value}"]`
-      );
+
+      let rowContainer;
+      if (isPresent(value)) {
+        rowContainer = this.element.querySelector(
+          `.select-kit-row[data-value="${value}"]`
+        );
+      } else {
+        rowContainer = this.element.querySelector(".select-kit-row.is-none");
+      }
+
       rowContainer && rowContainer.focus({ preventScroll });
     },
 
@@ -998,6 +1005,10 @@ export default Component.extend(
         const input = this.getFilterInput();
         if (!forceHeader && input) {
           input.focus({ preventScroll: true });
+
+          if (typeof input.selectionStart === "number") {
+            input.selectionStart = input.selectionEnd = input.value.length;
+          }
         } else if (!this.selectKit.options.preventHeaderFocus) {
           const headerContainer = this.getHeader();
           headerContainer && headerContainer.focus({ preventScroll: true });

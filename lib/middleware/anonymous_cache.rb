@@ -29,7 +29,7 @@ module Middleware
         method << "|#{k}=#\{h.#{v}}"
       end
       method << "\"\nend"
-      eval(method)
+      eval(method) # rubocop:disable Security/Eval
       @@compiled = true
     end
 
@@ -171,6 +171,7 @@ module Middleware
       def force_anonymous!
         @env[Auth::DefaultCurrentUserProvider::USER_API_KEY] = nil
         @env['HTTP_COOKIE'] = nil
+        @env['HTTP_DISCOURSE_LOGGED_IN'] = nil
         @env['rack.request.cookie.hash'] = {}
         @env['rack.request.cookie.string'] = ''
         @env['_bypass_cache'] = nil

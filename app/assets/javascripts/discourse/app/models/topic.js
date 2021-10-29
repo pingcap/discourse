@@ -376,17 +376,43 @@ const Topic = RestModel.extend({
     return ajax(`/t/${this.id}/remove_bookmarks`, { type: "PUT" });
   },
 
+  bookmarkCount: alias("bookmarks.length"),
+
+  removeBookmark(id) {
+    if (!this.bookmarks) {
+      this.set("bookmarks", []);
+    }
+    this.set(
+      "bookmarks",
+      this.bookmarks.filter((bookmark) => {
+        if (bookmark.id === id && bookmark.for_topic) {
+          // TODO (martin) (2022-02-01) Remove these old bookmark events, replaced by bookmarks:changed.
+          this.appEvents.trigger("topic:bookmark-toggled");
+          this.appEvents.trigger(
+            "bookmarks:changed",
+            null,
+            bookmark.attachedTo()
+          );
+        }
+
+        return bookmark.id !== id;
+      })
+    );
+    this.set("bookmarked", this.bookmarks.length);
+    this.incrementProperty("bookmarksWereChanged");
+  },
+
   clearBookmarks() {
     this.toggleProperty("bookmarked");
 
-    const postIds = this.bookmarked_posts.mapBy("post_id");
+    const postIds = this.bookmarks.mapBy("post_id");
     postIds.forEach((postId) => {
       const loadedPost = this.postStream.findLoadedPost(postId);
       if (loadedPost) {
         loadedPost.clearBookmark();
       }
     });
-    this.set("bookmarked_posts", []);
+    this.set("bookmarks", []);
 
     return postIds;
   },
@@ -413,9 +439,9 @@ const Topic = RestModel.extend({
   },
 
   // Delete this topic
-  destroy(deleted_by) {
+  destroy(deleted_by, opts) {
     return ajax(`/t/${this.id}`, {
-      data: { context: window.location.pathname },
+      data: { context: window.location.pathname, ...opts },
       type: "DELETE",
     })
       .then(() => {
@@ -609,6 +635,7 @@ Topic.reopenClass({
   munge(json) {
     // ensure we are not overriding category computed property
     delete json.category;
+    json.bookmarks = json.bookmarks || [];
     return json;
   },
 

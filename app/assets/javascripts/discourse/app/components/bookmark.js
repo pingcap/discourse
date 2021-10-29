@@ -167,25 +167,13 @@ export default Component.extend({
 
     localStorage.bookmarkDeleteOption = this.autoDeletePreference;
 
-    let reminderType;
-    if (this.selectedReminderType === TIME_SHORTCUT_TYPES.NONE) {
-      reminderType = null;
-    } else if (
-      this.selectedReminderType === TIME_SHORTCUT_TYPES.LAST_CUSTOM ||
-      this.selectedReminderType === TIME_SHORTCUT_TYPES.POST_LOCAL_DATE
-    ) {
-      reminderType = TIME_SHORTCUT_TYPES.CUSTOM;
-    } else {
-      reminderType = this.selectedReminderType;
-    }
-
     const data = {
-      reminder_type: reminderType,
       reminder_at: reminderAtISO,
       name: this.model.name,
       post_id: this.model.postId,
       id: this.model.id,
       auto_delete_preference: this.autoDeletePreference,
+      for_topic: this.model.forTopic,
     };
 
     if (this.editingExistingBookmark) {
@@ -207,11 +195,13 @@ export default Component.extend({
       return;
     }
     this.afterSave({
-      reminderAt: reminderAtISO,
-      reminderType: this.selectedReminderType,
-      autoDeletePreference: this.autoDeletePreference,
+      reminder_at: reminderAtISO,
+      for_topic: this.model.forTopic,
+      auto_delete_preference: this.autoDeletePreference,
+      post_id: this.model.postId,
       id: this.model.id || response.id,
       name: this.model.name,
+      topic_id: this.model.topicId,
     });
   },
 
@@ -220,7 +210,7 @@ export default Component.extend({
       type: "DELETE",
     }).then((response) => {
       if (this.afterDelete) {
-        this.afterDelete(response.topic_bookmarked);
+        this.afterDelete(response.topic_bookmarked, this.model.id);
       }
     });
   },
@@ -276,7 +266,7 @@ export default Component.extend({
   showDelete: notEmpty("model.id"),
   userHasTimezoneSet: notEmpty("userTimezone"),
   editingExistingBookmark: and("model", "model.id"),
-  existingBookmarkHasReminder: and("model", "model.reminderAt"),
+  existingBookmarkHasReminder: and("model", "model.id", "model.reminderAt"),
 
   @discourseComputed("postDetectedLocalDate", "postDetectedLocalTime")
   showPostLocalDate(postDetectedLocalDate, postDetectedLocalTime) {
@@ -320,6 +310,32 @@ export default Component.extend({
     }
 
     return customOptions;
+  },
+
+  @discourseComputed("existingBookmarkHasReminder")
+  customTimeShortcutLabels(existingBookmarkHasReminder) {
+    const labels = {};
+    if (existingBookmarkHasReminder) {
+      labels[TIME_SHORTCUT_TYPES.NONE] =
+        "bookmarks.remove_reminder_keep_bookmark";
+    }
+    return labels;
+  },
+
+  @discourseComputed("editingExistingBookmark", "existingBookmarkHasReminder")
+  hiddenTimeShortcutOptions(
+    editingExistingBookmark,
+    existingBookmarkHasReminder
+  ) {
+    if (!editingExistingBookmark) {
+      return [];
+    }
+
+    if (!existingBookmarkHasReminder) {
+      return [TIME_SHORTCUT_TYPES.NONE];
+    }
+
+    return [];
   },
 
   @discourseComputed()

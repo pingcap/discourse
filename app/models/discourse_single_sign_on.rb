@@ -240,10 +240,17 @@ class DiscourseSingleSignOn < SingleSignOn
         try_name = name.presence
         try_username = username.presence
 
+        name_suggester_input = try_username
+        username_suggester_input = try_username || try_name
+        if SiteSetting.use_email_for_username_and_name_suggestions
+          name_suggester_input = name_suggester_input || email
+          username_suggester_input = username_suggester_input || email
+        end
+
         user_params = {
           primary_email: UserEmail.new(email: email, primary: true),
-          name: try_name || User.suggest_name(try_username || email),
-          username: UserNameSuggester.suggest(try_username || try_name || email),
+          name: try_name || User.suggest_name(name_suggester_input),
+          username: UserNameSuggester.suggest(username_suggester_input),
           ip_address: ip_address
         }
 
@@ -316,8 +323,8 @@ class DiscourseSingleSignOn < SingleSignOn
     if SiteSetting.auth_overrides_username? && username.present?
       if user.username.downcase == username.downcase
         user.username = username # there may be a change of case
-      elsif user.username != username
-        user.username = UserNameSuggester.suggest(username || name || email, user.username)
+      elsif user.username != UserNameSuggester.fix_username(username)
+        user.username = UserNameSuggester.suggest(username)
       end
     end
 

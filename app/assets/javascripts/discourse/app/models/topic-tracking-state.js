@@ -6,6 +6,7 @@ import DiscourseURL from "discourse/lib/url";
 import { NotificationLevels } from "discourse/lib/notification-levels";
 import PreloadStore from "discourse/lib/preload-store";
 import User from "discourse/models/user";
+import Site from "discourse/models/site";
 import { isEmpty } from "@ember/utils";
 
 function isNew(topic) {
@@ -240,6 +241,17 @@ const TopicTrackingState = EmberObject.extend({
       this._addIncoming(data.topic_id);
     }
 
+    // Add incoming to the 'categories and latest topics' desktop view
+    if (
+      filter === "categories" &&
+      data.message_type === "latest" &&
+      !Site.current().mobileView &&
+      this.siteSettings.desktop_category_page_style ===
+        "categories_and_latest_topics"
+    ) {
+      this._addIncoming(data.topic_id);
+    }
+
     // hasIncoming relies on this count
     this.set("incomingCount", this.newIncoming.length);
   },
@@ -272,13 +284,15 @@ const TopicTrackingState = EmberObject.extend({
   trackIncoming(filter) {
     this.newIncoming = [];
 
-    const split = filter.split("/");
-    if (split.length >= 4) {
-      filter = split[split.length - 1];
-      let category = Category.findSingleBySlug(
-        split.splice(1, split.length - 4).join("/")
-      );
+    if (filter.startsWith("c/")) {
+      const categoryId = filter.match(/\/(\d*)\//);
+      const category = Category.findById(parseInt(categoryId[1], 10));
       this.set("filterCategory", category);
+
+      const split = filter.split("/");
+      if (split.length >= 4) {
+        filter = split[split.length - 1];
+      }
     } else {
       this.set("filterCategory", null);
     }
