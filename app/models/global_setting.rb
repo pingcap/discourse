@@ -135,6 +135,9 @@ class GlobalSetting
       password
       replica_host
       replica_port
+      encoding
+      encoding
+      collation
     }.each do |s|
       if val = self.public_send("db_#{s}")
         hash[s] = val
