@@ -120,7 +120,7 @@ class GlobalSetting
   end
 
   def self.database_config
-    hash = { "adapter" => "postgresql" }
+    hash = { "adapter" => "tidb" }
 
     %w{
       pool
