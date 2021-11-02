@@ -14,7 +14,7 @@ class UpdatePrivateMessageOnPostSearchData < ActiveRecord::Migration[6.0]
         JOIN topics t ON t.id = p.topic_id
         WHERE pd.private_message IS NULL OR
           pd.private_message <> CASE WHEN t.archetype = 'private_message' THEN TRUE ELSE FALSE END
-        LIMIT 3000000
+        LIMIT 30000
       ) X ON X.post_id = post_search_data.post_id
       SET post_search_data.private_message = X.private_message
       WHERE X.post_id = post_search_data.post_id
