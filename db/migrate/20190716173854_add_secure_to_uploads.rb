@@ -10,7 +10,7 @@ class AddSecureToUploads < ActiveRecord::Migration[5.2]
     if prevent_anons_from_downloading_files
       execute(
         <<-SQL
-        UPDATE uploads SET secure = 't' WHERE id IN (
+        UPDATE uploads SET secure = true WHERE id IN (
           SELECT DISTINCT(uploads.id) FROM uploads
           INNER JOIN post_uploads ON post_uploads.upload_id = uploads.id
           WHERE LOWER(original_filename) NOT REGEXP '.\.(jpg|jpeg|png|gif|svg|ico)'
