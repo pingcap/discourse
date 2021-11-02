@@ -500,6 +500,7 @@ License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL
     # Automatically register icons in sprites added via themes or plugins
     icons = []
     custom_svg_sprites(theme_id).each do |item|
+      next if item.blank?
       svg_file = Nokogiri::XML(item[:sprite])
       svg_file.css('symbol').each do |sym|
         icons << sym.attributes['id'].value if sym.attributes['id'].present?
