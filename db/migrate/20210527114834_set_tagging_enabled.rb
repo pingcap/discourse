@@ -13,7 +13,7 @@ class SetTaggingEnabled < ActiveRecord::Migration[6.1]
     if result && result.to_datetime < 1.hour.ago
       execute <<~SQL
         INSERT IGNORE INTO site_settings(name, data_type, value, created_at, updated_at)
-        VALUES('tagging_enabled', 5, 'f', NOW(), NOW())
+        VALUES('tagging_enabled', 5, false, NOW(), NOW())
       SQL
     end
   end

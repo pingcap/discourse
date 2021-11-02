@@ -229,10 +229,10 @@ def update_user_stats
         FROM posts p
         JOIN topics t ON t.id = p.topic_id
        WHERE p.deleted_at IS NULL
-         AND NOT COALESCE(p.hidden, 't')
+         AND NOT COALESCE(p.hidden, true)
          AND p.post_type = 1
          AND t.deleted_at IS NULL
-         AND COALESCE(t.visible, 't')
+         AND COALESCE(t.visible, true)
          AND t.archetype <> 'private_message'
          AND p.user_id > 0
     GROUP BY p.user_id

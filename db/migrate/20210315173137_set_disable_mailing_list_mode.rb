@@ -6,7 +6,7 @@ class SetDisableMailingListMode < ActiveRecord::Migration[6.0]
     if  result && result > 0
       execute <<~SQL
         INSERT IGNORE INTO site_settings(name, data_type, value, created_at, updated_at)
-        VALUES('disable_mailing_list_mode', 5, 'f', NOW(), NOW())
+        VALUES('disable_mailing_list_mode', 5, false, NOW(), NOW())
       SQL
     end
   end

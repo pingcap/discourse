@@ -53,7 +53,7 @@ module Reports::UserFlaggingRatio
         SELECT u.id,
                u.username,
                u.uploaded_avatar_id as avatar_id,
-               CASE WHEN u.silenced_till IS NOT NULL THEN 't' ELSE 'f' END as silenced,
+               CASE WHEN u.silenced_till IS NOT NULL THEN true ELSE false END as silenced,
                #{disagreed} AS disagreed_flags,
                #{agreed} AS agreed_flags,
                #{ignored} AS ignored_flags,

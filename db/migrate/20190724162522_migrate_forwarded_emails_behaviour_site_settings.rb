@@ -7,7 +7,7 @@ class MigrateForwardedEmailsBehaviourSiteSettings < ActiveRecord::Migration[5.2]
       SET name      = 'forwarded_emails_behaviour',
           data_type = 7,
           value     = 'create_replies'
-      WHERE name = 'enable_forwarded_emails' AND value = 't';
+      WHERE name = 'enable_forwarded_emails' AND value = true;
     SQL
 
     execute <<~SQL
@@ -22,7 +22,7 @@ class MigrateForwardedEmailsBehaviourSiteSettings < ActiveRecord::Migration[5.2]
       UPDATE site_settings
       SET name      = 'enable_forwarded_emails',
           data_type = 5,
-          value     = 't'
+          value     = true
       WHERE name = 'forwarded_emails_behaviour' AND value = 'create_replies';
     SQL
 

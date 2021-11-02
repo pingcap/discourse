@@ -92,10 +92,10 @@ task 'users:recalculate_post_counts' => :environment do
 
   filter_public_posts_and_topics = <<~SQL
     p.deleted_at IS NULL
-     AND NOT COALESCE(p.hidden, 't')
+     AND NOT COALESCE(p.hidden, true)
      AND p.post_type = 1
      AND t.deleted_at IS NULL
-     AND COALESCE(t.visible, 't')
+     AND COALESCE(t.visible, true)
      AND t.archetype <> 'private_message'
      AND p.user_id > 0
   SQL
