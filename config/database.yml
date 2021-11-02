@@ -11,7 +11,7 @@ development:
   host: <%= ENV['DISCOURSE_DEV_HOST'] || '127.0.0.1' %>
   checkout_timeout: <%= ENV['CHECKOUT_TIMEOUT'] || 5 %>
   encoding: utf8mb4
-  collation: utf8mb4_general_ci
+  collation: utf8mb4_unicode_ci
   variables:
     tidb_enable_noop_functions: ON
   advisory_locks: false # Disable until https://github.com/rails/rails/issues/40029 has been resolved.
@@ -53,7 +53,7 @@ test:
   password: <%= ENV['DISCOURSE_DEV_PASSWORD'] || '' %>
   host: <%= ENV['DISCOURSE_DEV_HOST'] || '127.0.0.1' %>
   encoding: utf8mb4
-  collation: utf8mb4_general_ci
+  collation: utf8mb4_unicode_ci
   variables:
     tidb_enable_noop_functions: ON
   advisory_locks: false # Disable until https://github.com/rails/rails/issues/40029 has been resolved.
@@ -69,7 +69,7 @@ profile:
   pool: 5
   timeout: 5000
   encoding: utf8mb4
-  collation: utf8mb4_general_ci
+  collation: utf8mb4_unicode_ci
   variables:
     tidb_enable_noop_functions: ON
   host_names:
