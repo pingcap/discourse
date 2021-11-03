@@ -609,6 +609,9 @@ registerIconRenderer({
 
   string(icon, params) {
     const id = handleIconId(icon);
+    if (icon['id'] === 'far-check-square-emoji') {
+      return "✅"
+    }  
     let html = `<svg class='${iconClasses(icon, params)} svg-string'`;
 
     if (params.label) {
