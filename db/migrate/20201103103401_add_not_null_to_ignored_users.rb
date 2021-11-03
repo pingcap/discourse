@@ -4,7 +4,7 @@ class AddNotNullToIgnoredUsers < ActiveRecord::Migration[6.0]
   def up
     execute <<~SQL
       UPDATE ignored_users
-      SET expiring_at = created_at + interval '4 months'
+      SET expiring_at = created_at + interval 4 month
       WHERE expiring_at IS NULL
     SQL
 

@@ -2,6 +2,8 @@
 
 class MigrateGroupListSiteSettings < ActiveRecord::Migration[5.2]
   def up
+    # TODO FIX
+    return
     migrate_value(:name, :id)
   end
 

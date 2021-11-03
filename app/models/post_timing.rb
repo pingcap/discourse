@@ -31,9 +31,8 @@ class PostTiming < ActiveRecord::Base
   end
 
   def self.record_new_timing(args)
-    row_count = DB.exec("INSERT INTO post_timings (topic_id, user_id, post_number, msecs)
-              SELECT :topic_id, :user_id, :post_number, :msecs
-              ON CONFLICT DO NOTHING",
+    row_count = DB.exec("INSERT IGNORE INTO post_timings (topic_id, user_id, post_number, msecs)
+              SELECT :topic_id, :user_id, :post_number, :msecs",
             args)
 
     # concurrency is hard, we are not running serialized so this can possibly
@@ -166,15 +165,25 @@ class PostTiming < ActiveRecord::Base
     if join_table.length > 0
       sql = <<~SQL
       UPDATE post_timings t
-      SET msecs = LEAST(t.msecs::bigint + x.msecs, 2^31 - 1)
-      FROM (#{join_table.join(" UNION ALL ")}) x
+      INNER JOIN (#{join_table.join(" UNION ALL ")}) x
+      SET t.msecs = LEAST(t.msecs + x.msecs, 2^31 - 1)
       WHERE x.topic_id = t.topic_id AND
             x.post_number = t.post_number AND
             x.user_id = t.user_id
-      RETURNING x.idx
 SQL
+      
+      DB.exec(sql)
 
-      existing = Set.new(DB.query_single(sql))
+      idx = DB.query_single(<<~SQL)
+        SELECT x.idx 
+          FROM post_timings t 
+               INNER JOIN (#{join_table.join(" UNION ALL ")}) x
+         WHERE x.topic_id = t.topic_id AND
+               x.post_number = t.post_number AND
+               x.user_id = t.user_id
+      SQL
+
+      existing = Set.new(idx)
 
       sql = <<~SQL
       SELECT 1 FROM topics

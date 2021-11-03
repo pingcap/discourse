@@ -56,9 +56,8 @@ class MigrateUserTopicTimersToBookmarkReminders < ActiveRecord::Migration[6.0]
     end
 
     DB.exec(<<~SQL)
-    INSERT INTO bookmarks(user_id, topic_id, post_id, reminder_at, reminder_type, created_at, updated_at)
+    INSERT IGNORE INTO bookmarks(user_id, topic_id, post_id, reminder_at, reminder_type, created_at, updated_at)
     VALUES #{new_bookmarks.join(",\n")}
-    ON CONFLICT DO NOTHING
     SQL
 
     # TODO(2021-01-07): delete leftover trashed records

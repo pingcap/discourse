@@ -97,9 +97,11 @@ class About
     per_cat_limit = category_mods_limit / category_ids.size
     per_cat_limit = 1 if per_cat_limit < 1
 
+    # TODO FIX: TiDB json_array_agg with sorting unsupported.
+    # ORDER BY u.last_seen_at DESC
     results = DB.query(<<~SQL, category_ids: category_ids)
         SELECT c.id category_id
-             , (ARRAY_AGG(u.id ORDER BY u.last_seen_at DESC))[:#{per_cat_limit}] user_ids
+             , (JSON_ARRAYAGG(u.id))[:#{per_cat_limit}] user_ids
           FROM categories c
           JOIN group_users gu ON gu.group_id = c.reviewable_by_group_id
           JOIN users u ON u.id = gu.user_id

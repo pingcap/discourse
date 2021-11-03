@@ -53,9 +53,9 @@ class DirectoryItem < ActiveRecord::Base
 
     ActiveRecord::Base.transaction do
       # Delete records that belonged to users who have been deleted
-      DB.exec("DELETE FROM directory_items
-                USING directory_items di
-                LEFT JOIN users u ON (u.id = user_id AND u.active AND u.silenced_till IS NULL AND u.id > 0)
+      DB.exec("DELETE directory_items FROM directory_items
+                JOIN directory_items di ON directory_items.id = di.id
+                LEFT JOIN users u ON (u.id = directory_items.user_id AND u.active AND u.silenced_till IS NULL AND u.id > 0)
                 WHERE di.id = directory_items.id AND
                       u.id IS NULL AND
                       di.period_type = :period_type", period_type: period_types[period_type])
@@ -110,15 +110,17 @@ class DirectoryItem < ActiveRecord::Base
                     AND u.silenced_till IS NULL
                     AND u.id > 0
                   GROUP BY u.id)
-      UPDATE directory_items di SET
-               likes_received = x.likes_received,
-               likes_given = x.likes_given,
-               topics_entered = x.topics_entered,
-               days_visited = x.days_visited,
-               posts_read = x.posts_read,
-               topic_count = x.topic_count,
-               post_count = x.post_count
-      FROM x
+      UPDATE directory_items di 
+      JOIN x ON x.user_id = di.user_id
+      SET
+               di.likes_received = x.likes_received,
+               di.likes_given = x.likes_given,
+               di.topics_entered = x.topics_entered,
+               di.days_visited = x.days_visited,
+               di.posts_read = x.posts_read,
+               di.topic_count = x.topic_count,
+               di.post_count = x.post_count
+      
       WHERE
         x.user_id = di.user_id AND
         di.period_type = :period_type AND (

@@ -33,11 +33,10 @@ def insert_post_timings
   log "Inserting post timings..."
 
   DB.exec <<-SQL
-    INSERT INTO post_timings (topic_id, post_number, user_id, msecs)
+    INSERT IGNORE  INTO post_timings (topic_id, post_number, user_id, msecs)
          SELECT topic_id, post_number, user_id, #{MS_SPEND_CREATING_POST}
            FROM posts
           WHERE user_id > 0
-    ON CONFLICT DO NOTHING
   SQL
 end
 
@@ -45,11 +44,10 @@ def insert_post_replies
   log "Inserting post replies..."
 
   DB.exec <<-SQL
-    INSERT INTO post_replies (post_id, reply_post_id, created_at, updated_at)
+    INSERT IGNORE INTO post_replies (post_id, reply_post_id, created_at, updated_at)
          SELECT p2.id, p.id, p.created_at, p.created_at
            FROM posts p
      INNER JOIN posts p2 ON p2.post_number = p.reply_to_post_number AND p2.topic_id = p.topic_id
-    ON CONFLICT DO NOTHING
   SQL
 end
 
@@ -57,12 +55,11 @@ def insert_topic_users
   log "Inserting topic users..."
 
   DB.exec <<-SQL
-    INSERT INTO topic_users (user_id, topic_id, posted, last_read_post_number, first_visited_at, last_visited_at, total_msecs_viewed)
+    INSERT IGNORE INTO topic_users (user_id, topic_id, posted, last_read_post_number, first_visited_at, last_visited_at, total_msecs_viewed)
          SELECT user_id, topic_id, 't' , MAX(post_number), MIN(created_at), MAX(created_at), COUNT(id) * #{MS_SPEND_CREATING_POST}
            FROM posts
           WHERE user_id > 0
        GROUP BY user_id, topic_id
-    ON CONFLICT DO NOTHING
   SQL
 end
 
@@ -77,12 +74,11 @@ def insert_topic_views
            WHERE user_id > 0
         GROUP BY topic_id, user_id, DATE(p.created_at)
     )
-    INSERT INTO topic_views (topic_id, user_id, viewed_at, ip_address)
+    INSERT IGNORE INTO topic_views (topic_id, user_id, viewed_at, ip_address)
          SELECT X.topic_id, X.user_id, X.posted_at, ip_address
            FROM X
            JOIN users u ON u.id = X.user_id
           WHERE ip_address IS NOT NULL
-    ON CONFLICT DO NOTHING
   SQL
 end
 
@@ -90,7 +86,7 @@ def insert_user_actions
   log "Inserting user actions for NEW_TOPIC = 4..."
 
   DB.exec <<-SQL
-    INSERT INTO user_actions (action_type, user_id, target_topic_id, target_post_id, acting_user_id, created_at, updated_at)
+    INSERT IGNORE INTO user_actions (action_type, user_id, target_topic_id, target_post_id, acting_user_id, created_at, updated_at)
          SELECT 4, p.user_id, topic_id, p.id, p.user_id, p.created_at, p.created_at
            FROM posts p
            JOIN topics t ON t.id = p.topic_id
@@ -98,13 +94,12 @@ def insert_user_actions
             AND archetype <> 'private_message'
             AND p.deleted_at IS NULL
             AND t.deleted_at IS NULL
-    ON CONFLICT DO NOTHING
   SQL
 
   log "Inserting user actions for REPLY = 5..."
 
   DB.exec <<-SQL
-    INSERT INTO user_actions (action_type, user_id, target_topic_id, target_post_id, acting_user_id, created_at, updated_at)
+    INSERT IGNORE INTO user_actions (action_type, user_id, target_topic_id, target_post_id, acting_user_id, created_at, updated_at)
          SELECT 5, p.user_id, topic_id, p.id, p.user_id, p.created_at, p.created_at
            FROM posts p
            JOIN topics t ON t.id = p.topic_id
@@ -112,13 +107,12 @@ def insert_user_actions
             AND archetype <> 'private_message'
             AND p.deleted_at IS NULL
             AND t.deleted_at IS NULL
-    ON CONFLICT DO NOTHING
   SQL
 
   log "Inserting user actions for RESPONSE = 6..."
 
   DB.exec <<-SQL
-    INSERT INTO user_actions (action_type, user_id, target_topic_id, target_post_id, acting_user_id, created_at, updated_at)
+    INSERT IGNORE INTO user_actions (action_type, user_id, target_topic_id, target_post_id, acting_user_id, created_at, updated_at)
          SELECT 6, p.user_id, p.topic_id, p.id, p2.user_id, p.created_at, p.created_at
            FROM posts p
            JOIN topics t ON t.id = p.topic_id
@@ -129,7 +123,6 @@ def insert_user_actions
             AND t.deleted_at IS NULL
             AND p2.topic_id = p.topic_id
             AND p2.user_id <> p.user_id
-    ON CONFLICT DO NOTHING
   SQL
 
   # TODO:
@@ -191,10 +184,9 @@ def insert_user_stats
   log "Inserting user stats..."
 
   DB.exec <<-SQL
-    INSERT INTO user_stats (user_id, new_since)
+    INSERT IGNORE INTO user_stats (user_id, new_since)
          SELECT id, created_at
            FROM users
-    ON CONFLICT DO NOTHING
   SQL
 end
 
@@ -202,12 +194,11 @@ def insert_user_visits
   log "Inserting user visits..."
 
   DB.exec <<-SQL
-    INSERT INTO user_visits (user_id, visited_at, posts_read)
+    INSERT IGNORE INTO user_visits (user_id, visited_at, posts_read)
          SELECT user_id, DATE(created_at), COUNT(*)
            FROM posts
           WHERE user_id > 0
        GROUP BY user_id, DATE(created_at)
-    ON CONFLICT DO NOTHING
   SQL
 end
 
@@ -215,12 +206,11 @@ def insert_draft_sequences
   log "Inserting draft sequences..."
 
   DB.exec <<-SQL
-    INSERT INTO draft_sequences (user_id, draft_key, sequence)
+    INSERT IGNORE INTO draft_sequences (user_id, draft_key, sequence)
          SELECT user_id, CONCAT('#{Draft::EXISTING_TOPIC}', id), 1
            FROM topics
           WHERE user_id > 0
             AND archetype = 'regular'
-    ON CONFLICT DO NOTHING
   SQL
 end
 
@@ -239,10 +229,10 @@ def update_user_stats
         FROM posts p
         JOIN topics t ON t.id = p.topic_id
        WHERE p.deleted_at IS NULL
-         AND NOT COALESCE(p.hidden, 't')
+         AND NOT COALESCE(p.hidden, true)
          AND p.post_type = 1
          AND t.deleted_at IS NULL
-         AND COALESCE(t.visible, 't')
+         AND COALESCE(t.visible, true)
          AND t.archetype <> 'private_message'
          AND p.user_id > 0
     GROUP BY p.user_id

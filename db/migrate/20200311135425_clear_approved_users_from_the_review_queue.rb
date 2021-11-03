@@ -1,13 +1,20 @@
 # frozen_string_literal: true
 class ClearApprovedUsersFromTheReviewQueue < ActiveRecord::Migration[6.0]
   def up
-    reviewables = DB.query_single <<~SQL
+    DB.exec <<~SQL
       UPDATE reviewables r
+      INNER JOIN users u
       SET status = #{Reviewable.statuses[:approved]}
-      FROM users u
       WHERE u.id = r.target_id AND u.approved = true
       AND r.type = 'ReviewableUser' AND r.status = #{Reviewable.statuses[:pending]}
-      RETURNING r.id
+    SQL
+
+    reviewables = DB.query_single <<~SQL
+      SELECT r.id 
+        FROM reviewables r
+             INNER JOIN users u
+       WHERE u.id = r.target_id AND u.approved = true
+             AND r.type = 'ReviewableUser' AND r.status = #{Reviewable.statuses[:pending]}
     SQL
 
     system_user_id = Discourse::SYSTEM_USER_ID

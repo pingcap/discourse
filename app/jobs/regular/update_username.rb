@@ -100,7 +100,7 @@ module Jobs
                                         ELSE NULL END
                         )
                     )) :: JSON
-        WHERE data ILIKE '%' || :old_username || '%'
+        WHERE data LIKE '%' || :old_username || '%'
       SQL
     end
 

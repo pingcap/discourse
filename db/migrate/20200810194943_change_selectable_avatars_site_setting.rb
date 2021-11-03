@@ -3,7 +3,7 @@
 class ChangeSelectableAvatarsSiteSetting < ActiveRecord::Migration[6.0]
   def up
     selectable_avatars = execute("SELECT value FROM site_settings WHERE name = 'selectable_avatars'")
-    return if selectable_avatars.cmd_tuples == 0
+    return if selectable_avatars.size == 0
 
     # Keep old site setting value as a backup
     execute <<~SQL

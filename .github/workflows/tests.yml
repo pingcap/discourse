@@ -33,20 +33,11 @@ jobs:
             target: plugins
 
     services:
-      postgres:
-        image: postgres:${{ matrix.postgres }}
-        ports:
-          - 5432:5432
+      tidb:
+        image: hooopo/tidb-playground:v5.2.0
         env:
-          POSTGRES_USER: discourse
-          POSTGRES_PASSWORD: discourse
-          POSTGRES_DB: discourse_test
-        options: >-
-          --mount type=tmpfs,destination=/var/lib/postgresql/data
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          TIDB_VERSION: v5.2.0
+        ports: ["4000:4000"]
 
     steps:
       - uses: actions/checkout@master
@@ -72,6 +63,7 @@ jobs:
 
       - name: Setup gems
         run: |
+          sudo apt-get install libmariadb-dev-compat libmariadb-dev -y
           bundle config --local path vendor/bundle
           bundle config --local deployment true
           bundle config --local without development
@@ -100,7 +92,7 @@ jobs:
 
       - name: Create database
         run: |
-          bin/rake db:create
+          sleep 20 && bin/rake db:create
           bin/rake db:migrate
 
       - name: Create parallel databases

@@ -48,7 +48,7 @@ module FlagQuery
              p.user_deleted,
              NULL as post_action_ids,
              (SELECT created_at FROM post_revisions WHERE post_id = p.id AND user_id = p.user_id ORDER BY created_at DESC LIMIT 1) AS last_revised_at,
-             (SELECT COUNT(*) FROM post_actions WHERE (disagreed_at IS NOT NULL OR agreed_at IS NOT NULL OR deferred_at IS NOT NULL) AND post_id = p.id)::int AS previous_flags_count
+             cast((SELECT COUNT(*) FROM post_actions WHERE (disagreed_at IS NOT NULL OR agreed_at IS NOT NULL OR deferred_at IS NOT NULL) AND post_id = p.id) as unsigned) AS previous_flags_count
         FROM posts p
        WHERE p.id in (:post_ids)
     SQL

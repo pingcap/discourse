@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 class AddHighPriorityColumnToNotifications < ActiveRecord::Migration[6.0]
-  disable_ddl_transaction!
   def up
     if !column_exists?(:notifications, :high_priority)
       add_column :notifications, :high_priority, :boolean, default: nil
@@ -11,32 +10,32 @@ class AddHighPriorityColumnToNotifications < ActiveRecord::Migration[6.0]
     # priority 0 = low, 1 = normal, 2 = high
     if column_exists?(:notifications, :high_priority)
       execute <<~SQL
-        UPDATE notifications SET high_priority = TRUE WHERE notification_type IN (6, 24);
+        UPDATE notifications SET `high_priority` = TRUE WHERE notification_type IN (6, 24);
       SQL
 
       execute <<~SQL
-        UPDATE notifications SET high_priority = FALSE WHERE notification_type NOT IN (6, 24);
+        UPDATE notifications SET `high_priority` = FALSE WHERE notification_type NOT IN (6, 24);
       SQL
 
       execute <<~SQL
-        ALTER TABLE notifications ALTER COLUMN high_priority SET DEFAULT FALSE;
+        ALTER TABLE notifications modify COLUMN `high_priority` tinyint(1)  DEFAULT FALSE;
       SQL
 
       execute <<~SQL
-        UPDATE notifications SET high_priority = FALSE WHERE high_priority IS NULL;
+        UPDATE notifications SET `high_priority` = FALSE WHERE `high_priority` IS NULL;
       SQL
 
       execute <<~SQL
-        ALTER TABLE notifications ALTER COLUMN high_priority SET NOT NULL;
+        ALTER TABLE `notifications` modify COLUMN `high_priority` tinyint(1) NOT NULL DEFAULT FALSE;
       SQL
     end
 
     execute <<~SQL
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS index_notifications_read_or_not_high_priority ON notifications(user_id, id DESC, read, topic_id) WHERE (read OR (high_priority = FALSE));
+      CREATE INDEX IF NOT EXISTS index_notifications_read_or_not_high_priority ON notifications(user_id, id DESC, `read`, topic_id);
     SQL
 
     execute <<~SQL
-      CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS index_notifications_unique_unread_high_priority ON notifications(user_id, id) WHERE NOT read AND high_priority = TRUE;
+      CREATE INDEX IF NOT EXISTS index_notifications_unique_unread_high_priority ON notifications(user_id, id);
     SQL
   end
 

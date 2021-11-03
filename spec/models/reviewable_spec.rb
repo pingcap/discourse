@@ -523,7 +523,7 @@ RSpec.describe Reviewable, type: :model do
           INNER JOIN posts p ON p.id = target_id
           INNER JOIN topics t ON t.id = p.topic_id
           INNER JOIN topic_custom_fields tcf ON tcf.topic_id = t.id
-          INNER JOIN users u ON u.id = tcf.value::integer
+          INNER JOIN users u ON u.id = CAST(tcf.value AS UNSIGNED)
                           SQL
                          )
               .where(target_type: Post.name)

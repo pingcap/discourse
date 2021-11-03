@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 class AddImapGroupIdToIncomingEmail < ActiveRecord::Migration[6.0]
-  disable_ddl_transaction!
 
   def up
     execute <<~SQL
@@ -9,8 +8,8 @@ class AddImapGroupIdToIncomingEmail < ActiveRecord::Migration[6.0]
     SQL
 
     execute <<~SQL
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS
-      index_incoming_emails_on_imap_group_id ON incoming_emails USING btree (imap_group_id)
+      CREATE INDEX IF NOT EXISTS
+      index_incoming_emails_on_imap_group_id ON incoming_emails (imap_group_id)
     SQL
   end
 

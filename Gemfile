@@ -110,7 +110,6 @@ gem 'omniauth-google-oauth2'
 gem 'oj', '3.13.2'
 
 gem 'pg'
-gem 'mini_sql'
 gem 'pry-rails', require: false
 gem 'pry-byebug', require: false
 gem 'r2', require: false
@@ -247,7 +246,6 @@ gem 'lz4-ruby', require: false, platform: :ruby
 gem 'sanitize'
 
 if ENV["IMPORT"] == "1"
-  gem 'mysql2'
   gem 'redcarpet'
 
   # NOTE: in import mode the version of sqlite can matter a lot, so we stick it to a specific one
@@ -263,3 +261,8 @@ gem 'colored2', require: false
 gem 'maxminddb'
 
 gem 'rails_failover', require: false
+
+gem "activerecord-tidb-adapter", "~> 6.1"
+gem 'mini_sql', github: 'hooopo/mini_sql'
+
+gem "default_value_for", "~> 3.4"

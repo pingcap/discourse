@@ -24,12 +24,12 @@ module Jobs
         .joins(:user_option, :user_stat, :user_emails)
         .where("user_options.email_digests")
         .where("user_stats.bounce_score < #{SiteSetting.bounce_score_threshold}")
-        .where("user_emails.primary")
-        .where("COALESCE(last_emailed_at, '2010-01-01') <= CURRENT_TIMESTAMP - ('1 MINUTE'::INTERVAL * user_options.digest_after_minutes)")
-        .where("COALESCE(user_stats.digest_attempted_at, '2010-01-01') <= CURRENT_TIMESTAMP - ('1 MINUTE'::INTERVAL * user_options.digest_after_minutes)")
-        .where("COALESCE(last_seen_at, '2010-01-01') <= CURRENT_TIMESTAMP - ('1 MINUTE'::INTERVAL * user_options.digest_after_minutes)")
-        .where("COALESCE(last_seen_at, '2010-01-01') >= CURRENT_TIMESTAMP - ('1 DAY'::INTERVAL * #{SiteSetting.suppress_digest_email_after_days})")
-        .order("user_stats.digest_attempted_at ASC NULLS FIRST")
+        .where("user_emails.`primary`")
+        .where("COALESCE(last_emailed_at, '2010-01-01') <= CURRENT_TIMESTAMP - INTERVAL (1 * user_options.digest_after_minutes) MINUTE")
+        .where("COALESCE(user_stats.digest_attempted_at, '2010-01-01') <= CURRENT_TIMESTAMP - INTERVAL (1 * user_options.digest_after_minutes) MINUTE")
+        .where("COALESCE(last_seen_at, '2010-01-01') <= CURRENT_TIMESTAMP - INTERVAL (1 * user_options.digest_after_minutes) MINUTE")
+        .where("COALESCE(last_seen_at, '2010-01-01') >= CURRENT_TIMESTAMP - INTERVAL (1 * #{SiteSetting.suppress_digest_email_after_days}) DAY")
+        .order("user_stats.digest_attempted_at ASC")
 
       # If the site requires approval, make sure the user is approved
       query = query.where("approved OR moderator OR admin") if SiteSetting.must_approve_users?

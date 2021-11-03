@@ -64,7 +64,7 @@ class TagGroupsController < ApplicationController
     matches = TagGroup.includes(:tags).visible(guardian).all
 
     if params[:q].present?
-      matches = matches.where('lower(name) ILIKE ?', "%#{params[:q].strip}%")
+      matches = matches.where('lower(name) LIKE ?', "%#{params[:q].strip}%")
     end
 
     if params[:names].present?

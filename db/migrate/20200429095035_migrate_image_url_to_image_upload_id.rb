@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
 class MigrateImageUrlToImageUploadId < ActiveRecord::Migration[6.0]
-  disable_ddl_transaction! # Avoid holding update locks on posts for the whole migration
 
   BATCH_SIZE = 1000
 
   def up
+    # TODO FIX
+    return
     # Defining regex here to avoid needing to double-escape the \ characters
     regex = '\/(original|optimized)\/\dX[\/\.\w]*\/([a-zA-Z0-9]+)[\.\w]*'
 

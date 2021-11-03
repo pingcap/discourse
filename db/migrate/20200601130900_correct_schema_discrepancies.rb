@@ -164,7 +164,7 @@ class CorrectSchemaDiscrepancies < ActiveRecord::Migration[6.0]
     raw_info = DB.query_hash <<~SQL
       SELECT table_name, column_name, is_nullable, character_maximum_length, column_default
       FROM information_schema.columns
-      WHERE table_schema='public'
+      WHERE table_schema= database()
       AND (
         #{lookup_sql}
       )
@@ -188,11 +188,11 @@ class CorrectSchemaDiscrepancies < ActiveRecord::Migration[6.0]
       # There shouldn't be any null values - rails inserts timestamps automatically
       # But just in case, set them to now() if there are any nulls
       DB.exec <<~SQL
-        UPDATE #{table} SET #{column} = now() WHERE #{column} IS NULL
+        UPDATE `#{table}` SET #{column} = now() WHERE `#{column}` IS NULL
       SQL
 
       DB.exec <<~SQL
-        ALTER TABLE #{table} ALTER COLUMN #{column} SET NOT NULL
+        ALTER TABLE `#{table}` modify COLUMN `#{column}` datetime NOT NULL
       SQL
     end
 
@@ -203,10 +203,7 @@ class CorrectSchemaDiscrepancies < ActiveRecord::Migration[6.0]
       current_value = schema_hash[ref]["character_maximum_length"]
       next if current_value == nil
       table, column = ref.split(".")
-
-      DB.exec <<~SQL
-        ALTER TABLE #{table} ALTER COLUMN #{column} TYPE varchar
-      SQL
+      change_column table, column, :string, limit: 255
     end
 
     # In the past, rails changed the default behavior for float columns
@@ -218,23 +215,21 @@ class CorrectSchemaDiscrepancies < ActiveRecord::Migration[6.0]
       table, column = ref.split(".")
 
       DB.exec <<~SQL
-        ALTER TABLE #{table} ALTER COLUMN #{column} SET DEFAULT 0.0
+        ALTER TABLE `#{table}` modify COLUMN `#{column}` float DEFAULT 0.0
       SQL
     end
 
     # Category color default was changed in https://github.com/discourse/discourse/commit/faf09bb8c80fcb28b132a5a644ac689cc9abffc2
     # But should have been added in a new migration
-    if schema_hash["categories.color"]["column_default"] != "'0088CC'::character varying"
-      DB.exec <<~SQL
-        ALTER TABLE categories ALTER COLUMN color SET DEFAULT '0088CC'
-      SQL
+    if schema_hash["categories.color"]["column_default"] != "'0088CC'"
+      change_column :categories, :color, :string, default: '0088CC'
     end
 
     # Older sites have a default value like nextval('topic_search_data_topic_id_seq'::regclass)
     # Modern sites do not. This is likely caused by another historical change in rails
     if schema_hash["topic_search_data.topic_id"]["column_default"] != nil
       DB.exec <<~SQL
-        ALTER TABLE topic_search_data ALTER COLUMN topic_id SET DEFAULT NULL
+        ALTER TABLE topic_search_data modify COLUMN topic_id text DEFAULT NULL
       SQL
     end
   end

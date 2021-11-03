@@ -111,10 +111,7 @@ class TagUser < ActiveRecord::Base
   def self.auto_watch(opts)
     builder = DB.build <<~SQL
       UPDATE topic_users
-      SET notification_level = CASE WHEN should_watch THEN :watching ELSE :tracking END,
-          notifications_reason_id = CASE WHEN should_watch THEN :auto_watch_tag ELSE NULL END
-      FROM
-      (
+      JOIN (
       SELECT tu.topic_id, tu.user_id, CASE
           WHEN MAX(tag_users.notification_level) = :watching THEN true
           ELSE false
@@ -137,6 +134,8 @@ class TagUser < ActiveRecord::Base
       /*where*/
       GROUP BY tu.topic_id, tu.user_id, tu.notification_level, tu.notifications_reason_id
       ) AS X
+      SET notification_level = CASE WHEN should_watch THEN :watching ELSE :tracking END,
+          notifications_reason_id = CASE WHEN should_watch THEN :auto_watch_tag ELSE NULL END
       WHERE X.topic_id = topic_users.topic_id AND
             X.user_id = topic_users.user_id AND
             (should_track OR should_watch)
@@ -163,8 +162,7 @@ class TagUser < ActiveRecord::Base
   def self.auto_track(opts)
     builder = DB.build <<~SQL
       UPDATE topic_users
-      SET notification_level = :tracking, notifications_reason_id = :auto_track_tag
-      FROM (
+      JOIN (
           SELECT DISTINCT tu.topic_id, tu.user_id
           FROM topic_users tu
           JOIN topic_tags ON tu.topic_id = topic_tags.topic_id
@@ -173,6 +171,7 @@ class TagUser < ActiveRecord::Base
                               AND tag_users.notification_level = :tracking
           /*where*/
       ) as X
+      SET notification_level = :tracking, notifications_reason_id = :auto_track_tag
       WHERE
         topic_users.notification_level = :regular AND
         topic_users.topic_id = X.topic_id AND

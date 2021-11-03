@@ -80,9 +80,9 @@ class ThemeModifierSet < ActiveRecord::Base
       next if ["id", "theme_id"].include?(column_name)
 
       type = nil
-      if info.type == :string && info.array?
+      if info.type == :json
         type = :string_array
-      elsif info.type == :boolean && !info.array?
+      elsif info.type == :boolean
         type = :boolean
       else
         raise ThemeModifierSetError "Invalid theme modifier column type" if ![:boolean, :string].include?(info.type)

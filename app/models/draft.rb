@@ -57,8 +57,7 @@ class Draft < ActiveRecord::Base
           sequence: sequence,
           draft_key: key,
           user_id: user.id,
-        },
-        unique_by: [:user_id, :draft_key]
+        }
       )
 
       DB.exec(<<~SQL, id: draft_id, sequence: sequence, data: data, owner: owner || current_owner)
@@ -85,9 +84,7 @@ class Draft < ActiveRecord::Base
       DB.exec(<<~SQL, opts)
         INSERT INTO drafts (user_id, draft_key, data, sequence, owner, created_at, updated_at)
         VALUES (:user_id, :draft_key, :data, :sequence, :owner, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id, draft_key) DO
-        UPDATE
-        SET
+        ON DUPLICATE KEY UPDATE
           sequence = :sequence,
           data = :data,
           revisions = drafts.revisions + 1,

@@ -5,7 +5,7 @@ class MigrateWatchedWordsFromReplaceToLink < ActiveRecord::Migration[6.1]
     execute <<~SQL
       UPDATE watched_words
       SET action = 8
-      WHERE action = 5 AND replacement ILIKE 'http%'
+      WHERE action = 5 AND lower(replacement) LIKE 'http%'
     SQL
   end
 

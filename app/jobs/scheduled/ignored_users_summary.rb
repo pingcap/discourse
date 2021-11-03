@@ -13,7 +13,7 @@ module Jobs
       user_ids = DB.query_single(<<~SQL, params)
         SELECT ignored_user_id
         FROM ignored_users
-        WHERE COALESCE(summarized_at, CURRENT_TIMESTAMP + ':coalesced_gap_days DAYS'::INTERVAL) - ':gap_days DAYS'::INTERVAL > CURRENT_TIMESTAMP
+        WHERE COALESCE(summarized_at, CURRENT_TIMESTAMP + interval :coalesced_gap_days DAY) - interval :gap_days DAY > CURRENT_TIMESTAMP
         GROUP BY ignored_user_id
         HAVING COUNT(ignored_user_id) >= :threshold
       SQL

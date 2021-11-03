@@ -6,9 +6,10 @@ class RemoveSuppressFromLatestFromCategory < ActiveRecord::Migration[6.0]
   }
 
   def up
-    ids = DB.query_single("SELECT id::text FROM categories WHERE suppress_from_latest = TRUE")
+    ids = DB.query_single("SELECT id FROM categories WHERE suppress_from_latest = TRUE")
 
     if ids.present?
+      ids.map!{|x| x.to_s}
       muted_ids = DB.query_single("SELECT value from site_settings WHERE name = 'default_categories_muted'").first
       ids += muted_ids.split("|") if muted_ids.present?
       ids.uniq!
@@ -17,7 +18,7 @@ class RemoveSuppressFromLatestFromCategory < ActiveRecord::Migration[6.0]
       if ids.count <= 10
         # CategoryUser.notification_levels[:muted] is 0, avoid reaching to object model
         DB.exec(<<~SQL, muted: 0)
-          INSERT INTO category_users (category_id, user_id, notification_level)
+          INSERT IGNORE INTO category_users (category_id, user_id, notification_level)
             SELECT c.id category_id, u.id user_id, :muted
             FROM users u
               CROSS JOIN categories c
@@ -26,7 +27,6 @@ class RemoveSuppressFromLatestFromCategory < ActiveRecord::Migration[6.0]
                   AND c.id = cu.category_id
             WHERE c.suppress_from_latest = TRUE
               AND cu.notification_level IS NULL
-          ON CONFLICT DO NOTHING
         SQL
 
         DB.exec(<<~SQL, value: ids.join("|"))
@@ -38,7 +38,9 @@ class RemoveSuppressFromLatestFromCategory < ActiveRecord::Migration[6.0]
     end
 
     DROPPED_COLUMNS.each do |table, columns|
-      Migration::ColumnDropper.execute_drop(table, columns)
+      columns.each do |column|
+        remove_column table, column
+      end
     end
   end
 

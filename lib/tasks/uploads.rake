@@ -870,7 +870,7 @@ def fix_relative_links
   Post.where('raw like ?', '%](/uploads%').find_each do |post|
     inline_uploads(post)
   end
-  Post.where("raw ilike ?", '%<img%src=%/uploads/%>%').find_each do |post|
+  Post.where("raw like ?", '%<img%src=%/uploads/%>%').find_each do |post|
     inline_img_tags(post)
   end
 end
@@ -932,7 +932,7 @@ def analyze_missing_s3
       [:users, :uploaded_avatar_id],
       [:user_avatars, :gravatar_upload_id],
       [:user_avatars, :custom_upload_id],
-      [:site_settings, ["NULLIF(value, '')::integer", "data_type = #{SiteSettings::TypeSupervisor.types[:upload].to_i}"]],
+      [:site_settings, ["CAST(NULLIF(value, '') AS UNSIGNED)", "data_type = #{SiteSettings::TypeSupervisor.types[:upload].to_i}"]],
       [:user_profiles, :profile_background_upload_id],
       [:user_profiles, :card_background_upload_id],
       [:categories, :uploaded_logo_id],

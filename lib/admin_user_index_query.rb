@@ -53,7 +53,7 @@ class AdminUserIndexQuery
 
     if !custom_order.present?
       if params[:query] == "active"
-        order << "COALESCE(users.last_seen_at, to_date('1970-01-01', 'YYYY-MM-DD')) DESC"
+        order << "COALESCE(users.last_seen_at, '1970-01-01') DESC"
       else
         order << "users.created_at DESC"
       end

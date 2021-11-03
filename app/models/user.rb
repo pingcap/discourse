@@ -220,7 +220,7 @@ class User < ActiveRecord::Base
     if filter.is_a?(Array)
       where('username_lower ~* ?', "(#{filter.join('|')})")
     else
-      where('username_lower ILIKE ?', "%#{filter}%")
+      where('username_lower LIKE ?', "%#{filter}%")
     end
   end
 
@@ -241,7 +241,7 @@ class User < ActiveRecord::Base
       )
     else
       users.where(
-        'username_lower ILIKE :filter OR lower(user_emails.email) ILIKE :filter',
+        'username_lower LIKE :filter OR lower(user_emails.email) LIKE :filter',
         filter: "%#{filter}%"
       )
     end
@@ -392,7 +392,7 @@ class User < ActiveRecord::Base
     GroupUser
       .where(user_id: id)
       .includes(:group)
-      .maximum("groups.grant_trust_level")
+      .maximum("`groups`.grant_trust_level")
   end
 
   def visible_groups
@@ -490,7 +490,7 @@ class User < ActiveRecord::Base
          WHERE t.deleted_at IS NULL
            AND n.notification_type = :notification_type
            AND n.user_id = :user_id
-           AND NOT read
+           AND NOT `read`
     SQL
 
     # to avoid coalesce we do to_i
@@ -506,7 +506,7 @@ class User < ActiveRecord::Base
          WHERE t.deleted_at IS NULL
            AND n.high_priority = :high_priority
            AND n.user_id = :user_id
-           AND NOT read
+           AND NOT `read`
     SQL
 
     # to avoid coalesce we do to_i
@@ -550,7 +550,7 @@ class User < ActiveRecord::Base
             n.high_priority = FALSE AND
             n.user_id = :user_id AND
             n.id > :seen_notification_id AND
-            NOT read
+            NOT `read`
           LIMIT :limit
         ) AS X
       SQL
@@ -602,7 +602,7 @@ class User < ActiveRecord::Base
           t.deleted_at IS NULL AND
           n.high_priority AND
           n.user_id = :user_id AND
-          NOT read
+          NOT `read`
         ORDER BY n.id DESC
         LIMIT 20
       ) AS x
@@ -612,7 +612,7 @@ class User < ActiveRecord::Base
        LEFT JOIN topics t ON n.topic_id = t.id
        WHERE
         t.deleted_at IS NULL AND
-        (n.high_priority = FALSE OR read) AND
+        (n.high_priority = FALSE OR `read`) AND
         n.user_id = :user_id
        ORDER BY n.id DESC
        LIMIT 20
@@ -745,9 +745,8 @@ class User < ActiveRecord::Base
         DB.exec(<<~SQL, user_id: self.id, ip_address: new_ip_address, current_timestamp: Time.zone.now)
         INSERT INTO user_ip_address_histories (user_id, ip_address, created_at, updated_at)
         VALUES (:user_id, :ip_address, :current_timestamp, :current_timestamp)
-        ON CONFLICT (user_id, ip_address)
-        DO
-          UPDATE SET updated_at = :current_timestamp
+        ON DUPLICATE KEY UPDATE
+          updated_at = :current_timestamp
         SQL
 
         DB.exec(<<~SQL, user_id: self.id, offset: SiteSetting.keep_old_ip_address_count)
@@ -1315,7 +1314,7 @@ class User < ActiveRecord::Base
   end
 
   def emails
-    self.user_emails.order("user_emails.primary DESC NULLS LAST").pluck(:email)
+    self.user_emails.order("user_emails.primary DESC").pluck(:email)
   end
 
   def secondary_emails
@@ -1353,9 +1352,9 @@ class User < ActiveRecord::Base
   end
 
   def next_best_title
-    group_titles_query = groups.where("groups.title <> ''")
-    group_titles_query = group_titles_query.order("groups.id = #{primary_group_id} DESC") if primary_group_id
-    group_titles_query = group_titles_query.order("groups.primary_group DESC").limit(1)
+    group_titles_query = groups.where("`groups`.title <> ''")
+    group_titles_query = group_titles_query.order("`groups`.id = #{primary_group_id} DESC") if primary_group_id
+    group_titles_query = group_titles_query.order("`groups`.primary_group DESC").limit(1)
 
     if next_best_group_title = group_titles_query.pluck_first(:title)
       return next_best_group_title
@@ -1521,8 +1520,8 @@ class User < ActiveRecord::Base
 
     UNION ALL
 
-    (SELECT groups.id, false as is_user FROM groups
-    WHERE lower(groups.name) = :username)
+    (SELECT `groups`.id, false as is_user FROM `groups`
+    WHERE lower(`groups`.name) = :username)
   SQL
 
   def self.username_exists?(username)

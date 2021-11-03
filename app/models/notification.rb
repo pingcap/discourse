@@ -31,8 +31,8 @@ class Notification < ActiveRecord::Base
       consolidation_window = MEMBERSHIP_REQUEST_CONSOLIDATION_WINDOW_HOURS.hours.ago
     end
 
-    notifications = notifications.where("created_at > ? AND data::json ->> '#{key}' = ?", consolidation_window, data[key.to_sym]) if data[key&.to_sym].present?
-    notifications = notifications.where("data::json ->> 'username2' IS NULL") if notification_type == types[:liked]
+    notifications = notifications.where("created_at > ? AND json_unquote(json_extract(cast(data as json), '$.#{key}')) = ?", consolidation_window, data[key.to_sym]) if data[key&.to_sym].present?
+    notifications = notifications.where("json_extract(cast(data as json), '$.username2') IS NULL") if notification_type == types[:liked]
 
     notifications
   }
@@ -241,7 +241,7 @@ class Notification < ActiveRecord::Base
          WHERE
            n.high_priority = TRUE AND
            n.user_id = #{user.id.to_i} AND
-           NOT read
+           NOT `read`
         ORDER BY n.id ASC
         LIMIT :limit
       SQL

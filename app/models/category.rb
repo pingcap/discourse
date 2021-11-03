@@ -225,14 +225,14 @@ class Category < ActiveRecord::Base
 
     DB.exec <<~SQL
       UPDATE categories c
-         SET topic_count = COALESCE(x.topic_count, 0),
-             post_count = COALESCE(x.post_count, 0)
-        FROM (
+        JOIN (
               SELECT ccc.id as category_id, stats.topic_count, stats.post_count
               FROM categories ccc
               LEFT JOIN (#{topics_with_post_count}) stats
               ON stats.category_id = ccc.id
-             ) x
+             ) x ON x.category_id = c.id
+         SET c.topic_count = COALESCE(x.topic_count, 0),
+             c.post_count = COALESCE(x.post_count, 0)
        WHERE x.category_id = c.id
          AND (c.topic_count <> COALESCE(x.topic_count, 0) OR c.post_count <> COALESCE(x.post_count, 0))
     SQL
@@ -332,7 +332,7 @@ class Category < ActiveRecord::Base
     Group
       .joins(:category_groups)
       .where("category_groups.category_id = ?", self.id)
-      .where("groups.public_admission OR groups.allow_membership_requests")
+      .where("groups.public_admission OR `groups`.allow_membership_requests")
       .order(:allow_membership_requests)
       .first
   end
@@ -414,7 +414,7 @@ class Category < ActiveRecord::Base
 
     DB.query(<<~SQL, id: id, parent_id: parent_id, max_height: max_height)[0].max
       WITH RECURSIVE ancestors(parent_category_id, height) AS (
-        SELECT :parent_id :: integer, 0
+        SELECT  cast(:parent_id as unsigned), 0
 
         UNION ALL
 
@@ -429,7 +429,7 @@ class Category < ActiveRecord::Base
         AND ancestors.height < :max_height
       )
 
-      SELECT max(height) FROM ancestors
+      SELECT max(height) as max FROM ancestors
     SQL
   end
 
@@ -442,7 +442,7 @@ class Category < ActiveRecord::Base
 
     DB.query(<<~SQL, id: id, parent_id: parent_id, max_depth: max_depth)[0].max
       WITH RECURSIVE descendants(id, depth) AS (
-        SELECT :id :: integer, 0
+        SELECT cast(:id as unsigned), 0
 
         UNION ALL
 
@@ -457,7 +457,7 @@ class Category < ActiveRecord::Base
         AND descendants.depth < :max_depth
       )
 
-      SELECT max(depth) FROM descendants
+      SELECT max(depth) as max FROM descendants
     SQL
   end
 
@@ -575,7 +575,7 @@ class Category < ActiveRecord::Base
 
     auto_bumps = CategoryCustomField
       .where(name: Category::NUM_AUTO_BUMP_DAILY)
-      .where('NULLIF(value, \'\')::int > 0')
+      .where("CAST(NULLIF(value, '') AS UNSIGNED) > 0")
       .pluck(:category_id)
 
     if (auto_bumps.length > 0)
@@ -670,7 +670,7 @@ class Category < ActiveRecord::Base
 
   def secure_group_ids
     if self.read_restricted?
-      groups.pluck("groups.id")
+      groups.pluck("`groups`.id")
     end
   end
 

@@ -434,8 +434,8 @@ class UsersController < ApplicationController
 
       show_emails = guardian.can_see_invite_emails?(inviter)
       if params[:search].present? && invites.present?
-        filter_sql = '(LOWER(users.username) LIKE :filter)'
-        filter_sql = '(LOWER(invites.email) LIKE :filter) or (LOWER(users.username) LIKE :filter)' if show_emails
+        filter_sql = '(LOWER(users.username) LIKE binary :filter)'
+        filter_sql = '(LOWER(invites.email) LIKE binary :filter) or (LOWER(users.username) LIKE binary :filter)' if show_emails
         invites = invites.where(filter_sql, filter: "%#{params[:search].downcase}%")
       end
 

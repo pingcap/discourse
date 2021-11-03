@@ -43,7 +43,7 @@ class BookmarkQuery
       results = results
         .joins("LEFT JOIN post_search_data ON post_search_data.post_id = bookmarks.post_id")
         .where(
-          "bookmarks.name ILIKE :q OR #{bookmark_ts_query} @@ post_search_data.search_data",
+          "bookmarks.name LIKE :q OR #{bookmark_ts_query} @@ post_search_data.search_data",
           q: "%#{term}%"
         )
     end

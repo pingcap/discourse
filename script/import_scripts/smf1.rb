@@ -38,7 +38,7 @@ class ImportScripts::Smf1 < ImportScripts::Base
     Topic
       .joins(:topic_allowed_users)
       .where(archetype: Archetype.private_message)
-      .where("title NOT ILIKE 'Re: %'")
+      .where("title NOT LIKE 'Re: %'")
       .group(:id)
       .order(:id)
       .pluck("string_agg(topic_allowed_users.user_id::text, ',' ORDER BY topic_allowed_users.user_id), title, topics.id")

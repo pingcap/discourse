@@ -373,19 +373,19 @@ class BadgeGranter
     full_backfill = !user_ids && !post_ids
 
     post_clause = badge.target_posts ? "AND (q.post_id = ub.post_id OR NOT :multiple_grant)" : ""
-    post_id_field = badge.target_posts ? "q.post_id" : "NULL"
+    post_id_field = badge.target_posts ? "q.post_id" : "NULL AS post_id"
 
     sql = <<~SQL
-      DELETE FROM user_badges
-        WHERE id IN (
+      DELETE user_badges FROM user_badges
+        JOIN (
           SELECT ub.id
-          FROM user_badges ub
+          FROM (select * from user_badges) ub
           LEFT JOIN (
             #{badge.query}
           ) q ON q.user_id = ub.user_id
           #{post_clause}
           WHERE ub.badge_id = :id AND q.user_id IS NULL
-        )
+        ) t ON t.id = user_badges.id
     SQL
 
     DB.exec(
@@ -396,25 +396,6 @@ class BadgeGranter
       backfill: true,
       multiple_grant: true # cheat here, cause we only run on backfill and are deleting
     ) if badge.auto_revoke && full_backfill
-
-    sql = <<~SQL
-      WITH w as (
-        INSERT INTO user_badges(badge_id, user_id, granted_at, granted_by_id, created_at, post_id)
-        SELECT :id, q.user_id, q.granted_at, -1, current_timestamp, #{post_id_field}
-          FROM (
-                 #{badge.query}
-               ) q
-     LEFT JOIN user_badges ub ON ub.badge_id = :id AND ub.user_id = q.user_id
-        #{post_clause}
-        /*where*/
-        ON CONFLICT DO NOTHING
-        RETURNING id, user_id, granted_at
-      )
-      SELECT w.*, username, locale, (u.admin OR u.moderator) AS staff, uo.skip_new_user_tips
-        FROM w
-        JOIN users u on u.id = w.user_id
-        JOIN user_options uo ON uo.user_id = w.user_id
-    SQL
 
     builder = DB.build(sql)
     builder.where("ub.badge_id IS NULL AND q.user_id > 0")
@@ -434,7 +415,44 @@ class BadgeGranter
       return
     end
 
+    w_sql = <<~SQL
+    SELECT :id AS badge_id, q.user_id, q.granted_at, -1 AS granted_by_id, #{post_id_field}
+      FROM (#{badge.query}) q
+ LEFT JOIN user_badges ub ON ub.badge_id = :id AND ub.user_id = q.user_id
+    #{post_clause}
+    /*where*/
+    SQL
+
+    w_builder = DB.build(w_sql)
+    w_builder.where("ub.badge_id IS NULL AND q.user_id > 0")
+    ub_ids = w_builder.query(
+      id: badge.id,
+      multiple_grant: badge.multiple_grant,
+      backfill: full_backfill,
+      post_ids: post_ids || [-2],
+      user_ids: user_ids || [-2]
+    ).map do |ub|
+      DB.exec(
+        "INSERT IGNORE INTO user_badges(badge_id, user_id, granted_at, granted_by_id, post_id) 
+         VALUES (:badge_id, :user_id, :granted_at, :granted_by_id, :post_id)",
+         badge_id: badge.id,
+         user_id: ub.user_id,
+         granted_at: ub.granted_at,
+         granted_by_id: -1,
+         post_id: ub.post_id
+      )
+      DB.raw_connection.last_id
+    end.reject { |x| x.zero? }
+
+    sql = <<~SQL
+      SELECT w.*, username, locale, (u.admin OR u.moderator) AS staff
+        FROM (SELECT id, user_id, granted_at FROM user_badges WHERE id IN (:ub_ids)) w
+        JOIN users u on u.id = w.user_id
+    SQL
+    builder = DB.build(sql)
+
     builder.query(
+      ub_ids: ub_ids,
       id: badge.id,
       multiple_grant: badge.multiple_grant,
       backfill: full_backfill,
@@ -461,8 +479,8 @@ class BadgeGranter
   def self.revoke_ungranted_titles!
     DB.exec <<~SQL
       UPDATE users u
+      JOIN user_profiles up
       SET title = ''
-      FROM user_profiles up
       WHERE u.title IS NOT NULL
         AND u.title <> ''
         AND up.user_id = u.id
@@ -480,9 +498,9 @@ class BadgeGranter
 
     DB.exec <<~SQL
       UPDATE user_profiles up
+      JOIN users u
       SET badge_granted_title    = FALSE,
           granted_title_badge_id = NULL
-      FROM users u
       WHERE up.user_id = u.id
         AND (u.title IS NULL OR u.title = '')
         AND (up.badge_granted_title OR up.granted_title_badge_id IS NOT NULL)

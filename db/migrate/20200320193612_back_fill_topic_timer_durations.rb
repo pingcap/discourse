@@ -10,7 +10,7 @@ class BackFillTopicTimerDurations < ActiveRecord::Migration[6.0]
 
     DB.exec <<~SQL
       UPDATE topic_timers
-      SET duration = EXTRACT(EPOCH FROM execute_at - created_at) / 3600
+      SET duration = (UNIX_TIMESTAMP(execute_at) - UNIX_TIMESTAMP(created_at)) / 3600
       WHERE duration IS NULL AND execute_at IS NOT NULL AND created_at IS NOT NULL
     SQL
   end

@@ -1,16 +1,12 @@
 # frozen_string_literal: true
 
 class UpdatePrivateMessageOnPostSearchData < ActiveRecord::Migration[6.0]
-  # this is a very big change ... avoid an enormous transaction here
-  disable_ddl_transaction!
 
   def update_private_message_flag
 
     sql = <<~SQL
       UPDATE post_search_data
-      SET private_message = X.private_message
-      FROM
-      (
+      JOIN (
         SELECT post_id,
           CASE WHEN t.archetype = 'private_message' THEN TRUE ELSE FALSE END private_message
         FROM posts p
@@ -18,13 +14,14 @@ class UpdatePrivateMessageOnPostSearchData < ActiveRecord::Migration[6.0]
         JOIN topics t ON t.id = p.topic_id
         WHERE pd.private_message IS NULL OR
           pd.private_message <> CASE WHEN t.archetype = 'private_message' THEN TRUE ELSE FALSE END
-        LIMIT 3000000
-      ) X
+        LIMIT 30000
+      ) X ON X.post_id = post_search_data.post_id
+      SET post_search_data.private_message = X.private_message
       WHERE X.post_id = post_search_data.post_id
     SQL
 
     while true
-      count = execute(sql).cmd_tuples
+      count = DB.exec(sql)
       if count == 0
         break
       else

@@ -20,26 +20,28 @@ class AddUserApiKeyScopes < ActiveRecord::Migration[6.0]
             created_at,
             updated_at
           )
-          SELECT
-            user_api_keys.id,
-            unnest(user_api_keys.scopes),
-            created_at,
-            updated_at
-          FROM user_api_keys
+          SELECT 
+            t.id,  
+            json_unquote(json_extract(t.scopes, concat('$[', n.i, ']'))) scope,
+            t.created_at,
+            t.updated_at
+          FROM user_api_keys t 
+               INNER JOIN (
+                 SELECT 0 i 
+                 union all 
+                 SELECT 1 
+                 union all 
+                 SELECT 2
+                ) n on n.i < json_length(t.scopes);
         SQL
 
-        Migration::SafeMigrate.disable!
         change_column_null :user_api_keys, :scopes, true
         change_column_default :user_api_keys, :scopes, nil
-        Migration::SafeMigrate.enable!
-
-        Migration::ColumnDropper.mark_readonly(:user_api_keys, :scopes)
       end
 
       dir.down do
         change_column_null :user_api_keys, :scopes, false
         change_column_default :user_api_keys, :scopes, []
-        Migration::ColumnDropper.drop_readonly(:user_api_keys, :scopes)
       end
     end
   end

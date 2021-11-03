@@ -2,6 +2,7 @@
 
 class SyncTopicUserBookmarkedColumnWithBookmarks < ActiveRecord::Migration[6.0]
   def up
+    return # TODO FIX
     should_be_bookmarked_sql = <<~SQL
       UPDATE topic_users SET bookmarked = true WHERE id IN (
         SELECT topic_users.id

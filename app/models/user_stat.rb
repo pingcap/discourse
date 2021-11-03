@@ -180,16 +180,17 @@ class UserStat < ActiveRecord::Base
   end
 
   def self.update_distinct_badge_count(user_id = nil)
+    badge_ids = DB.query_single("SELECT id FROM badges WHERE enabled").join(",")
     sql = <<~SQL
       UPDATE user_stats
-      SET distinct_badge_count = x.distinct_badge_count
-      FROM (
+      JOIN (
         SELECT users.id user_id, COUNT(distinct user_badges.badge_id) distinct_badge_count
         FROM users
         LEFT JOIN user_badges ON user_badges.user_id = users.id
-                              AND (user_badges.badge_id IN (SELECT id FROM badges WHERE enabled))
+                              AND (user_badges.badge_id IN (#{badge_ids.presence || 'null'}))
         GROUP BY users.id
-      ) x
+      ) x ON x.user_id = user_stats.user_id
+      SET user_stats.distinct_badge_count = x.distinct_badge_count
       WHERE user_stats.user_id = x.user_id AND user_stats.distinct_badge_count <> x.distinct_badge_count
     SQL
 
@@ -204,12 +205,13 @@ class UserStat < ActiveRecord::Base
 
   def self.update_draft_count(user_id = nil)
     if user_id.present?
-      draft_count = DB.query_single <<~SQL, user_id: user_id
+      DB.query_single <<~SQL, user_id: user_id
         UPDATE user_stats
         SET draft_count = (SELECT COUNT(*) FROM drafts WHERE user_id = :user_id)
         WHERE user_id = :user_id
-        RETURNING draft_count
       SQL
+
+      draft_count = DB.query_single("select draft_count from user_stats where user_id = :user_id limit 1", user_id: user_id)
 
       MessageBus.publish(
         '/user',

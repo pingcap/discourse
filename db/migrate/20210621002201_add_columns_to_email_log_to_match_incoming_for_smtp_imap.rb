@@ -3,11 +3,11 @@
 class AddColumnsToEmailLogToMatchIncomingForSmtpImap < ActiveRecord::Migration[6.1]
   def up
     add_column :email_logs, :cc_addresses, :text, null: true
-    add_column :email_logs, :cc_user_ids, :integer, array: true, null: true
+    add_column :email_logs, :cc_user_ids, :json, null: true
     add_column :email_logs, :raw, :text, null: true
     add_column :email_logs, :topic_id, :integer, null: true
 
-    add_index :email_logs, :topic_id, where: 'topic_id IS NOT NULL'
+    add_index :email_logs, :topic_id
   end
 
   def down

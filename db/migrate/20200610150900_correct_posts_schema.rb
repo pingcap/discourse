@@ -11,7 +11,7 @@ class CorrectPostsSchema < ActiveRecord::Migration[6.0]
     result = DB.query <<~SQL
       SELECT character_maximum_length
       FROM information_schema.columns
-      WHERE table_schema='public'
+      WHERE table_schema=database()
       AND table_name = 'posts'
       AND column_name IN ('action_code', 'edit_reason')
     SQL
@@ -21,8 +21,8 @@ class CorrectPostsSchema < ActiveRecord::Migration[6.0]
 
     execute "DROP VIEW badge_posts"
 
-    execute "ALTER TABLE posts ALTER COLUMN action_code TYPE varchar"
-    execute "ALTER TABLE posts ALTER COLUMN edit_reason TYPE varchar"
+    execute "ALTER TABLE posts modify COLUMN action_code  varchar(255)"
+    execute "ALTER TABLE posts modify COLUMN edit_reason varchar(255)"
 
     # we must recreate this view every time we amend posts
     # p.* is auto expanded and persisted into the view definition

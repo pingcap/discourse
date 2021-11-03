@@ -181,6 +181,7 @@ class SearchIndexer
   end
 
   def self.queue_post_reindex(topic_id)
+    return
     return if @disabled
 
     DB.exec(<<~SQL, topic_id: topic_id, version: REINDEX_VERSION)
@@ -193,6 +194,7 @@ class SearchIndexer
   end
 
   def self.index(obj, force: false)
+    return
     return if @disabled
 
     category_name = nil

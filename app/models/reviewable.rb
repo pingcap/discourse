@@ -608,15 +608,18 @@ class Reviewable < ActiveRecord::Base
           AND rs.status IN (:pending, :agreed)
       ), 0.0)
       WHERE id = :id
-      RETURNING score
     SQL
 
-    result = DB.query(
+    DB.exec(
       sql,
       id: self.id,
       pending: ReviewableScore.statuses[:pending],
       agreed: ReviewableScore.statuses[:agreed]
     )
+
+    result = DB.query(<<~SQL, id: self.id)
+      SELECT score FROM reviewables WHERE id = :id
+    SQL
 
     # Update topic score
     sql = <<~SQL
@@ -630,7 +633,7 @@ class Reviewable < ActiveRecord::Base
       WHERE id = :topic_id
     SQL
 
-    DB.query(
+    DB.exec(
       sql,
       topic_id: topic_id,
       pending: Reviewable.statuses[:pending],
@@ -672,19 +675,28 @@ protected
     version_result = nil
 
     if version
-      version_result = DB.query_single(
-        "UPDATE reviewables SET version = version + 1 WHERE id = :id AND version = :version RETURNING version",
+      count = DB.exec(
+        "UPDATE reviewables SET version = version + 1 WHERE id = :id AND version = :version",
         version: version,
         id: self.id
       )
+      version_result = DB.query_single(
+        "SELECT version FROM reviewables WHERE id = :id",
+        id: self.id
+      ) if count > 0
     else
       # We didn't supply a version to update safely, so just increase it
+      DB.exec(
+        "UPDATE reviewables SET version = version + 1 WHERE id = :id",
+        id: self.id
+      )
+
       version_result = DB.query_single(
-        "UPDATE reviewables SET version = version + 1 WHERE id = :id RETURNING version",
+        "SELECT version FROM reviewables WHERE id = :id",
         id: self.id
       )
     end
-
+    
     if version_result && version_result[0]
       self.version = version_result[0]
     else
@@ -711,11 +723,16 @@ private
     user_ids -= [post&.user_id]
     return if user_ids.blank?
 
-    result = DB.query(<<~SQL, user_ids: user_ids)
+    DB.exec(<<~SQL, user_ids: user_ids)
       UPDATE user_stats
       SET flags_#{status} = flags_#{status} + 1
       WHERE user_id IN (:user_ids)
-      RETURNING user_id, flags_agreed + flags_disagreed + flags_ignored AS total
+    SQL
+
+    result = DB.query(<<~SQL, user_ids: user_ids)
+     SELECT user_id, flags_agreed + flags_disagreed + flags_ignored AS total
+       FROM user_stats
+      WHERE user_id IN (:user_ids)
     SQL
 
     user_ids = result.select { |r| r.total > Jobs::TruncateUserFlagStats.truncate_to }.map(&:user_id)

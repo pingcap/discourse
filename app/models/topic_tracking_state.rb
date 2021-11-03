@@ -264,7 +264,7 @@ class TopicTrackingState
     User.where("GREATEST(CASE
                   WHEN COALESCE(uo.new_topic_duration_minutes, :default_duration) = :always THEN u.created_at
                   WHEN COALESCE(uo.new_topic_duration_minutes, :default_duration) = :last_visit THEN COALESCE(u.previous_visit_at,u.created_at)
-                  ELSE (:now::timestamp - INTERVAL '1 MINUTE' * COALESCE(uo.new_topic_duration_minutes, :default_duration))
+                  ELSE (:now - INTERVAL 1 * (COALESCE(uo.new_topic_duration_minutes, :default_duration)) MINUTE )
                END, u.created_at, :min_date)",
                treat_as_new_topic_params
               ).where_clause.ast.to_sql
@@ -300,7 +300,7 @@ class TopicTrackingState
     tag_ids = muted_tag_ids(user)
     sql = new_and_unread_sql(topic_id, user, tag_ids)
     sql = tags_included_wrapped_sql(sql)
-
+    
     report = DB.query(
       sql + "\n\n LIMIT :max_topics",
       {
@@ -347,7 +347,7 @@ class TopicTrackingState
           #{sql}
         )
         SELECT *, (
-          SELECT ARRAY_AGG(name) from topic_tags
+          SELECT JSON_ARRAYAGG(name) from topic_tags
              JOIN tags on tags.id = topic_tags.tag_id
              WHERE topic_id = tags_included_cte.topic_id
           ) tags
@@ -413,7 +413,7 @@ class TopicTrackingState
               WHEN COALESCE(uo.new_topic_duration_minutes, :default_duration) = :last_visit THEN COALESCE(
                 u.previous_visit_at,u.created_at
               )
-              ELSE (:now::timestamp - INTERVAL '1 MINUTE' * COALESCE(uo.new_topic_duration_minutes, :default_duration))
+              ELSE (:now - INTERVAL 1 * (COALESCE(uo.new_topic_duration_minutes, :default_duration)) MINUTE )
               END, u.created_at, :min_date
            ) AS treat_as_new_topic_start_date"
 
@@ -444,7 +444,7 @@ class TopicTrackingState
     tags_filter = ""
 
     if muted_tag_ids.present? && ['always', 'only_muted'].include?(SiteSetting.remove_muted_tags_from_latest)
-      existing_tags_sql = "(select array_agg(tag_id) from topic_tags where topic_tags.topic_id = topics.id)"
+      existing_tags_sql = "(select json_arrayagg(tag_id) from topic_tags where topic_tags.topic_id = topics.id)"
       muted_tags_array_sql = "ARRAY[#{muted_tag_ids.join(',')}]"
 
       if SiteSetting.remove_muted_tags_from_latest == 'always'
@@ -529,8 +529,8 @@ class TopicTrackingState
     topic.allowed_groups
       .joins(:group_users)
       .where(publish_read_state: true)
-      .select('ARRAY_AGG(group_users.user_id) AS members', :name, :id)
-      .group('groups.id')
+      .select('JSON_ARRAYAGG(group_users.user_id) AS members', :name, :id)
+      .group('`groups`.id')
   end
 
   def self.update_topic_list_read_indicator(topic, groups, last_read_post_number, user_id, write_event)

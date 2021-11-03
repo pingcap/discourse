@@ -3,8 +3,8 @@
 class AddUniqueIndexToDevelopers < ActiveRecord::Migration[6.0]
   def up
     execute <<~SQL
-      DELETE FROM developers d1
-      USING (
+      DELETE d1 FROM developers d1
+      inner join (
         SELECT MAX(id) as id, user_id
         FROM developers
         GROUP BY user_id

@@ -412,7 +412,7 @@ class Topic < ActiveRecord::Base
   end
 
   def best_post
-    posts.where(post_type: Post.types[:regular], user_deleted: false).order('score desc nulls last').limit(1).first
+    posts.where(post_type: Post.types[:regular], user_deleted: false).order('score desc').limit(1).first
   end
 
   def has_flags?
@@ -672,11 +672,14 @@ class Topic < ActiveRecord::Base
 
     if opts[:whisper]
 
-      result = DB.query_single(<<~SQL, highest, topic_id)
+      DB.exec(<<~SQL, highest, topic_id)
         UPDATE topics
         SET highest_staff_post_number = ? + 1
         WHERE id = ?
-        RETURNING highest_staff_post_number
+      SQL
+
+      result = DB.query_single(<<~SQL, topic_id)
+        SELECT highest_staff_post_number FROM topics WHERE id = ?
       SQL
 
       result.first.to_i
@@ -686,14 +689,17 @@ class Topic < ActiveRecord::Base
       reply_sql = opts[:reply] ? ", reply_count = reply_count + 1" : ""
       posts_sql = opts[:post]  ? ", posts_count = posts_count + 1" : ""
 
-      result = DB.query_single(<<~SQL, highest: highest, topic_id: topic_id)
+      DB.exec(<<~SQL, highest: highest, topic_id: topic_id)
         UPDATE topics
         SET highest_staff_post_number = :highest + 1,
             highest_post_number = :highest + 1
             #{reply_sql}
             #{posts_sql}
         WHERE id = :topic_id
-        RETURNING highest_post_number
+      SQL
+
+      result = DB.query_single(<<~SQL, topic_id)
+        SELECT highest_post_number FROM topics WHERE id = ?
       SQL
 
       result.first.to_i
@@ -781,7 +787,7 @@ class Topic < ActiveRecord::Base
     # ignore small_action replies for private messages
     post_type = archetype == Archetype.private_message ? " AND post_type <> #{Post.types[:small_action]}" : ''
 
-    result = DB.query_single(<<~SQL, topic_id: topic_id)
+    DB.exec(<<~SQL, topic_id: topic_id)
       UPDATE topics
       SET
         highest_staff_post_number = (
@@ -811,7 +817,10 @@ class Topic < ActiveRecord::Base
                 #{post_type}
         )
       WHERE id = :topic_id
-      RETURNING highest_post_number
+    SQL
+
+    result = DB.query_single(<<~SQL, topic_id)
+      SELECT highest_post_number FROM topics WHERE id = ?
     SQL
 
     highest_post_number = result.first.to_i
@@ -1498,9 +1507,9 @@ class Topic < ActiveRecord::Base
   end
 
   TIME_TO_FIRST_RESPONSE_SQL ||= <<-SQL
-    SELECT AVG(t.hours)::float AS "hours", t.created_at AS "date"
+    SELECT AVG(t.hours) AS "hours", t.created_at AS "date"
     FROM (
-      SELECT t.id, t.created_at::date AS created_at, EXTRACT(EPOCH FROM MIN(p.created_at) - t.created_at)::float / 3600.0 AS "hours"
+      SELECT t.id, date(t.created_at) AS created_at, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id
       /*where*/
@@ -1511,9 +1520,9 @@ class Topic < ActiveRecord::Base
   SQL
 
   TIME_TO_FIRST_RESPONSE_TOTAL_SQL ||= <<-SQL
-    SELECT AVG(t.hours)::float AS "hours"
+    SELECT AVG(t.hours) AS "hours"
     FROM (
-      SELECT t.id, EXTRACT(EPOCH FROM MIN(p.created_at) - t.created_at)::float / 3600.0 AS "hours"
+      SELECT t.id, TIMESTAMPDIFF(second, MIN(p.created_at), t.created_at) / 3600.0 AS "hours"
       FROM topics t
       LEFT JOIN posts p ON p.topic_id = t.id
       /*where*/
@@ -1540,7 +1549,7 @@ class Topic < ActiveRecord::Base
     builder.where("p.user_id != t.user_id")
     builder.where("p.user_id in (:user_ids)", user_ids: opts[:user_ids]) if opts[:user_ids]
     builder.where("p.post_type = :post_type", post_type: Post.types[:regular])
-    builder.where("EXTRACT(EPOCH FROM p.created_at - t.created_at) > 0")
+    builder.where("UNIX_TIMESTAMP(p.created_at) - UNIX_TIMESTAMP(t.created_at) > 0")
     builder.query_hash
   end
 

@@ -49,7 +49,7 @@ puts "Simulating activity for user id #{user.id}: #{user.name}"
 
 while true
   puts "Creating a random topic"
-  category = Category.where(read_restricted: false).order('random()').first
+  category = Category.where(read_restricted: false).order('rand()').first
   PostCreator.create(user, raw: sentence, title: sentence[0..50].strip, category: category.id)
 
   puts "creating random reply"

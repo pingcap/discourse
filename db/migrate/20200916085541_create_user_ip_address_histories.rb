@@ -4,7 +4,7 @@ class CreateUserIpAddressHistories < ActiveRecord::Migration[6.0]
   def up
     create_table :user_ip_address_histories do |t|
       t.integer :user_id, null: false
-      t.inet :ip_address, null: false
+      t.string :ip_address, null: false
 
       t.timestamps
     end

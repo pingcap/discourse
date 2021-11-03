@@ -416,7 +416,7 @@ class Search
   end
 
   advanced_filter(/^badge:(.*)$/i) do |posts, match|
-    badge_id = Badge.where('name ilike ? OR id = ?', match, match.to_i).pluck_first(:id)
+    badge_id = Badge.where('name like ? OR id = ?', match, match.to_i).pluck_first(:id)
     if badge_id
       posts.where('posts.user_id IN (SELECT ub.user_id FROM user_badges ub WHERE ub.badge_id = ?)', badge_id)
     else
@@ -505,7 +505,7 @@ class Search
       match = match[1..-1]
     end
 
-    category_ids = Category.where('slug ilike ? OR name ilike ? OR id = ?',
+    category_ids = Category.where('slug like ? OR name like ? OR id = ?',
                                   match, match, match.to_i).pluck(:id)
     if category_ids.present?
       category_ids += Category.subcategory_ids(category_ids.first) unless exact
@@ -575,7 +575,8 @@ class Search
           posts.where <<~SQL
             posts.id IN (
               SELECT post_id FROM post_search_data pd1
-              WHERE pd1.search_data @@ #{Search.ts_query(term: "##{match}")})
+              WHERE #{Search.like_query(term: '#' + match, field: "pd1.search_data")}
+              )
           SQL
         end
       end
@@ -583,7 +584,7 @@ class Search
   end
 
   advanced_filter(/^group:(.+)$/i) do |posts, match|
-    group_id = Group.where('name ilike ? OR (id = ? AND id > 0)', match, match.to_i).pluck_first(:id)
+    group_id = Group.where('name like ? OR (id = ? AND id > 0)', match, match.to_i).pluck_first(:id)
     if group_id
       posts.where("posts.user_id IN (select gu.user_id from group_users gu where gu.group_id = ?)", group_id)
     else
@@ -679,8 +680,8 @@ class Search
         FROM topic_tags tt, tags
         WHERE tt.tag_id = tags.id
         GROUP BY tt.topic_id
-        HAVING to_tsvector(#{default_ts_config}, array_to_string(array_agg(lower(tags.name)), ' ')) @@ to_tsquery(#{default_ts_config}, ?)
-      )", tags.join('&'))
+        HAVING #{Search.like_query(term: tags.join(' '), field: "group_concat(tags.name)", is_or: false) } 
+      )")
     else
       tags = match.split(",")
 
@@ -805,7 +806,7 @@ class Search
     secure_category_ids
 
     categories = Category.includes(:category_search_data)
-      .where("category_search_data.search_data @@ #{ts_query}")
+      .where(Search.like_query(term: term, field: "category_search_data.search_data"))
       .references(:category_search_data)
       .order("topics_month DESC")
       .secured(@guardian)
@@ -824,7 +825,7 @@ class Search
       .references(:user_search_data)
       .where(active: true)
       .where(staged: false)
-      .where("user_search_data.search_data @@ #{ts_query("simple")}")
+      .where(Search.like_query(term: term, field: "user_search_data.search_data"))
       .order("CASE WHEN username_lower = '#{@original_term.downcase}' THEN 0 ELSE 1 END")
       .order("last_posted_at DESC")
       .limit(limit)
@@ -835,10 +836,10 @@ class Search
 
     users_custom_data_query = DB.query(<<~SQL, user_ids: users.pluck(:id), term: "%#{@original_term.downcase}%")
       SELECT user_custom_fields.user_id, user_fields.name, user_custom_fields.value FROM user_custom_fields
-      INNER JOIN user_fields ON user_fields.id = REPLACE(user_custom_fields.name, 'user_field_', '')::INTEGER AND user_fields.searchable IS TRUE
+      INNER JOIN user_fields ON user_fields.id = CAST(REPLACE(user_custom_fields.name, 'user_field_', '') AS UNSIGNED) AND user_fields.searchable IS TRUE
       WHERE user_id IN (:user_ids)
       AND user_custom_fields.name LIKE 'user_field_%'
-      AND user_custom_fields.value ILIKE :term
+      AND user_custom_fields.value LIKE :term
     SQL
     users_custom_data = users_custom_data_query.reduce({}) do |acc, row|
       acc[row.user_id] =
@@ -858,16 +859,15 @@ class Search
   def groups_search
     groups = Group
       .visible_groups(@guardian.user, "name ASC", include_everyone: false)
-      .where("name ILIKE :term OR full_name ILIKE :term", term: "%#{@term}%")
+      .where("name LIKE :term OR full_name LIKE :term", term: "%#{@term}%")
       .limit(limit)
-
     groups.each { |group| @results.add(group) }
   end
 
   def tags_search
     return unless SiteSetting.tagging_enabled
     tags = Tag.includes(:tag_search_data)
-      .where("tag_search_data.search_data @@ #{ts_query}")
+      .where(Search.like_query(term: term, field: "tag_search_data.search_data"))
       .references(:tag_search_data)
       .order("name asc")
       .limit(limit)
@@ -945,7 +945,7 @@ class Search
         end
 
         posts = posts.joins('JOIN users u ON u.id = posts.user_id')
-        posts = posts.where("posts.raw  || ' ' || u.username || ' ' || COALESCE(u.name, '') ilike ?", "%#{term_without_quote}%")
+        posts = posts.where("posts.raw  || ' ' || u.username || ' ' || COALESCE(u.name, '') like ?", "%#{term_without_quote}%")
       else
         # A is for title
         # B is for category
@@ -953,11 +953,11 @@ class Search
         # D is for cooked
         weights = @in_title ? 'A' : (SiteSetting.tagging_enabled ? 'ABCD' : 'ABD')
         posts = posts.where(post_number: 1) if @in_title
-        posts = posts.where("post_search_data.search_data @@ #{ts_query(weight_filter: weights)}")
+        posts = posts.where(Search.like_query(term: @term, field: "post_search_data.search_data"))
         exact_terms = @term.scan(Regexp.new(PHRASE_MATCH_REGEXP_PATTERN)).flatten
 
         exact_terms.each do |exact|
-          posts = posts.where("posts.raw ilike :exact OR topics.title ilike :exact", exact: "%#{exact}%")
+          posts = posts.where("posts.raw like :exact OR topics.title like :exact", exact: "%#{exact}%")
         end
       end
     end
@@ -1028,59 +1028,7 @@ class Search
       else
         posts = posts.order("posts.like_count DESC")
       end
-    elsif !is_topic_search
-      rank = <<~SQL
-      TS_RANK_CD(
-        post_search_data.search_data,
-        #{@term.blank? ? '' : ts_query(weight_filter: weights)},
-        #{SiteSetting.search_ranking_normalization}|32
-      )
-      SQL
-
-      if type_filter != "private_messages"
-        category_search_priority = <<~SQL
-        (
-          CASE categories.search_priority
-          WHEN #{Searchable::PRIORITIES[:very_high]}
-          THEN 3
-          WHEN #{Searchable::PRIORITIES[:very_low]}
-          THEN 1
-          ELSE 2
-          END
-        )
-        SQL
-
-        category_priority_weights = <<~SQL
-        (
-          CASE categories.search_priority
-          WHEN #{Searchable::PRIORITIES[:low]}
-          THEN #{SiteSetting.category_search_priority_low_weight}
-          WHEN #{Searchable::PRIORITIES[:high]}
-          THEN #{SiteSetting.category_search_priority_high_weight}
-          ELSE
-            CASE WHEN topics.closed
-            THEN 0.9
-            ELSE 1
-            END
-          END
-        )
-        SQL
-
-        data_ranking =
-          if @term.blank?
-            "(#{category_priority_weights})"
-          else
-            "(#{rank} * #{category_priority_weights})"
-          end
-
-        posts =
-          if aggregate_search
-            posts.order("MAX(#{category_search_priority}) DESC", "MAX(#{data_ranking}) DESC")
-          else
-            posts.order("#{category_search_priority} DESC", "#{data_ranking} DESC")
-          end
-      end
-
+    else
       posts = posts.order("topics.bumped_at DESC")
     end
 
@@ -1124,6 +1072,14 @@ class Search
     )
   end
 
+  def self.like_query(term: , field:, is_or: true)
+    tokens = term.to_s.split(/[^\p{han}a-zA-Z0-9]+/)
+    joiner = is_or ? " OR " : " AND "
+    tokens.map do |token|
+      "#{field} LIKE '#{EscapeLike.escape_like(token)}'"
+    end.join(joiner)
+  end
+
   def self.to_tsquery(ts_config: nil, term:, joiner: nil)
     ts_config = ActiveRecord::Base.connection.quote(ts_config) if ts_config
     tsquery = "TO_TSQUERY(#{ts_config || default_ts_config}, '#{self.escape_string(term)}')"
@@ -1146,7 +1102,7 @@ class Search
   end
 
   def wrap_rows(query)
-    "SELECT *, row_number() over() row_number FROM (#{query.to_sql}) xxx"
+    "SELECT *, row_number() over() `row_number` FROM (#{query.to_sql}) xxx"
   end
 
   def aggregate_post_sql(opts)
@@ -1196,7 +1152,7 @@ class Search
 
     posts_scope(posts_eager_loads(Post))
       .joins("JOIN (#{post_sql}) x ON x.id = posts.topic_id AND x.post_number = posts.post_number")
-      .order('row_number')
+      .order('`row_number`')
   end
 
   def aggregate_search(opts = {})

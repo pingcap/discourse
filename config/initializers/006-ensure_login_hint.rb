@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-
+return # TMP skip for migration
 return if GlobalSetting.skip_db?
 
 # Some sanity checking so we don't count on an unindexed column on boot

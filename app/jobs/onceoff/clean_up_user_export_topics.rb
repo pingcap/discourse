@@ -15,7 +15,7 @@ module Jobs
       slugs = slugs.reject { |s| s == "%-topic" }
 
       topics = Topic.with_deleted.where(<<~SQL, slugs, UserExport::DESTROY_CREATED_BEFORE)
-        slug LIKE ANY(ARRAY[?]) AND
+        slug LIKE binary ANY(ARRAY[?]) AND
         archetype = 'private_message' AND
         subtype = 'system_message' AND
         posts_count = 1 AND

@@ -3,8 +3,8 @@
 class DeleteOrphanPostRevisions < ActiveRecord::Migration[6.0]
   def up
     sql = <<~SQL
-        DELETE FROM post_revisions
-        USING post_revisions pr
+        DELETE post_revisions FROM post_revisions
+        INNER JOIN post_revisions pr ON pr.id = post_revisions.id
         LEFT JOIN posts ON posts.id = pr.post_id
         WHERE posts.id IS NULL
         AND post_revisions.id = pr.id

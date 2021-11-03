@@ -8,10 +8,9 @@ class AddTimestampsToOptimizedImages < ActiveRecord::Migration[6.0]
     # Not perfect, but a good approximation
     execute <<~SQL
       UPDATE optimized_images
-      SET created_at = uploads.created_at,
-          updated_at = uploads.created_at
-      FROM uploads
-      WHERE uploads.id = optimized_images.upload_id
+      JOIN uploads ON uploads.id = optimized_images.upload_id
+      SET optimized_images.created_at = uploads.created_at,
+          optimized_images.updated_at = uploads.created_at
     SQL
 
     # Integrity is not enforced, we might have optimized images
@@ -24,11 +23,11 @@ class AddTimestampsToOptimizedImages < ActiveRecord::Migration[6.0]
     SQL
 
     execute <<~SQL
-      ALTER TABLE optimized_images ALTER COLUMN created_at SET NOT NULL;
+      ALTER TABLE optimized_images modify COLUMN created_at datetime NOT NULL;
     SQL
 
     execute <<~SQL
-      ALTER TABLE optimized_images ALTER COLUMN updated_at SET NOT NULL;
+      ALTER TABLE optimized_images modify COLUMN updated_at datetime NOT NULL;
     SQL
   end
 end

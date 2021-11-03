@@ -6,9 +6,10 @@ module Jobs
       topic_id = args[:topic_id]
 
       DB.exec(<<~SQL, topic_id: topic_id)
-        UPDATE topic_users SET bookmarked = true
-        FROM bookmarks AS b
+        UPDATE topic_users 
+        JOIN bookmarks AS b 
         INNER JOIN posts ON posts.id = b.post_id
+        SET bookmarked = true
         WHERE NOT topic_users.bookmarked AND
           posts.deleted_at IS NULL AND
           topic_users.topic_id = posts.topic_id AND

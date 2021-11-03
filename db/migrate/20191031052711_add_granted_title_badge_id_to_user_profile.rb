@@ -8,22 +8,22 @@ class AddGrantedTitleBadgeIdToUserProfile < ActiveRecord::Migration[6.0]
     # on the normal badge name
     ActiveRecord::Base.connection.execute <<-SQL
       UPDATE user_profiles
+             INNER JOIN users on users.id = user_profiles.user_id
+             INNER JOIN badges b ON users.title = b.name
       SET granted_title_badge_id = b.id
-      FROM users
-      INNER JOIN badges b ON users.title = b.name
-      WHERE users.id = user_profiles.user_id
-        AND user_profiles.granted_title_badge_id IS NULL
+      WHERE user_profiles.granted_title_badge_id IS NULL
     SQL
 
     # update all of the system badge derived titles where the
     # badge has had custom text set for it via TranslationOverride
     ActiveRecord::Base.connection.execute <<-SQL
       UPDATE user_profiles
+             JOIN users on users.id = user_profiles.user_id
+             JOIN translation_overrides ON translation_overrides.value = users.title
+             JOIN badges ON concat('badges.', LOWER(REPLACE(badges.name, ' ', '_')), '.name') = translation_overrides.translation_key
+             JOIN user_badges ON user_badges.user_id = users.id AND user_badges.badge_id = badges.id
       SET granted_title_badge_id = badges.id
-      FROM users
-      JOIN translation_overrides ON translation_overrides.value = users.title
-      JOIN badges ON ('badges.' || LOWER(REPLACE(badges.name, ' ', '_')) || '.name') = translation_overrides.translation_key
-      JOIN user_badges ON user_badges.user_id = users.id AND user_badges.badge_id = badges.id
+
       WHERE users.id = user_profiles.user_id
         AND user_profiles.granted_title_badge_id IS NULL
     SQL

@@ -34,7 +34,7 @@ class RandomTopicSelector
       .where(closed: false, archived: false)
       .where("topics.created_at > ?", SiteSetting.suggested_topics_max_days_old.days.ago)
       .limit(BACKFILL_SIZE)
-      .reorder('RANDOM()')
+      .reorder('RAND()')
       .pluck(:id)
 
     key = cache_key(category)

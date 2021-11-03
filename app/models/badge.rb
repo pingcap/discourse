@@ -176,8 +176,8 @@ class Badge < ActiveRecord::Base
   def clear_user_titles!
     DB.exec(<<~SQL, badge_id: self.id, updated_at: Time.zone.now)
       UPDATE users AS u
+      JOIN user_profiles AS up
       SET title = '', updated_at = :updated_at
-      FROM user_profiles AS up
       WHERE up.user_id = u.id AND up.granted_title_badge_id = :badge_id
     SQL
     DB.exec(<<~SQL, badge_id: self.id)
@@ -192,8 +192,8 @@ class Badge < ActiveRecord::Base
   def update_user_titles!(new_title)
     DB.exec(<<~SQL, granted_title_badge_id: self.id, title: new_title, updated_at: Time.zone.now)
       UPDATE users AS u
+      JOIN user_profiles AS up
       SET title = :title, updated_at = :updated_at
-      FROM user_profiles AS up
       WHERE up.user_id = u.id AND up.granted_title_badge_id = :granted_title_badge_id
     SQL
   end
@@ -204,9 +204,9 @@ class Badge < ActiveRecord::Base
   def reset_user_titles!
     DB.exec(<<~SQL, granted_title_badge_id: self.id, updated_at: Time.zone.now)
       UPDATE users AS u
-      SET title = badges.name, updated_at = :updated_at
-      FROM user_profiles AS up
+      JOIN user_profiles AS up
       INNER JOIN badges ON badges.id = up.granted_title_badge_id
+      SET title = badges.name, updated_at = :updated_at
       WHERE up.user_id = u.id AND up.granted_title_badge_id = :granted_title_badge_id
     SQL
   end

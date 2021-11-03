@@ -7,14 +7,14 @@ class AddHashedApiKey < ActiveRecord::Migration[6.0]
     execute(
       <<~SQL
         UPDATE api_keys
-        SET truncated_key = LEFT(key, 4)
+        SET truncated_key = LEFT(`key`, 4)
       SQL
     )
 
     batch_size = 500
     begin
       batch = DB.query <<-SQL
-        SELECT id, key
+        SELECT id, `key`
         FROM api_keys
         WHERE key_hash IS NULL
         LIMIT #{batch_size}
@@ -26,15 +26,17 @@ class AddHashedApiKey < ActiveRecord::Migration[6.0]
         to_update << { id: row.id, key_hash: hashed }
       end
 
+      selects = batch.map do |row|
+        "SELECT #{row.id} AS id, '#{Digest::SHA256.hexdigest row.key}' AS key_hash"
+      end.join(" UNION ")
+
       if to_update.size > 0
         data_string = to_update.map { |r| "(#{r[:id]}, '#{r[:key_hash]}')" }.join(",")
 
         DB.exec <<~SQL
           UPDATE api_keys
-          SET key_hash = data.key_hash
-          FROM (values
-            #{data_string}
-          ) as data(id, key_hash)
+          JOIN (#{selects}) as data ON api_keys.id = data.id
+          SET api_keys.key_hash = data.key_hash
           WHERE api_keys.id = data.id
         SQL
       end
@@ -47,9 +49,9 @@ class AddHashedApiKey < ActiveRecord::Migration[6.0]
 
     # The key column will be dropped in a post_deploy migration
     # But allow it to be null in the meantime
-    Migration::SafeMigrate.disable!
+    #Migration::SafeMigrate.disable!
     change_column_null :api_keys, :key, true
-    Migration::SafeMigrate.enable!
+    #Migration::SafeMigrate.enable!
   end
 
   def down

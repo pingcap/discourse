@@ -231,8 +231,8 @@ class UserAction < ActiveRecord::Base
       LEFT JOIN post_custom_fields pc ON pc.post_id = a.target_post_id AND pc.name = 'action_code_who'
       /*where*/
       /*order_by*/
-      /*offset*/
       /*limit*/
+      /*offset*/
     SQL
 
     apply_common_filters(builder, user_id, guardian, ignore_private_messages)

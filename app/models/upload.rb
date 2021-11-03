@@ -68,7 +68,7 @@ class Upload < ActiveRecord::Base
     scope = self
       .joins(<<~SQL)
         LEFT JOIN site_settings ss
-        ON NULLIF(ss.value, '')::integer = uploads.id
+        ON cast(NULLIF(ss.value, '') as unsigned) = uploads.id
         AND ss.data_type = #{SiteSettings::TypeSupervisor.types[:upload].to_i}
       SQL
       .where("ss.value IS NULL")
@@ -86,7 +86,7 @@ class Upload < ActiveRecord::Base
       .where("tf.upload_id IS NULL")
       .joins("LEFT JOIN user_exports ue ON ue.upload_id = uploads.id")
       .where("ue.upload_id IS NULL")
-      .joins("LEFT JOIN groups g ON g.flair_upload_id = uploads.id")
+      .joins("LEFT JOIN `groups` g ON g.flair_upload_id = uploads.id")
       .where("g.flair_upload_id IS NULL")
       .joins("LEFT JOIN badges b ON b.image_upload_id = uploads.id")
       .where("b.image_upload_id IS NULL")

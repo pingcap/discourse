@@ -141,34 +141,34 @@ class Group < ActiveRecord::Base
     groups = self.order(order || "name ASC")
 
     if !opts || !opts[:include_everyone]
-      groups = groups.where("groups.id > 0")
+      groups = groups.where("`groups`.id > 0")
     end
 
     if !user&.admin
       is_staff = !!user&.staff?
 
       if user.blank?
-        sql = "groups.visibility_level = :public"
+        sql = "`groups`.visibility_level = :public"
       elsif is_staff
-        sql = "groups.visibility_level IN (:public, :logged_on_users, :members, :staff)"
+        sql = "`groups`.visibility_level IN (:public, :logged_on_users, :members, :staff)"
       else
         sql = <<~SQL
           groups.id IN (
             SELECT id
-              FROM groups
+              FROM `groups`
             WHERE visibility_level IN (:public, :logged_on_users)
 
             UNION ALL
 
             SELECT g.id
-              FROM groups g
+              FROM `groups` g
               JOIN group_users gu ON gu.group_id = g.id AND gu.user_id = :user_id
             WHERE g.visibility_level = :members
 
             UNION ALL
 
             SELECT g.id
-              FROM groups g
+              FROM `groups` g
               JOIN group_users gu ON gu.group_id = g.id AND gu.user_id = :user_id AND gu.owner
             WHERE g.visibility_level IN (:staff, :owners)
           )
@@ -186,34 +186,34 @@ class Group < ActiveRecord::Base
     groups = self.order(order || "name ASC")
 
     if !opts || !opts[:include_everyone]
-      groups = groups.where("groups.id > 0")
+      groups = groups.where("`groups`.id > 0")
     end
 
     if !user&.admin
       is_staff = !!user&.staff?
 
       if user.blank?
-        sql = "groups.members_visibility_level = :public"
+        sql = "`groups`.members_visibility_level = :public"
       elsif is_staff
-        sql = "groups.members_visibility_level IN (:public, :logged_on_users, :members, :staff)"
+        sql = "`groups`.members_visibility_level IN (:public, :logged_on_users, :members, :staff)"
       else
         sql = <<~SQL
           groups.id IN (
             SELECT id
-              FROM groups
+              FROM `groups`
             WHERE members_visibility_level IN (:public, :logged_on_users)
 
             UNION ALL
 
             SELECT g.id
-              FROM groups g
+              FROM `groups` g
               JOIN group_users gu ON gu.group_id = g.id AND gu.user_id = :user_id
             WHERE g.members_visibility_level = :members
 
             UNION ALL
 
             SELECT g.id
-              FROM groups g
+              FROM `groups` g
               JOIN group_users gu ON gu.group_id = g.id AND gu.user_id = :user_id AND gu.owner
             WHERE g.members_visibility_level IN (:staff, :owners)
           )
@@ -469,12 +469,10 @@ class Group < ActiveRecord::Base
       when :trust_level_0, :trust_level_1, :trust_level_2, :trust_level_3, :trust_level_4
         "SELECT id FROM users WHERE id <= 0 OR trust_level < #{id - 10} OR staged"
       end
-
+      
     DB.exec <<-SQL
       DELETE FROM group_users
-            USING (#{remove_subquery}) X
-            WHERE group_id = #{group.id}
-              AND user_id = X.id
+            WHERE group_id = #{group.id} AND user_id IN (#{remove_subquery})
     SQL
 
     # Add people to groups
@@ -522,7 +520,7 @@ class Group < ActiveRecord::Base
             FROM group_users
         GROUP BY group_id
       )
-      UPDATE groups
+      UPDATE `groups`
          SET user_count = X.users
         FROM X
        WHERE id = X.group_id
@@ -537,7 +535,7 @@ class Group < ActiveRecord::Base
 
   def self.refresh_has_messages!
     DB.exec <<-SQL
-      UPDATE groups g SET has_messages = false
+      UPDATE `groups` g SET has_messages = false
       WHERE NOT EXISTS (SELECT tg.id
                           FROM topic_allowed_groups tg
                     INNER JOIN topics t ON t.id = tg.topic_id
@@ -561,7 +559,7 @@ class Group < ActiveRecord::Base
     groups ||= Group
 
     groups.where(
-      "name ILIKE :term_like OR full_name ILIKE :term_like", term_like: "%#{name}%"
+      "name LIKE :term_like OR full_name LIKE :term_like", term_like: "%#{name}%"
     )
   end
 
@@ -754,7 +752,7 @@ class Group < ActiveRecord::Base
 
       # update group user count
       DB.exec <<~SQL
-        UPDATE groups g
+        UPDATE `groups` g
         SET user_count =
           (SELECT COUNT(gu.user_id)
            FROM group_users gu
@@ -779,7 +777,7 @@ class Group < ActiveRecord::Base
 
   def self.member_of(groups, user)
     groups
-      .joins("LEFT JOIN group_users gu ON gu.group_id = groups.id ")
+      .joins("LEFT JOIN group_users gu ON gu.group_id = `groups`.id ")
       .where("gu.user_id = ?", user.id)
   end
 

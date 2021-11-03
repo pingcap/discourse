@@ -2,10 +2,9 @@
 
 class AddUniqueIndexToDrafts < ActiveRecord::Migration[6.0]
   def up
-
     execute <<~SQL
-      DELETE FROM drafts d1
-      USING (
+      DELETE d1 FROM drafts d1
+      inner join (
         SELECT MAX(id) as id, draft_key, user_id
         FROM drafts
         GROUP BY draft_key, user_id

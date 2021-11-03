@@ -19,22 +19,31 @@ class TopicGroup < ActiveRecord::Base
   def self.update_read_count(user, topic_id, post_number)
     update_query = <<~SQL
       UPDATE topic_groups tg
-      SET
-        last_read_post_number = GREATEST(:post_number, tg.last_read_post_number),
-        updated_at = :now
-      FROM topic_allowed_groups tag
+      INNER JOIN topic_allowed_groups tag ON tag.topic_id = tg.topic_id and tag.group_id = tg.group_id
       INNER JOIN group_users gu ON gu.group_id = tag.group_id
+      SET
+        tg.last_read_post_number = GREATEST(:post_number, tg.last_read_post_number),
+        tg.updated_at = :now
       WHERE gu.user_id = :user_id
       AND tag.topic_id = :topic_id
       AND tg.topic_id = :topic_id
-      RETURNING
-        tg.group_id
     SQL
 
-    updated_groups = DB.query(
+    DB.exec(
       update_query,
       user_id: user.id, topic_id: topic_id, post_number: post_number, now: DateTime.now
     )
+
+    select_query = <<~SQL
+      SELECT tg.group_id 
+        FROM topic_groups tg 
+             INNER JOIN topic_allowed_groups tag ON tag.topic_id = tg.topic_id and tag.group_id  = tg.group_id
+             INNER JOIN group_users gu ON gu.group_id = tag.group_id 
+       WHERE gu.user_id = :user_id
+             AND tag.topic_id = :topic_id
+             AND tg.topic_id = :topic_id
+    SQL
+    updated_groups = DB.query(select_query, user_id: user.id, topic_id: topic_id)
   end
 
   def self.create_topic_group(user, topic_id, post_number, updated_group_ids)
@@ -50,8 +59,8 @@ class TopicGroup < ActiveRecord::Base
     query += 'AND NOT(tag.group_id IN (:already_updated_groups))' unless updated_group_ids.length.zero?
 
     query += <<~SQL
-      ON CONFLICT(topic_id, group_id)
-      DO UPDATE SET last_read_post_number = :post_number, created_at = :now, updated_at = :now
+      ON DUPLICATE KEY UPDATE
+      last_read_post_number = :post_number, created_at = :now, updated_at = :now
     SQL
 
     DB.exec(

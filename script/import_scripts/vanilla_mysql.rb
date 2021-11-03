@@ -637,7 +637,7 @@ class ImportScripts::VanillaSQL < ImportScripts::Base
     puts "", "Marking topics as solved..."
 
     DB.exec <<~SQL
-      INSERT INTO topic_custom_fields (name, value, topic_id, created_at, updated_at)
+      INSERT IGNORE INTO topic_custom_fields (name, value, topic_id, created_at, updated_at)
       SELECT 'accepted_answer_post_id', pcf.post_id, p.topic_id, p.created_at, p.created_at
         FROM post_custom_fields pcf
         JOIN posts p ON p.id = pcf.post_id
@@ -647,7 +647,6 @@ class ImportScripts::VanillaSQL < ImportScripts::Base
            FROM topic_custom_fields x
            WHERE x.topic_id = p.topic_id AND x.name = 'accepted_answer_post_id'
          )
-      ON CONFLICT DO NOTHING
     SQL
   end
 end

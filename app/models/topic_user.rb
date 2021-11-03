@@ -217,7 +217,7 @@ class TopicUser < ActiveRecord::Base
            ).exists?
 
           group_notification_level = Group
-            .joins("LEFT OUTER JOIN group_users gu ON gu.group_id = groups.id AND gu.user_id = #{user_id}")
+            .joins("LEFT OUTER JOIN group_users gu ON gu.group_id = `groups`.id AND gu.user_id = #{user_id}")
             .joins("LEFT OUTER JOIN topic_allowed_groups tag ON tag.topic_id = #{topic_id}")
             .where("gu.id IS NOT NULL AND tag.id IS NOT NULL")
             .pluck(:default_notification_level)
@@ -261,10 +261,14 @@ class TopicUser < ActiveRecord::Base
     # This would be a lot easier if psql supported some kind of upsert
     UPDATE_TOPIC_USER_SQL = <<~SQL
       UPDATE topic_users
+      JOIN topic_users tu
+      join topics t on t.id = tu.topic_id
+      join users u on u.id = :user_id
+      join user_options uo on uo.user_id = :user_id
       SET
-        last_read_post_number = GREATEST(:post_number, tu.last_read_post_number),
-        total_msecs_viewed = LEAST(tu.total_msecs_viewed + :msecs,86400000),
-        notification_level =
+        topic_users.last_read_post_number = GREATEST(:post_number, COALESCE(tu.last_read_post_number, 0)),
+        topic_users.total_msecs_viewed = LEAST(tu.total_msecs_viewed + :msecs,86400000),
+        topic_users.notification_level =
            case when tu.notifications_reason_id is null and (tu.total_msecs_viewed + :msecs) >
               coalesce(uo.auto_track_topics_after_msecs,:threshold) and
               coalesce(uo.auto_track_topics_after_msecs, :threshold) >= 0
@@ -273,20 +277,11 @@ class TopicUser < ActiveRecord::Base
            else
               tu.notification_level
            end
-    FROM topic_users tu
-    join topics t on t.id = tu.topic_id
-    join users u on u.id = :user_id
-    join user_options uo on uo.user_id = :user_id
     WHERE
          tu.topic_id = topic_users.topic_id AND
          tu.user_id = topic_users.user_id AND
          tu.topic_id = :topic_id AND
          tu.user_id = :user_id
-    RETURNING
-      topic_users.notification_level,
-      tu.notification_level old_level,
-      tu.last_read_post_number,
-      t.archetype
     SQL
 
     INSERT_TOPIC_USER_SQL = "INSERT INTO topic_users (user_id, topic_id, last_read_post_number, last_visited_at, first_visited_at, notification_level)
@@ -302,6 +297,8 @@ class TopicUser < ActiveRecord::Base
       return if post_number.blank?
       msecs = 0 if msecs.to_i < 0
 
+      old_tu = TopicUser.where(user_id: user.id, topic_id: topic_id).first
+
       args = {
         user_id: user.id,
         topic_id: topic_id,
@@ -312,12 +309,13 @@ class TopicUser < ActiveRecord::Base
         threshold: SiteSetting.default_other_auto_track_topics_after_msecs
       }
 
-      rows = DB.query(UPDATE_TOPIC_USER_SQL, args)
+      DB.exec(UPDATE_TOPIC_USER_SQL, args)
+      rows = DB.query("SELECT notification_level, topics.archetype FROM topic_users JOIN topics ON topics.id = topic_users.topic_id WHERE topic_users.user_id = :user_id AND topic_users.topic_id = :topic_id", args)
 
       if rows.length == 1
-        before = rows[0].old_level.to_i
+        before = old_tu.notification_level.to_i
         after = rows[0].notification_level.to_i
-        before_last_read = rows[0].last_read_post_number.to_i
+        before_last_read = old_tu.last_read_post_number.to_i
         archetype = rows[0].archetype
 
         if before_last_read < post_number
@@ -362,7 +360,8 @@ class TopicUser < ActiveRecord::Base
 
         begin
           DB.exec(INSERT_TOPIC_USER_SQL, args)
-        rescue PG::UniqueViolation
+        rescue Mysql2::Error => e
+          Rails.logger.warn $!
           # if record is inserted between two statements this can happen
           # we retry once to avoid failing the req
           if opts[:retry]
@@ -420,8 +419,7 @@ class TopicUser < ActiveRecord::Base
 
     builder = DB.build <<~SQL
       UPDATE topic_users tu
-      SET #{action_type_name} = x.state
-      FROM (
+      INNER JOIN (
         SELECT CASE WHEN EXISTS (
           SELECT 1
           FROM post_actions pa
@@ -438,6 +436,7 @@ class TopicUser < ActiveRecord::Base
         FROM topic_users tu2
         /*where*/
       ) x
+      SET tu.#{action_type_name} = x.state
       WHERE x.topic_id = tu.topic_id AND x.user_id = tu.user_id AND x.state != tu.#{action_type_name}
     SQL
 
@@ -494,7 +493,7 @@ SQL
     builder = DB.build <<~SQL
       UPDATE topic_users t
         SET
-          last_read_post_number = LEAST(GREATEST(last_read, last_read_post_number), max_post_number)
+          last_read_post_number = LEAST(GREATEST(last_read, COALESCE(last_read_post_number, 0)), max_post_number)
       FROM (
         SELECT topic_id, user_id, MAX(post_number) last_read
         FROM post_timings
@@ -511,7 +510,7 @@ SQL
       X.topic_id = t.topic_id AND
       X.user_id = t.user_id AND
       (
-        last_read_post_number <> LEAST(GREATEST(last_read, last_read_post_number), max_post_number)
+        last_read_post_number <> LEAST(GREATEST(last_read, COALESCE(last_read_post_number, 0)), max_post_number)
       )
     SQL
 

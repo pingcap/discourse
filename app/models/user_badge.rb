@@ -19,7 +19,7 @@ class UserBadge < ActiveRecord::Base
   scope :select_for_grouping, -> {
     select(
       UserBadge.attribute_names.map do |name|
-        operation = BOOLEAN_ATTRIBUTES.include?(name) ? "BOOL_OR" : "MAX"
+        operation = BOOLEAN_ATTRIBUTES.include?(name) ? "MAX" : "MAX"
         "#{operation}(user_badges.#{name}) AS #{name}"
       end,
       'COUNT(*) AS "count"'
@@ -71,9 +71,9 @@ class UserBadge < ActiveRecord::Base
           user_badges.badge_id,
           RANK() OVER (
             PARTITION BY user_badges.user_id -- Do a separate rank for each user
-            ORDER BY BOOL_OR(badges.enabled) DESC, -- Disabled badges last
-                    MAX(featured_tl_badge.user_id) NULLS LAST, -- Best tl badge first
-                    BOOL_OR(user_badges.is_favorite) DESC NULLS LAST, -- Favorite badges next
+            ORDER BY max(badges.enabled) DESC, -- Disabled badges last
+                    MAX(featured_tl_badge.user_id), -- Best tl badge first
+                    max(user_badges.is_favorite), -- Favorite badges next
                     CASE WHEN user_badges.badge_id IN (1,2,3,4) THEN 1 ELSE 0 END ASC, -- Non-featured tl badges last
                     MAX(badges.badge_type_id) ASC,
                     MAX(badges.grant_count) ASC,
@@ -86,8 +86,10 @@ class UserBadge < ActiveRecord::Base
         GROUP BY user_badges.user_id, user_badges.badge_id
       )
       -- Now use that data to update the featured_rank column
-      UPDATE user_badges SET featured_rank = rank_number
-      FROM ranks WHERE ranks.badge_id = user_badges.badge_id AND ranks.user_id = user_badges.user_id AND featured_rank IS DISTINCT FROM rank_number
+      UPDATE user_badges 
+      INNER JOIN ranks on ranks.badge_id = user_badges.badge_id AND ranks.user_id = user_badges.user_id
+      SET featured_rank = rank_number
+      WHERE not(featured_rank <=> rank_number)
     SQL
 
     DB.exec query

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 class BackfillEmailLogTopicId < ActiveRecord::Migration[6.1]
-  disable_ddl_transaction!
   BATCH_SIZE = 30_000
 
   def up
@@ -15,8 +14,8 @@ class BackfillEmailLogTopicId < ActiveRecord::Migration[6.1]
             LIMIT :batch_size
           )
           UPDATE email_logs
-          SET topic_id = cte.topic_id
-          FROM cte
+          INNER JOIN cte  ON email_logs.id = cte.id
+          SET email_logs.topic_id = cte.topic_id
           WHERE email_logs.id = cte.id
       SQL
 

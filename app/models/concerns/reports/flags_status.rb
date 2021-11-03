@@ -127,13 +127,10 @@ module Reports::FlagsStatus
       pa.disagreed_by_id,
       pa.deferred_by_id,
       COALESCE(pa.disagreed_at, pa.agreed_at, pa.deferred_at) AS responded_at
-      FROM period_actions pa
-      FULL OUTER JOIN staff_data sd
-      ON sd.id = pa.id
-      FULL OUTER JOIN flagger_data fd
-      ON fd.id = pa.id
-      FULL OUTER JOIN poster_data pd
-      ON pd.id = pa.id
+      FROM period_actions pa, staff_data sd, flagger_data fd, poster_data pd
+      WHERE sd.id = pa.id
+      and fd.id = pa.id
+      and pd.id = pa.id
       SQL
 
       DB.query(sql).each do |row|

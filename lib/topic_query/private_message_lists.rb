@@ -108,9 +108,10 @@ class TopicQuery
       result = result.includes(:tags) if SiteSetting.tagging_enabled
 
       if type == :group
-        result = result.joins(
-          "INNER JOIN topic_allowed_groups tag ON tag.topic_id = topics.id AND tag.group_id IN (SELECT id FROM groups WHERE LOWER(name) = '#{PG::Connection.escape_string(@options[:group_name].downcase)}')"
-        )
+        # TODO FIX
+        #result = result.joins(
+        #  "INNER JOIN topic_allowed_groups tag ON tag.topic_id = topics.id AND tag.group_id IN (SELECT id FROM `groups` WHERE LOWER(name) = '#{PG::Connection.escape_string(@options[:group_name].downcase)}')"
+        #)
 
         unless user.admin?
           result = result.joins("INNER JOIN group_users gu ON gu.group_id = tag.group_id AND gu.user_id = #{user.id.to_i}")
@@ -255,7 +256,7 @@ class TopicQuery
     def group
       @group ||= begin
         Group
-          .where('name ilike ?', @options[:group_name])
+          .where('name like ?', @options[:group_name])
           .select(:id, :publish_read_state)
           .first
       end

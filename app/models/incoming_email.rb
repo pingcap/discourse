@@ -13,8 +13,8 @@ class IncomingEmail < ActiveRecord::Base
   scope :addressed_to, -> (email) do
     where(<<~SQL, email: "%#{email}%")
       incoming_emails.from_address = :email OR
-      incoming_emails.to_addresses ILIKE :email OR
-      incoming_emails.cc_addresses ILIKE :email
+      incoming_emails.to_addresses LIKE :email OR
+      incoming_emails.cc_addresses LIKE :email
     SQL
   end
 
@@ -25,8 +25,8 @@ class IncomingEmail < ActiveRecord::Base
           FROM user_emails
           WHERE user_emails.user_id = :user_id AND
                 (incoming_emails.from_address = user_emails.email OR
-                 incoming_emails.to_addresses ILIKE '%' || user_emails.email || '%' OR
-                 incoming_emails.cc_addresses ILIKE '%' || user_emails.email || '%')
+                 incoming_emails.to_addresses LIKE '%' || user_emails.email || '%' OR
+                 incoming_emails.cc_addresses LIKE '%' || user_emails.email || '%')
       )
     SQL
   end

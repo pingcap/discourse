@@ -255,20 +255,20 @@ module BadgeQueries
       WITH consecutive_visits AS (
         SELECT user_id
              , visited_at
-             , visited_at - (DENSE_RANK() OVER (PARTITION BY user_id ORDER BY visited_at))::int s
+             , visited_at -  INTERVAL (DENSE_RANK() OVER (PARTITION BY user_id ORDER BY visited_at)) DAY s
           FROM user_visits
       ), visits AS (
         SELECT user_id
-             , MIN(visited_at) "start"
-             , DENSE_RANK() OVER (PARTITION BY user_id ORDER BY s) "rank"
+             , MIN(visited_at) `start`
+             , DENSE_RANK() OVER (PARTITION BY user_id ORDER BY s) `rank`
           FROM consecutive_visits
       GROUP BY user_id, s
         HAVING COUNT(*) >= #{days}
       )
       SELECT user_id
-           , "start" + interval '#{days} days' "granted_at"
+           , `start` + interval #{days} day "granted_at"
         FROM visits
-       WHERE "rank" = 1
+       WHERE `rank` = 1
     SQL
   end
 

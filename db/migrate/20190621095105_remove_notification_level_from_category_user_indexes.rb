@@ -2,8 +2,8 @@
 
 class RemoveNotificationLevelFromCategoryUserIndexes < ActiveRecord::Migration[5.2]
   def up
-    execute <<SQL
-DELETE FROM category_users cu USING category_users cu1
+    execute <<~SQL
+DELETE cu FROM category_users cu inner join  category_users cu1
   WHERE cu.user_id = cu1.user_id AND
         cu.category_id = cu1.category_id AND
         cu.notification_level < cu1.notification_level

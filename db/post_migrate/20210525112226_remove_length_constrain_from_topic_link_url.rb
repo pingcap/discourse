@@ -2,7 +2,7 @@
 
 class RemoveLengthConstrainFromTopicLinkUrl < ActiveRecord::Migration[6.1]
   def up
-    change_column :topic_links, :url, :string, null: false
+    #change_column :topic_links, :url, :string, null: false
   end
 
   def down

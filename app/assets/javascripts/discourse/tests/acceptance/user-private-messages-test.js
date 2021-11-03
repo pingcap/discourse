@@ -47,6 +47,22 @@ acceptance(
         "it does not display unread filter"
       );
     });
+
+    test("viewing messages of another user", async function (assert) {
+      updateCurrentUser({ id: 5, username: "charlie" });
+
+      await visit("/u/eviltrout/messages");
+
+      assert.ok(
+        !exists(".messages-nav li a.new"),
+        "it does not display new filter"
+      );
+
+      assert.ok(
+        !exists(".messages-nav li a.unread"),
+        "it does not display unread filter"
+      );
+    });
   }
 );
 

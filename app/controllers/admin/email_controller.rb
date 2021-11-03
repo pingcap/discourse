@@ -34,7 +34,7 @@ class Admin::EmailController < Admin::AdminController
           email_logs.where("post_reply_keys.reply_key = ?", reply_key)
         else
           email_logs.where(
-            "replace(post_reply_keys.reply_key::VARCHAR, '-', '') ILIKE ?",
+            "replace(cast(post_reply_keys.reply_key as char), '-', '') LIKE ?",
             "%#{reply_key}%"
           )
         end
@@ -54,7 +54,7 @@ class Admin::EmailController < Admin::AdminController
           "(post_id,user_id) IN (#{(['(?)'] * tuples.size).join(', ')})",
           *tuples
         )
-        .pluck(:post_id, :user_id, "reply_key::text")
+        .pluck(:post_id, :user_id, "cast(reply_key as char)")
         .each do |post_id, user_id, key|
           reply_keys[[post_id, user_id]] = key
         end
@@ -229,9 +229,9 @@ class Admin::EmailController < Admin::AdminController
       .offset(params[:offset] || 0)
       .limit(50)
 
-    logs = logs.where("users.username ILIKE ?", "%#{params[:user]}%") if params[:user].present?
-    logs = logs.where("#{table_name}.to_address ILIKE ?", "%#{params[:address]}%") if params[:address].present?
-    logs = logs.where("#{table_name}.email_type ILIKE ?", "%#{params[:type]}%") if params[:type].present?
+    logs = logs.where("users.username LIKE ?", "%#{params[:user]}%") if params[:user].present?
+    logs = logs.where("#{table_name}.to_address LIKE ?", "%#{params[:address]}%") if params[:address].present?
+    logs = logs.where("#{table_name}.email_type LIKE ?", "%#{params[:type]}%") if params[:type].present?
     logs
   end
 
@@ -241,10 +241,10 @@ class Admin::EmailController < Admin::AdminController
       .offset(params[:offset] || 0)
       .limit(50)
 
-    incoming_emails = incoming_emails.where("from_address ILIKE ?", "%#{params[:from]}%") if params[:from].present?
-    incoming_emails = incoming_emails.where("to_addresses ILIKE :to OR cc_addresses ILIKE :to", to: "%#{params[:to]}%") if params[:to].present?
-    incoming_emails = incoming_emails.where("subject ILIKE ?", "%#{params[:subject]}%") if params[:subject].present?
-    incoming_emails = incoming_emails.where("error ILIKE ?", "%#{params[:error]}%") if params[:error].present?
+    incoming_emails = incoming_emails.where("from_address LIKE ?", "%#{params[:from]}%") if params[:from].present?
+    incoming_emails = incoming_emails.where("to_addresses LIKE :to OR cc_addresses LIKE :to", to: "%#{params[:to]}%") if params[:to].present?
+    incoming_emails = incoming_emails.where("subject LIKE ?", "%#{params[:subject]}%") if params[:subject].present?
+    incoming_emails = incoming_emails.where("error LIKE ?", "%#{params[:error]}%") if params[:error].present?
 
     incoming_emails
   end

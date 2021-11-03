@@ -594,7 +594,7 @@ class TopicView
       columns = [:id]
 
       if !is_mega_topic?
-        columns << '(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP - posts.created_at) / 86400)::INT AS days_ago'
+        columns << 'CAST(datediff(CURRENT_TIMESTAMP, posts.created_at) AS UNSIGNED) AS days_ago'
       end
 
       posts.pluck(*columns)
@@ -689,7 +689,7 @@ class TopicView
         SELECT posts.sort_order
         FROM posts
         WHERE posts.topic_id = #{@topic.id.to_i}
-        ORDER BY @(post_number - #{post_number.to_i})
+        ORDER BY abs(post_number - #{post_number.to_i})
         LIMIT 1
       SQL
 

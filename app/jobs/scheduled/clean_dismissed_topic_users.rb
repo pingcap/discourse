@@ -13,8 +13,8 @@ module Jobs
 
     def delete_overdue_dismissals!
       sql = <<~SQL
-        DELETE FROM dismissed_topic_users dtu1
-        USING dismissed_topic_users dtu2
+        DELETE dtu1 FROM dismissed_topic_users dtu1
+        JOIN dismissed_topic_users dtu2 ON dtu2.id = dtu1.id
         JOIN topics ON topics.id = dtu2.topic_id
         JOIN users ON users.id = dtu2.user_id
         JOIN categories ON categories.id = topics.category_id
@@ -23,7 +23,7 @@ module Jobs
         WHERE topics.created_at < GREATEST(CASE
                     WHEN COALESCE(user_options.new_topic_duration_minutes, :default_duration) = :always THEN users.created_at
                     WHEN COALESCE(user_options.new_topic_duration_minutes, :default_duration) = :last_visit THEN COALESCE(users.previous_visit_at,users.created_at)
-                    ELSE (:now::timestamp - INTERVAL '1 MINUTE' * COALESCE(user_options.new_topic_duration_minutes, :default_duration))
+                    ELSE (:now - INTERVAL 1 * COALESCE(user_options.new_topic_duration_minutes, :default_duration) MINUTE)
                  END, users.created_at, :min_date)
         AND dtu1.id = dtu2.id
       SQL

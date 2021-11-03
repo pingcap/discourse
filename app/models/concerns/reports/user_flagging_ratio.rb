@@ -45,15 +45,15 @@ module Reports::UserFlaggingRatio
 
       statuses = ReviewableScore.statuses
 
-      agreed = "SUM(CASE WHEN rs.status = #{statuses[:agreed]} THEN 1 ELSE 0 END)::numeric"
-      disagreed = "SUM(CASE WHEN rs.status = #{statuses[:disagreed]} THEN 1 ELSE 0 END)::numeric"
-      ignored = "SUM(CASE WHEN rs.status = #{statuses[:ignored]} THEN 1 ELSE 0 END)::numeric"
+      agreed = "SUM(CASE WHEN rs.status = #{statuses[:agreed]} THEN 1 ELSE 0 END)"
+      disagreed = "SUM(CASE WHEN rs.status = #{statuses[:disagreed]} THEN 1 ELSE 0 END)"
+      ignored = "SUM(CASE WHEN rs.status = #{statuses[:ignored]} THEN 1 ELSE 0 END)"
 
       sql = <<~SQL
         SELECT u.id,
                u.username,
                u.uploaded_avatar_id as avatar_id,
-               CASE WHEN u.silenced_till IS NOT NULL THEN 't' ELSE 'f' END as silenced,
+               CASE WHEN u.silenced_till IS NOT NULL THEN true ELSE false END as silenced,
                #{disagreed} AS disagreed_flags,
                #{agreed} AS agreed_flags,
                #{ignored} AS ignored_flags,

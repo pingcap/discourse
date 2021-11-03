@@ -54,9 +54,8 @@ def create_bookmarks(bookmarks_to_create)
   #
   DB.exec(
     <<~SQL
-      INSERT INTO bookmarks (post_id, user_id, created_at, updated_at)
+      INSERT IGNORE INTO bookmarks (post_id, user_id, created_at, updated_at)
       VALUES #{bookmarks_to_create.join(",\n")}
-      ON CONFLICT DO NOTHING
     SQL
   )
 end

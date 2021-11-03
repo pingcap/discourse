@@ -22,9 +22,9 @@ class PostRevision < ActiveRecord::Base
     DB.exec <<-SQL
       UPDATE posts
          SET version = 1 + (SELECT COUNT(*) FROM post_revisions WHERE post_id = posts.id),
-             public_version = 1 + (SELECT COUNT(*) FROM post_revisions pr WHERE post_id = posts.id AND pr.hidden = 'f')
+             public_version = 1 + (SELECT COUNT(*) FROM post_revisions pr WHERE post_id = posts.id AND pr.hidden = false)
        WHERE version <> 1 + (SELECT COUNT(*) FROM post_revisions WHERE post_id = posts.id)
-          OR public_version <> 1 + (SELECT COUNT(*) FROM post_revisions pr WHERE post_id = posts.id AND pr.hidden = 'f')
+          OR public_version <> 1 + (SELECT COUNT(*) FROM post_revisions pr WHERE post_id = posts.id AND pr.hidden = false)
     SQL
   end
 

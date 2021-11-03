@@ -9,8 +9,8 @@ class UpdateInvitesRedemptionCount < ActiveRecord::Migration[6.0]
         GROUP BY invite_id
       )
       UPDATE invites
+      INNER JOIN invite_counts ON invites.id = invite_counts.invite_id
       SET redemption_count = GREATEST(redemption_count, count)
-      FROM invite_counts
       WHERE invites.id = invite_counts.invite_id
     SQL
   end

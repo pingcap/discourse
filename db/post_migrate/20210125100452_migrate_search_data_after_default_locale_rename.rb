@@ -31,7 +31,8 @@ class MigrateSearchDataAfterDefaultLocaleRename < ActiveRecord::Migration[6.0]
     SQL
 
     loop do
-      count = execute(sql).cmd_tuples
+      result  = execute(sql)
+      count = result&.size || 0
       break if count == 0
       puts "Migrated #{count} rows of #{table} to new locale."
     end

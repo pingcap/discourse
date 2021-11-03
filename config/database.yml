@@ -1,11 +1,19 @@
 development:
   prepared_statements: false
-  adapter: postgresql
+  adapter: tidb
   database: <%= ENV['DISCOURSE_DEV_DB'] || 'discourse_development' %>
   min_messages: warning
   pool: 5
   timeout: 5000
+  username: <%= ENV['DISCOURSE_DEV_USER'] || 'root' %>
+  port: <%= ENV['DISCOURSE_DEV_PORT'] || '4000' %>
+  password: <%= ENV['DISCOURSE_DEV_PASSWORD'] || '' %>
+  host: <%= ENV['DISCOURSE_DEV_HOST'] || '127.0.0.1' %>
   checkout_timeout: <%= ENV['CHECKOUT_TIMEOUT'] || 5 %>
+  encoding: utf8mb4
+  collation: utf8mb4_unicode_ci
+  variables:
+    tidb_enable_noop_functions: ON
   advisory_locks: false # Disable until https://github.com/rails/rails/issues/40029 has been resolved.
   host_names:
     ### Don't include the port number here. Change the "port" site setting instead, at /admin/site_settings.
@@ -35,11 +43,19 @@ development:
 
 test:
   prepared_statements: false
-  adapter: postgresql
+  adapter: tidb
   database: <%= test_db %>
   min_messages: warning
   pool: 5
   timeout: 5000
+  username: <%= ENV['DISCOURSE_DEV_USER'] || 'root' %>
+  port: <%= ENV['DISCOURSE_DEV_PORT'] || '4000' %>
+  password: <%= ENV['DISCOURSE_DEV_PASSWORD'] || '' %>
+  host: <%= ENV['DISCOURSE_DEV_HOST'] || '127.0.0.1' %>
+  encoding: utf8mb4
+  collation: utf8mb4_unicode_ci
+  variables:
+    tidb_enable_noop_functions: ON
   advisory_locks: false # Disable until https://github.com/rails/rails/issues/40029 has been resolved.
   host_names:
     - test.localhost
@@ -47,11 +63,15 @@ test:
 # profile db is used for benchmarking using the script/bench.rb script
 profile:
   prepared_statements: false
-  adapter: postgresql
+  adapter: tidb
   database: discourse_profile
   min_messages: warning
   pool: 5
   timeout: 5000
+  encoding: utf8mb4
+  collation: utf8mb4_unicode_ci
+  variables:
+    tidb_enable_noop_functions: ON
   host_names:
     - "localhost"
 # You may be surprised production is not here, it is sourced from application.rb using a monkey patch
