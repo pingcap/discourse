@@ -12,7 +12,7 @@ module Jobs
         SET bookmarked = true
         WHERE NOT topic_users.bookmarked AND
           posts.deleted_at IS NULL AND
-          topic_users.topic_id = b.topic_id AND
+          topic_users.topic_id = posts.topic_id AND
           topic_users.user_id = b.user_id #{topic_id.present? ? "AND topic_users.topic_id = :topic_id" : ""}
       SQL
 
@@ -23,7 +23,7 @@ module Jobs
             SELECT COUNT(*)
             FROM bookmarks
             INNER JOIN posts ON posts.id = bookmarks.post_id
-            WHERE bookmarks.topic_id = topic_users.topic_id
+            WHERE posts.topic_id = topic_users.topic_id
             AND bookmarks.user_id = topic_users.user_id
             AND posts.deleted_at IS NULL
         ) = 0 #{topic_id.present? ? "AND topic_users.topic_id = :topic_id" : ""}

@@ -249,10 +249,10 @@ const Post = RestModel.extend({
     }
   },
 
-  destroy(deletedBy) {
+  destroy(deletedBy, opts) {
     return this.setDeletedState(deletedBy).then(() => {
       return ajax("/posts/" + this.id, {
-        data: { context: window.location.pathname },
+        data: { context: window.location.pathname, ...opts },
         type: "DELETE",
       });
     });
@@ -308,13 +308,17 @@ const Post = RestModel.extend({
     this.setProperties({
       "topic.bookmarked": true,
       bookmarked: true,
-      bookmark_reminder_at: data.reminderAt,
-      bookmark_reminder_type: data.reminderType,
-      bookmark_auto_delete_preference: data.autoDeletePreference,
+      bookmark_reminder_at: data.reminder_at,
+      bookmark_auto_delete_preference: data.auto_delete_preference,
       bookmark_name: data.name,
       bookmark_id: data.id,
     });
     this.topic.incrementProperty("bookmarksWereChanged");
+    this.appEvents.trigger("bookmarks:changed", data, {
+      target: "post",
+      targetId: this.id,
+    });
+    // TODO (martin) (2022-02-01) Remove these old bookmark events, replaced by bookmarks:changed.
     this.appEvents.trigger("page:bookmark-post-toggled", this);
     this.appEvents.trigger("post-stream:refresh", { id: this.id });
   },
@@ -322,20 +326,23 @@ const Post = RestModel.extend({
   deleteBookmark(bookmarked) {
     this.set("topic.bookmarked", bookmarked);
     this.clearBookmark();
-    this.topic.incrementProperty("bookmarksWereChanged");
-    this.appEvents.trigger("page:bookmark-post-toggled", this);
   },
 
   clearBookmark() {
     this.setProperties({
       bookmark_reminder_at: null,
-      bookmark_reminder_type: null,
       bookmark_name: null,
       bookmark_id: null,
       bookmarked: false,
       bookmark_auto_delete_preference: null,
     });
     this.topic.incrementProperty("bookmarksWereChanged");
+    this.appEvents.trigger("bookmarks:changed", null, {
+      target: "post",
+      targetId: this.id,
+    });
+    // TODO (martin) (2022-02-01) Remove these old bookmark events, replaced by bookmarks:changed.
+    this.appEvents.trigger("page:bookmark-post-toggled", this);
   },
 
   updateActionsSummary(json) {

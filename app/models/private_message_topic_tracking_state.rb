@@ -21,7 +21,6 @@ class PrivateMessageTopicTrackingState
   NEW_MESSAGE_TYPE = "new_topic"
   UNREAD_MESSAGE_TYPE = "unread"
   READ_MESSAGE_TYPE = "read"
-  ARCHIVE_MESSAGE_TYPE = "archive"
   GROUP_ARCHIVE_MESSAGE_TYPE = "group_archive"
 
   def self.report(user)
@@ -100,13 +99,14 @@ class PrivateMessageTopicTrackingState
   end
 
   def self.publish_unread(post)
-    return unless post.topic.private_message?
+    topic = post.topic
+    return unless topic.private_message?
 
     scope = TopicUser
       .tracking(post.topic_id)
-      .includes(user: :user_stat)
+      .includes(user: [:user_stat, :user_option])
 
-    allowed_group_ids = post.topic.allowed_groups.pluck(:id)
+    allowed_group_ids = topic.allowed_groups.pluck(:id)
 
     group_ids =
       if post.post_type == Post.types[:whisper]
@@ -124,6 +124,12 @@ class PrivateMessageTopicTrackingState
     scope
       .select([:user_id, :last_read_post_number, :notification_level])
       .each do |tu|
+
+      if tu.last_read_post_number.nil? &&
+          topic.created_at < tu.user.user_option.treat_as_new_topic_start_date
+
+        next
+      end
 
       message = {
         topic_id: post.topic_id,
@@ -164,29 +170,23 @@ class PrivateMessageTopicTrackingState
     end
   end
 
-  def self.publish_group_archived(topic, group_id)
+  def self.publish_group_archived(topic:, group_id:, acting_user_id: nil)
     return unless topic.private_message?
 
     message = {
       message_type: GROUP_ARCHIVE_MESSAGE_TYPE,
       topic_id: topic.id,
       payload: {
-        group_ids: [group_id]
+        group_ids: [group_id],
+        acting_user_id: acting_user_id
       }
     }.as_json
 
-    MessageBus.publish(self.group_channel(group_id), message, group_ids: [group_id])
-  end
-
-  def self.publish_user_archived(topic, user_id)
-    return unless topic.private_message?
-
-    message = {
-      message_type: ARCHIVE_MESSAGE_TYPE,
-      topic_id: topic.id,
-    }.as_json
-
-    MessageBus.publish(self.user_channel(user_id), message, user_ids: [user_id])
+    MessageBus.publish(
+      self.group_channel(group_id),
+      message,
+      group_ids: [group_id]
+    )
   end
 
   def self.publish_read(topic_id, last_read_post_number, user, notification_level = nil)

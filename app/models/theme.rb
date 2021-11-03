@@ -183,6 +183,18 @@ class Theme < ActiveRecord::Base
     end
   end
 
+  def self.allowed_remote_theme_ids
+    return nil if GlobalSetting.allowed_theme_repos.blank?
+
+    get_set_cache "allowed_remote_theme_ids" do
+      urls = GlobalSetting.allowed_theme_repos.split(",").map(&:strip)
+      Theme
+        .joins(:remote_theme)
+        .where('remote_themes.remote_url in (?)', urls)
+        .pluck(:id)
+    end
+  end
+
   def self.components_for(theme_id)
     get_set_cache "theme_components_for_#{theme_id}" do
       ChildTheme.where(parent_theme_id: theme_id).pluck(:child_theme_id)
@@ -679,10 +691,10 @@ class Theme < ActiveRecord::Base
     keys = schema["items"]["properties"].keys
     return if !keys
 
-    current_values = CSV.parse(setting_row.value, { col_sep: '|' }).flatten
+    current_values = CSV.parse(setting_row.value, **{ col_sep: '|' }).flatten
     new_values = []
     current_values.each do |item|
-      parts = CSV.parse(item, { col_sep: ',' }).flatten
+      parts = CSV.parse(item, **{ col_sep: ',' }).flatten
       props = parts.map.with_index { |p, idx| [keys[idx], p] }.to_h
       new_values << props
     end

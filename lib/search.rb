@@ -33,7 +33,7 @@ class Search
   end
 
   def self.facets
-    %w(topic category user private_messages tags all_topics)
+    %w(topic category user private_messages tags all_topics exclude_topics)
   end
 
   def self.ts_config(locale = SiteSetting.default_locale)
@@ -69,19 +69,17 @@ class Search
       SiteSetting.search_tokenize_chinese_japanese_korean
   end
 
-  def self.prepare_data(search_data, purpose = :query)
-    purpose ||= :query
-
+  def self.prepare_data(search_data, purpose = nil)
     data = search_data.dup
     data.force_encoding("UTF-8")
+
     if purpose != :topic
       # TODO cppjieba_rb is designed for chinese, we need something else for Japanese
       # Korean appears to be safe cause words are already space separated
       # For Japanese we should investigate using kakasi
       if segment_cjk?
         require 'cppjieba_rb' unless defined? CppjiebaRb
-        mode = (purpose == :query ? :query : :mix)
-        data = CppjiebaRb.segment(search_data, mode: mode)
+        data = CppjiebaRb.segment(search_data, mode: :mix)
 
         # TODO: we still want to tokenize here but the current stopword list is too wide
         # in cppjieba leading to words such as volume to be skipped. PG already has an English
@@ -93,7 +91,6 @@ class Search
         end
 
         data = data.join(' ')
-
       else
         data.squish!
       end
@@ -230,7 +227,7 @@ class Search
   end
 
   def limit
-    if @opts[:type_filter].present?
+    if @opts[:type_filter].present? && @opts[:type_filter] != "exclude_topics"
       Search.per_filter + 1
     else
       Search.per_facet + 1
@@ -863,13 +860,12 @@ class Search
     groups = Group
       .visible_groups(@guardian.user, "name ASC", include_everyone: false)
       .where("name LIKE :term OR full_name LIKE :term", term: "%#{@term}%")
-
+      .limit(limit)
     groups.each { |group| @results.add(group) }
   end
 
   def tags_search
     return unless SiteSetting.tagging_enabled
-
     tags = Tag.includes(:tag_search_data)
       .where(Search.like_query(term: term, field: "tag_search_data.search_data"))
       .references(:tag_search_data)
@@ -883,17 +879,29 @@ class Search
     end
   end
 
+  def exclude_topics_search
+    if @term.present?
+      user_search
+      category_search
+      tags_search
+      groups_search
+    end
+  end
+
   PHRASE_MATCH_REGEXP_PATTERN = '"([^"]+)"'
 
   def posts_query(limit, type_filter: nil, aggregate_search: false)
     posts = Post.where(post_type: Topic.visible_post_types(@guardian.user))
       .joins(:post_search_data, :topic)
-      .joins("LEFT JOIN categories ON categories.id = topics.category_id")
+
+    if type_filter != "private_messages"
+      posts = posts.joins("LEFT JOIN categories ON categories.id = topics.category_id")
+    end
 
     is_topic_search = @search_context.present? && @search_context.is_a?(Topic)
     posts = posts.where("topics.visible") unless is_topic_search
 
-    if type_filter === "private_messages" || (is_topic_search && @search_context.private_message?)
+    if type_filter == "private_messages" || (is_topic_search && @search_context.private_message?)
       posts = posts
         .where(
           "topics.archetype = ? AND post_search_data.private_message",
@@ -903,7 +911,7 @@ class Search
       unless @guardian.is_admin?
         posts = posts.private_posts_for_user(@guardian.user)
       end
-    elsif type_filter === "all_topics"
+    elsif type_filter == "all_topics"
       private_posts = posts
         .where(
           "topics.archetype = ? AND post_search_data.private_message",
@@ -966,7 +974,7 @@ class Search
     posts =
       if @search_context.present?
         if @search_context.is_a?(User)
-          if type_filter === "private_messages"
+          if type_filter == "private_messages"
             if @guardian.is_admin? && !@search_all_pms
               posts.private_posts_for_user(@search_context)
             else
@@ -982,7 +990,7 @@ class Search
             .push(@search_context.id)
 
           posts.where("topics.category_id in (?)", category_ids)
-        elsif @search_context.is_a?(Topic)
+        elsif is_topic_search
           posts.where("topics.id = #{@search_context.id}")
             .order("posts.post_number #{@order == :latest ? "DESC" : ""}")
         elsif @search_context.is_a?(Tag)
@@ -1024,12 +1032,14 @@ class Search
       posts = posts.order("topics.bumped_at DESC")
     end
 
-    posts =
-      if secure_category_ids.present?
-        posts.where("(categories.id IS NULL) OR (NOT categories.read_restricted) OR (categories.id IN (?))", secure_category_ids).references(:categories)
-      else
-        posts.where("(categories.id IS NULL) OR (NOT categories.read_restricted)").references(:categories)
-      end
+    if type_filter != "private_messages"
+      posts =
+        if secure_category_ids.present?
+          posts.where("(categories.id IS NULL) OR (NOT categories.read_restricted) OR (categories.id IN (?))", secure_category_ids).references(:categories)
+        else
+          posts.where("(categories.id IS NULL) OR (NOT categories.read_restricted)").references(:categories)
+        end
+    end
 
     if @order
       advanced_order = Search.advanced_orders&.fetch(@order, nil)
