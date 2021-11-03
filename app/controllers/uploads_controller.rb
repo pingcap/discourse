@@ -198,7 +198,7 @@ class UploadsController < ApplicationController
     if params[:inline]
       opts[:disposition] = "inline"
     elsif !FileHelper.is_supported_image?(upload.original_filename)
-      opts[:disposition] = "attachment"
+      opts[:disposition] = "attachment;filename*=utf-8''#{upload.original_filename}"
     end
 
     file_path = Discourse.store.path_for(upload)
