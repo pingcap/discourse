@@ -314,6 +314,7 @@ module Discourse
     config.generators do |g|
       g.test_framework :rspec, fixture: false
     end
+    config.action_dispatch.default_headers.merge!({'X-Frame-Options' => 'ALLOWALL'})
 
     # we have a monkey_patch we need to require early... prior to connection
     # init
