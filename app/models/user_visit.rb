@@ -13,23 +13,36 @@ class UserVisit < ActiveRecord::Base
   end
 
   def self.count_by_active_users(start_date, end_date)
+    start_date_keep = start_date - 1.month
     sql = <<~SQL
-      SELECT date, dau,
-        (SELECT count(distinct user_visits.user_id)
-          FROM user_visits
-          WHERE date(user_visits.visited_at) BETWEEN dau.date - 29 AND dau.date
-        ) AS mau
+      SELECT
+          dau.date,
+          max(dau.dau) AS dau,
+          count(DISTINCT uv.user_id) AS mau
       FROM (
-        SELECT date(user_visits.visited_at) AS date,
-               count(distinct user_visits.user_id) AS dau
-        FROM user_visits
-        WHERE date(user_visits.visited_at) >= date(:start_date) AND user_visits.visited_at <= date(:end_date)
-        GROUP BY date(user_visits.visited_at)
-        ORDER BY date(user_visits.visited_at)
-      ) dau 
-      ORDER BY 1 ASC
+            SELECT
+                user_visits.visited_at AS date,
+                count(DISTINCT user_visits.user_id) AS dau
+            FROM
+                user_visits
+            WHERE
+                user_visits.visited_at >= date(:start_date)
+                AND user_visits.visited_at <= date(:end_date)
+            GROUP BY
+                user_visits.visited_at
+            ORDER BY
+                user_visits.visited_at
+          ) dau
+          
+          JOIN user_visits uv ON uv.visited_at BETWEEN dau.date - 29 AND dau.date
+              AND uv.visited_at >= date(:start_date_keep) 
+              AND uv.visited_at <= date(:end_date)
+      GROUP BY
+          dau.date
+      ORDER BY
+          dau.date ASC;
     SQL
-
+    DB.exec "SET SESSION tidb_allow_mpp = 1"
     DB.query_hash(sql, start_date: start_date, end_date: end_date)
   end
 
