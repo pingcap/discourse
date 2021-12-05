@@ -43,7 +43,7 @@ class UserVisit < ActiveRecord::Base
           dau.date ASC;
     SQL
     DB.exec "SET SESSION tidb_allow_mpp = 1"
-    DB.query_hash(sql, start_date: start_date, end_date: end_date)
+    DB.query_hash(sql, start_date: start_date, end_date: end_date, start_date_keep: start_date_keep)
   end
 
   # A count of visits in a date range by day
