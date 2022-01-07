@@ -24,7 +24,7 @@ class NotificationsController < ApplicationController
       limit = (params[:limit] || 15).to_i
       limit = 50 if limit > 50
 
-      notifications = Notification.recent_report(current_user, limit)
+      notifications = Notification.recent_report(current_user, limit, params[:type])
       changed = false
 
       if notifications.present?
@@ -44,6 +44,8 @@ class NotificationsController < ApplicationController
         .visible
         .includes(:topic)
         .order(created_at: :desc)
+
+      notifications = notifications.where(notification_type: Notification.types[params[:type].to_sym]) if params[:type].present?
 
       total_rows = notifications.dup.count
       notifications = notifications.offset(offset).limit(60)

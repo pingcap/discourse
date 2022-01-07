@@ -144,7 +144,7 @@ class Notification < ActiveRecord::Base
     Post.find_by(topic_id: topic_id, post_number: post_number)
   end
 
-  def self.recent_report(user, count = nil)
+  def self.recent_report(user, count = nil, type = nil)
     return unless user && user.user_option
 
     count ||= 10
@@ -152,6 +152,8 @@ class Notification < ActiveRecord::Base
       .visible
       .recent(count)
       .includes(:topic)
+
+    notifications = notifications.where(notification_type: Notification.types[type.to_sym]) if type.present?
 
     if user.user_option.like_notification_frequency == UserOption.like_notification_frequency_type[:never]
       [
