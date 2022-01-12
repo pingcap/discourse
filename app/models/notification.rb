@@ -3,7 +3,7 @@
 require_dependency 'enum'
 require_dependency 'notification_emailer'
 
-class Notification < ActiveRecord::Base
+class  Notification < ActiveRecord::Base
   belongs_to :user
   belongs_to :topic
 
@@ -144,7 +144,7 @@ class Notification < ActiveRecord::Base
     Post.find_by(topic_id: topic_id, post_number: post_number)
   end
 
-  def self.recent_report(user, count = nil, type = nil)
+  def self.recent_report(user, count = nil, type = nil, is_unread = false)
     return unless user && user.user_option
 
     count ||= 10
@@ -152,6 +152,8 @@ class Notification < ActiveRecord::Base
       .visible
       .recent(count)
       .includes(:topic)
+      
+    notifications = notifications.unread if is_unread
 
     notifications = notifications.where(notification_type: Notification.types[type.to_sym]) if type.present?
 
