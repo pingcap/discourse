@@ -4,7 +4,7 @@ class UserActionsController < ApplicationController
 
   def index
     params.require(:username)
-    params.permit(:filter, :offset, :acting_username)
+    params.permit(:filter, :offset, :acting_username, :unsolved)
 
     per_chunk = 30
 
@@ -17,6 +17,7 @@ class UserActionsController < ApplicationController
       user_id: user.id,
       user: user,
       offset: params[:offset].to_i,
+      unsolved: params[:unsolved].present?,
       limit: per_chunk,
       action_types: action_types,
       guardian: guardian,

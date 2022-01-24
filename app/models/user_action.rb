@@ -164,6 +164,7 @@ class UserAction < ActiveRecord::Base
     offset = opts[:offset] || 0
     limit = opts[:limit] || 60
     acting_username = opts[:acting_username]
+    unsolved = opts[:unsolved]
 
     # Acting user columns. Can be extended by plugins to include custom avatar
     # columns
@@ -212,7 +213,8 @@ class UserAction < ActiveRecord::Base
       /*limit*/
       /*offset*/
     SQL
-
+    
+    builder.where("a.target_post_id not in (select cast(value as unsigned) from topic_custom_fields where name = 'accepted_answer_post_id' and value is not null)") if unsolved
     apply_common_filters(builder, user_id, guardian, ignore_private_messages)
 
     if action_id
