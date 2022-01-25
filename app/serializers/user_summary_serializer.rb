@@ -67,7 +67,7 @@ class UserSummarySerializer < ApplicationSerializer
   end
 
   def include_bookmark_count?
-    scope.authenticated? && object.user_id == scope.user.id
+    true
   end
 
   def time_read
