@@ -155,7 +155,7 @@ class  Notification < ActiveRecord::Base
       
     notifications = notifications.unread if is_unread
 
-    notifications = notifications.where(notification_type: Notification.types.values_at(*Array[type].map{|x| x.to_sym})) if type.present?
+    notifications = notifications.where(notification_type: Notification.types.values_at(*Array(type).map{|x| x.to_sym})) if type.present?
 
     if user.user_option.like_notification_frequency == UserOption.like_notification_frequency_type[:never]
       [

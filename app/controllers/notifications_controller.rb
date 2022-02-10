@@ -45,7 +45,7 @@ class NotificationsController < ApplicationController
         .includes(:topic)
         .order(created_at: :desc)
       notifications = notifications.unread if params[:unread] == '1'
-      notifications = notifications.where(notification_type: Notification.types.values_at(*Array[params[:type]].map{|x| x.to_sym})) if params[:type].present?
+      notifications = notifications.where(notification_type: Notification.types.values_at(*Array(params[:type]).map{|x| x.to_sym})) if params[:type].present?
 
       total_rows = notifications.dup.count
       notifications = notifications.offset(offset).limit(60)
