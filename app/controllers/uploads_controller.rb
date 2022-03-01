@@ -5,7 +5,7 @@ require_dependency 'upload_creator'
 require_dependency "file_store/local_store"
 
 class UploadsController < ApplicationController
-  requires_login except: [:show, :show_short]
+  requires_login except: [:show]
 
   skip_before_action :preload_json, :check_xhr, :redirect_to_login_if_required, only: [:show, :show_short]
 
