@@ -95,7 +95,7 @@ class UploadsController < ApplicationController
     return xhr_not_allowed if request.xhr?
 
     if SiteSetting.prevent_anons_from_downloading_files && current_user.nil?
-      return render_404
+      return redirect_to(path('/login'))
     end
 
     sha1 = Upload.sha1_from_base62_encoded(params[:base62])
