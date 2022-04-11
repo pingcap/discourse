@@ -6,7 +6,7 @@ module Jobs
     daily at: 2.hours
 
     def execute(args)
-      Topic.where(archetype: :regular).where(created_at: 3.days.ago..1.days.ago).where("posts_count > 1").each do |topic|
+      Topic.where(archetype: :regular).where(created_at: 8.days.ago..3.days.ago).where("posts_count > 1").each do |topic|
         next if topic.custom_fields["accepted_answer_post_id"].present?
         next if not category_can_push?(topic)
         next if not post_can_push?(topic)
@@ -23,7 +23,7 @@ module Jobs
           )
         end
 
-        if current_reminder_count == 1
+        if current_reminder_count == 1 && topic.created_at <= 7.days.ago
           topic.custom_fields["helper_reminder"] = 2
           topic.save_custom_fields
           SystemMessage.create_from_system_user(
