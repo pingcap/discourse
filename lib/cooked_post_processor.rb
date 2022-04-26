@@ -321,13 +321,11 @@ class CookedPostProcessor
     upload = Upload.get_from_url(src)
 
     if original_width <= width && original_height <= height
-      Rails.logger.warn "#{original_width} #{original_height} #{width} #{height} #{src}"
-       add_lightbox!(img, original_width, original_height, upload, cropped: crop) if upload
+      add_lightbox!(img, original_width, original_height, upload, cropped: crop) if upload
       return
     end
 
     if original_width <= SiteSetting.max_image_width && original_height <= SiteSetting.max_image_height
-      Rails.logger.warn Rails.logger.warn "#{original_width} #{original_height} #{width} #{height} #{src}"
       add_lightbox!(img, original_width, original_height, upload, cropped: crop) if upload
       return
     end
