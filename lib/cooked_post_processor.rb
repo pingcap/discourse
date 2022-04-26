@@ -318,8 +318,19 @@ class CookedPostProcessor
       return
     end
 
-    return if original_width <= width && original_height <= height
-    return if original_width <= SiteSetting.max_image_width && original_height <= SiteSetting.max_image_height
+    upload = Upload.get_from_url(src)
+
+    if original_width <= width && original_height <= height
+      Rails.logger.warn "#{original_width} #{original_height} #{width} #{height} #{src}"
+       add_lightbox!(img, original_width, original_height, upload, cropped: crop) if upload
+      return
+    end
+
+    if original_width <= SiteSetting.max_image_width && original_height <= SiteSetting.max_image_height
+      Rails.logger.warn Rails.logger.warn "#{original_width} #{original_height} #{width} #{height} #{src}"
+      add_lightbox!(img, original_width, original_height, upload, cropped: crop) if upload
+      return
+    end
 
     crop   = SiteSetting.min_ratio_to_crop > 0
     crop &&= original_width.to_f / original_height.to_f < SiteSetting.min_ratio_to_crop
@@ -330,7 +341,7 @@ class CookedPostProcessor
       img["height"] = height
     end
 
-    if upload = Upload.get_from_url(src)
+    if upload
       upload.create_thumbnail!(width, height, crop: crop)
 
       each_responsive_ratio do |ratio|
