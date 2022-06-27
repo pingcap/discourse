@@ -5,9 +5,6 @@
     {{#if topic.unseen}}
       <span class="badge-notification new-topic"></span>
     {{/if}}
-    {{#if topic.is_enhancement}}
-      <span class="tc-topic-badge tc-topic-badge-red">已加急</span>
-    {{/if}}
     <span class="{{cold-age-class topic.last_posted_at}}" title='{{raw-date topic.last_posted_at}}'>{{{format-age topic.last_posted_at}}}</span>
   </div>
 </td>
