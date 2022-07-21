@@ -480,7 +480,7 @@ SQL
         GROUP BY p.topic_id
       ) as Y on Y.topic_id = X.topic_id
       SET
-          last_read_post_number = LEAST(GREATEST(coalesce(last_read, 0), coalesce(last_read_post_number, 0)), coalesce(max_post_number, 0))
+          last_read_post_number = LEAST(GREATEST(coalesce(last_read, 0), coalesce(last_read_post_number, 0)), coalesce(max_post_number, 0)),
           highest_seen_post_number = LEAST(coalesce(max_post_number, 0), GREATEST(coalesce(t.highest_seen_post_number, 0), coalesce(last_read, 0)))
 
       /*where*/
