@@ -319,6 +319,8 @@ class CookedPostProcessor
     end
 
     upload = Upload.get_from_url(src)
+    crop   = SiteSetting.min_ratio_to_crop > 0
+    crop &&= original_width.to_f / original_height.to_f < SiteSetting.min_ratio_to_crop
 
     if original_width <= width && original_height <= height
       add_lightbox!(img, original_width, original_height, upload, cropped: crop) if upload
@@ -329,9 +331,6 @@ class CookedPostProcessor
       add_lightbox!(img, original_width, original_height, upload, cropped: crop) if upload
       return
     end
-
-    crop   = SiteSetting.min_ratio_to_crop > 0
-    crop &&= original_width.to_f / original_height.to_f < SiteSetting.min_ratio_to_crop
 
     if crop
       width, height = ImageSizer.crop(original_width, original_height)
